@@ -15,7 +15,6 @@ interface StorageAdapter {
   getActiveMonth(): Promise<any | null>;
   getClosedMonths(): Promise<any[]>;
   getGlobalConfig(): Promise<any>;
-  updateGlobalConfig(config: any): Promise<void>;
 }
 
 export interface InventoryItem {
@@ -470,20 +469,6 @@ async getEgresosByMonth(id: string) {
     return data;
   }
 
-async updateGlobalConfig(config: GlobalConfig) {
-  const { data, error } = await supabase
-    .from("configuraciones_globales")
-    .upsert(
-      {
-        id: 1, // la fila global siempre tendrá id = 1
-        ...config,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: ["id"] } // actualiza si ya existe
-    );
-
-  if (error) throw new Error(`Supabase updateGlobalConfig error: ${error.message}`);
-}
 
 
  // Inventory methods

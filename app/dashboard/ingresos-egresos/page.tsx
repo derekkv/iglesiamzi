@@ -146,8 +146,8 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
 
     try {
       // Obtener ingresos y egresos desde Supabase
-      let ingresos = [];
-      let egresos = [];
+      let ingresos: FinancialRecord[] = [];
+      let egresos: FinancialRecord[] = [];
 
       try {
         ingresos = await storage.getIngresosByMonth(currentMonth.id);
@@ -188,20 +188,20 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
         })) || [];
 
       const allRecords: FinancialRecord[] = [
-  ...incomeRecords,
-  ...expenseRecords
-];
+          ...incomeRecords,
+          ...expenseRecords
+            ];
 
-// Ordenar por fecha ascendente
-allRecords.sort((a, b) => {
-  return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
-});
+          // Ordenar por fecha ascendente
+          allRecords.sort((a, b) => {
+            return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+          });
 
-setRecords(allRecords);
-    } catch (error) {
-      console.error("Error loading financial records:", error);
-      setError("Error al cargar los registros financieros");
-    }
+      setRecords(allRecords);
+          } catch (error) {
+            console.error("Error loading financial records:", error);
+            setError("Error al cargar los registros financieros");
+          }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

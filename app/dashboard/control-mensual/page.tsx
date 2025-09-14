@@ -30,13 +30,13 @@ export default function ControlMensualPage() {
 
   const handleStartNewMonth = () => {
     if (selectedDate && monthName.trim()) {
-      startNewMonth(monthName.trim(), selectedDate)
+      startNewMonth()
     }
   }
 
   const handleCloseMonth = () => {
     if (selectedDate) {
-      closeCurrentMonth(selectedDate)
+      closeCurrentMonth()
     }
   }
 

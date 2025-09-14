@@ -53,6 +53,7 @@ export default function DiezmosPage() {
       try {
         setLoading(true)
         // buscar mes activo
+      if (!currentMonth) return
 
         setActiveMonth(currentMonth)
 

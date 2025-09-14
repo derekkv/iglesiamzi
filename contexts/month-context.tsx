@@ -9,7 +9,7 @@ interface MonthData {
   year: number
   month: number
   start_date: string
-  endDate?: string
+  end_date?: string
   status: "active" | "closed"
   data: {
     ingresos: any[]
@@ -147,7 +147,7 @@ export function MonthProvider({ children }: { children: ReactNode }) {
             attendance: {},
           },
           // Preservar configuraciones del mes anterior
-          configuraciones: { ...currentMonth.data.configuraciones },
+          configuraciones: { ...(currentMonth.data.configuraciones || {}) },
         },
       }
 

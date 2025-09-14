@@ -76,6 +76,7 @@ export default function DiscipuladoPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        if (!currentMonth) return
         const mesId = currentMonth?.id
         const discipuladoData = await discipuladoService.getDiscipuladoData(mesId)
         setData(discipuladoData)
