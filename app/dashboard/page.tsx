@@ -115,6 +115,14 @@ export default function DashboardPage() {
       href: "/dashboard/inventario",
       available: true,
       requiresActiveMonth: false,
+    },  
+    {
+      title: "Censo",
+      description: "Gestión de datos",
+      icon: "🐱‍🐉",
+      href: "/dashboard/censo",
+      available: false,
+      requiresActiveMonth: false,
     },
   ]
 

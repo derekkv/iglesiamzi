@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
-  const [cedula, setCedula] = useState("")
+  const [cedula, setCedula] = useState("87654321")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -60,11 +60,11 @@ export default function LoginPage() {
             </svg>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">Dashboard Iglesia</CardTitle>
-          <CardDescription className="text-gray-600">Ingrese sus credenciales para acceder al sistema</CardDescription>
+          <CardDescription className="text-gray-600">Ingrese la contraseña para acceder al sistema</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
+  {/*          <div className="space-y-2">
               <Label htmlFor="cedula" className="text-sm font-medium text-gray-700">
                 Número de Cédula
               </Label>
@@ -77,7 +77,7 @@ export default function LoginPage() {
                 className="w-full"
                 disabled={isLoading}
               />
-            </div>
+            </div>*/}
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                 Contraseña
@@ -104,7 +104,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 p-3 bg-gray-50 rounded-lg">
+       {/*   <div className="mt-6 p-3 bg-gray-50 rounded-lg">
             <p className="text-xs text-gray-600 text-center">
               <strong>Usuarios de prueba:</strong>
               <br />
@@ -112,7 +112,7 @@ export default function LoginPage() {
               <br />
               Cédula: 87654321 - Contraseña: admin123
             </p>
-          </div>
+          </div>*/}
         </CardContent>
       </Card>
     </div>
