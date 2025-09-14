@@ -1,10 +1,10 @@
 {
-	"name": "iglesiamzicloud",
+	"name": "iglesia",
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
 		"dev": "next dev --turbopack",
-		"build": "next build",
+		"build": "opennextjs-cloudflare build ",
 		"start": "next start",
 		"lint": "next lint",
 		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
