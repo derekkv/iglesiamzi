@@ -55,6 +55,7 @@ export default function DashboardPage() {
 
     try {
       const userPermissions = await getUserPermissions(user.id)
+      // @ts-ignore
       setPermissions(userPermissions)
     } catch (error) {
       console.error("Error cargando permisos:", error)
