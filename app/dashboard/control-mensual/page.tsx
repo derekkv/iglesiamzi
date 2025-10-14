@@ -7,22 +7,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useMonth } from "@/contexts/month-context"
+import { PermissionsGuard } from "@/lib/permissions-guard"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ControlMensualPage() {
-  const [user, setUser] = useState<any>(null)
+
   const router = useRouter()
   const { currentMonth, monthHistory, startNewMonth, closeCurrentMonth } = useMonth()
   const [selectedDate, setSelectedDate] = useState("")
   const [monthName, setMonthName] = useState("")
-
+ const { user, isLoading } = useAuth()
   useEffect(() => {
-    const userData = localStorage.getItem("churchUser")
-    if (!userData) {
-      router.push("/")
-      return
-    }
-    setUser(JSON.parse(userData))
-
     const now = new Date()
     setSelectedDate(now.toISOString().split("T")[0])
     setMonthName(`${now.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`)
@@ -66,6 +61,7 @@ export default function ControlMensualPage() {
 }
 
   return (
+        <PermissionsGuard moduleName="control_mensual">
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -193,5 +189,6 @@ export default function ControlMensualPage() {
         </div>
       </main>
     </div>
+    </PermissionsGuard>
   )
 }

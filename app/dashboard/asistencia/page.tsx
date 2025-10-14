@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PermissionsGuard } from "@/lib/permissions-guard"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -28,15 +30,16 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ArrowLeft, Plus, Trash2, Edit2 } from "lucide-react"
 import { attendanceService, type AttendanceDetail, type AttendanceColumn } from "@/lib/mod/attendance-service"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 interface AttendanceDataMap {
   [detalleId: number]: { [columnaId: number]: number }
 }
-import { useMonth } from "@/contexts/month-context";
+import { useMonth } from "@/contexts/month-context"
 export default function AsistenciaPage() {
   const router = useRouter()
 
-  const { currentMonth, updateConfigurations } = useMonth();// Mock month for now
+  const { currentMonth, updateConfigurations } = useMonth() // Mock month for now
   const [details, setDetails] = useState<AttendanceDetail[]>([])
   const [columns, setColumns] = useState<AttendanceColumn[]>([])
   const [attendanceData, setAttendanceData] = useState<AttendanceDataMap>({})
@@ -51,12 +54,18 @@ export default function AsistenciaPage() {
   // Estados para formularios
   const [newDetail, setNewDetail] = useState("")
   const [newColumnName, setNewColumnName] = useState("")
-  const [editingDetail, setEditingDetail] = useState<{ id: number; nombre: string } | null>(null)
-  const [editingColumn, setEditingColumn] = useState<{ id: number; nombre: string } | null>(null)
-
+  const [editingDetail, setEditingDetail] = useState<{
+    id: number
+    nombre: string
+  } | null>(null)
+  const [editingColumn, setEditingColumn] = useState<{
+    id: number
+    nombre: string
+  } | null>(null)
 
   const [saving, setSaving] = useState(false)
 
+  const [activeTab, setActiveTab] = useState("tabla")
 
   useEffect(() => {
     loadAttendanceData()
@@ -119,7 +128,7 @@ export default function AsistenciaPage() {
 
   const handleAddDetail = async () => {
     if (!newDetail.trim() || !currentMonth?.id) return
-        setSaving(true)
+    setSaving(true)
 
     try {
       const newDetailRecord = await attendanceService.createDetail(currentMonth.id, newDetail.trim())
@@ -136,14 +145,14 @@ export default function AsistenciaPage() {
       setAttendanceData(newData)
     } catch (error) {
       console.error("Error adding detail:", error)
-    }finally {
+    } finally {
       setSaving(false)
     }
   }
 
   const handleEditDetail = async () => {
     if (!editingDetail?.nombre.trim()) return
-setSaving(true)
+    setSaving(true)
     try {
       await attendanceService.updateDetail(editingDetail.id, editingDetail.nombre.trim())
       setDetails((prev) =>
@@ -155,7 +164,7 @@ setSaving(true)
       setEditingDetail(null)
     } catch (error) {
       console.error("Error editing detail:", error)
-    }finally {
+    } finally {
       setSaving(false)
     }
   }
@@ -175,7 +184,7 @@ setSaving(true)
 
   const handleEditColumn = async () => {
     if (!editingColumn?.nombre.trim()) return
-setSaving(true)
+    setSaving(true)
     try {
       await attendanceService.updateColumn(editingColumn.id, editingColumn.nombre.trim())
       setColumns((prev) =>
@@ -185,7 +194,7 @@ setSaving(true)
       setEditingColumn(null)
     } catch (error) {
       console.error("Error editing column:", error)
-    }finally {
+    } finally {
       setSaving(false)
     }
   }
@@ -231,350 +240,468 @@ setSaving(true)
     }, 0)
   }
 
+  const calculateRowTotal = (detailId: number) => {
+    return columns.reduce((total, column) => {
+      const value = attendanceData[detailId]?.[column.id] || 0
+      return total + value
+    }, 0)
+  }
+
   const calculateGrandTotal = () => {
     return columns.reduce((grandTotal, column) => {
       return grandTotal + calculateColumnTotal(column.id)
     }, 0)
   }
 
+  const getCategoryChartData = () => {
+    return details.map((detail) => ({
+      name: detail.nombre,
+      total: calculateRowTotal(detail.id),
+    }))
+  }
+
+  const getDateChartData = () => {
+    return columns.map((column) => {
+      const dataPoint: any = {
+        name: column.nombre,
+      }
+      details.forEach((detail) => {
+        dataPoint[detail.nombre] = attendanceData[detail.id]?.[column.id] || 0
+      })
+      return dataPoint
+    })
+  }
+
+  const getColors = () => {
+    const colors = [
+      "#3b82f6",
+      "#ef4444",
+      "#10b981",
+      "#f59e0b",
+      "#8b5cf6",
+      "#ec4899",
+      "#14b8a6",
+      "#f97316",
+      "#6366f1",
+      "#84cc16",
+    ]
+    return colors
+  }
+
   if (loading) {
     return (
-
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando datos de asistencia...</p>
         </div>
       </div>
-
     )
   }
 
-    if (!currentMonth) {
+  if (!currentMonth) {
     return (
-
-           <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Redirigiendo...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/dashboard")}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Volver</span>
-              </Button>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">Estadísticas de Asistencia</h1>
-                <p className="text-sm text-gray-600">Mes: {currentMonth?.name}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Dialog open={showAddColumn} onOpenChange={setShowAddColumn}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="flex items-center space-x-2">
-                    <Plus className="w-4 h-4" />
-                    <span>Agregar Fecha</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Agregar Nueva Fecha/Columna</DialogTitle>
-                    <DialogDescription>
-                      Ingrese el nombre para la nueva columna (ej: "Dom 15/12", "Miércoles", etc.)
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="columnName">Nombre de la columna</Label>
-                      <Input
-                        id="columnName"
-                        value={newColumnName}
-                        onChange={(e) => setNewColumnName(e.target.value)}
-                        placeholder="Ej: Dom 15/12"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowAddColumn(false)}>
-                      Cancelar
-                    </Button>
-                
-                          <Button onClick={handleAddColumn} disabled={saving}>
-                                        {saving ? "Guardando..." : "Agregar"}
-                                      </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={showAddDetail} onOpenChange={setShowAddDetail}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
-                    <Plus className="w-4 h-4" />
-                    <span>Agregar Detalle</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Agregar Nuevo Detalle</DialogTitle>
-                    <DialogDescription>Ingrese el nombre del nuevo detalle de asistencia</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="detailName">Nombre del detalle</Label>
-                      <Input
-                        id="detailName"
-                        value={newDetail}
-                        onChange={(e) => setNewDetail(e.target.value)}
-                        placeholder="Ej: ADULTOS MAYORES"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowAddDetail(false)}>
-                      Cancelar
-                    </Button>
-               
-                          <Button onClick={handleAddDetail} disabled={saving}>
-                    {saving ? "Guardando..." : "Agregar"}
-                  </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Tabla de Asistencia</span>
-              <div className="text-sm text-gray-600">
-                {details.length} detalles • {columns.length} fechas
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold min-w-[250px]">Detalle</th>
-                    {columns.map((column) => (
-                      <th
-                        key={column.id}
-                        className="border border-gray-300 px-4 py-3 text-center font-semibold min-w-[120px]"
-                      >
-                        <div className="flex items-center justify-center space-x-2">
-                          <span>{column.nombre}</span>
-                          <div className="flex space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => {
-                                setEditingColumn({ id: column.id, nombre: column.nombre })
-                                setShowEditColumn(true)
-                              }}
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar columna?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Se eliminará la columna "{column.nombre}" y todos sus datos. Esta acción no se puede
-                                    deshacer.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteColumn(column.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {details.map((detail) => (
-                    <tr key={detail.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-2 font-medium bg-gray-50">
-                        <div className="flex items-center justify-between">
-                          <span>{detail.nombre}</span>
-                          <div className="flex space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => {
-                                setEditingDetail({ id: detail.id, nombre: detail.nombre })
-                                setShowEditDetail(true)
-                              }}
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar detalle?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Se eliminará "{detail.nombre}" y todos sus datos. Esta acción no se puede deshacer.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteDetail(detail.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </div>
-                      </td>
-                      {columns.map((column) => (
-                        <td key={column.id} className="border border-gray-300 px-2 py-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={attendanceData[detail.id]?.[column.id] || ""}
-                            onChange={(e) => handleCellChange(detail.id, column.id, e.target.value)}
-                            className="border-0 text-center h-8 focus:ring-1 focus:ring-blue-500"
-                            placeholder="0"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {columns.length > 0 && (
-                    <tr className="bg-blue-50 font-semibold">
-                      <td className="border border-gray-300 px-4 py-2 font-bold bg-blue-100">TOTAL</td>
-                      {columns.map((column) => (
-                        <td key={column.id} className="border border-gray-300 px-2 py-2 text-center bg-blue-100">
-                          {calculateColumnTotal(column.id)}
-                        </td>
-                      ))}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {columns.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                <p>No hay fechas/columnas configuradas.</p>
-                <p className="text-sm">Agregue una fecha para comenzar a registrar asistencia.</p>
-              </div>
-            )}
-
-            {columns.length > 0 && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">
-                    Total de registros: {details.length} detalles × {columns.length} fechas
-                  </span>
-                  <span className="text-lg font-semibold text-blue-600">Total General: {calculateGrandTotal()}</span>
+    <PermissionsGuard moduleName="asistencia">
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/dashboard")}
+                  className="flex items-center space-x-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Volver</span>
+                </Button>
+                <div>
+                  <h1 className="text-xl font-semibold text-gray-900">Estadísticas de Asistencia</h1>
+                  <p className="text-sm text-gray-600">Mes: {currentMonth?.name}</p>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex items-center space-x-2">
+                <Dialog open={showAddColumn} onOpenChange={setShowAddColumn}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="flex items-center space-x-2">
+                      <Plus className="w-4 h-4" />
+                      <span>Agregar Fecha</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Agregar Nueva Fecha/Columna</DialogTitle>
+                      <DialogDescription>
+                        Ingrese el nombre para la nueva columna (ej: "Dom 15/12", "Miércoles", etc.)
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="columnName">Nombre de la columna</Label>
+                        <Input
+                          id="columnName"
+                          value={newColumnName}
+                          onChange={(e) => setNewColumnName(e.target.value)}
+                          placeholder="Ej: Dom 15/12"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowAddColumn(false)}>
+                        Cancelar
+                      </Button>
 
-        {/* Modal para editar detalle */}
-        <Dialog open={showEditDetail} onOpenChange={setShowEditDetail}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Detalle</DialogTitle>
-              <DialogDescription>Modifique el nombre del detalle de asistencia</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editDetailName">Nombre del detalle</Label>
-                <Input
-                  id="editDetailName"
-                  value={editingDetail?.nombre || ""}
-                  onChange={(e) => setEditingDetail((prev) => (prev ? { ...prev, nombre: e.target.value } : null))}
-                />
+                      <Button onClick={handleAddColumn} disabled={saving}>
+                        {saving ? "Guardando..." : "Agregar"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={showAddDetail} onOpenChange={setShowAddDetail}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
+                      <Plus className="w-4 h-4" />
+                      <span>Agregar Detalle</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Agregar Nuevo Detalle</DialogTitle>
+                      <DialogDescription>Ingrese el nombre del nuevo detalle de asistencia</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="detailName">Nombre del detalle</Label>
+                        <Input
+                          id="detailName"
+                          value={newDetail}
+                          onChange={(e) => setNewDetail(e.target.value)}
+                          placeholder="Ej: ADULTOS MAYORES"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowAddDetail(false)}>
+                        Cancelar
+                      </Button>
+
+                      <Button onClick={handleAddDetail} disabled={saving}>
+                        {saving ? "Guardando..." : "Agregar"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditDetail(false)}>
-                Cancelar
-              </Button>
-             
-                    <Button onClick={handleEditDetail} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </header>
 
-        {/* Modal para editar columna */}
-        <Dialog open={showEditColumn} onOpenChange={setShowEditColumn}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Fecha/Columna</DialogTitle>
-              <DialogDescription>Modifique el nombre de la fecha/columna</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editColumnName">Nombre de la columna</Label>
-                <Input
-                  id="editColumnName"
-                  value={editingColumn?.nombre || ""}
-                  onChange={(e) => setEditingColumn((prev) => (prev ? { ...prev, nombre: e.target.value } : null))}
-                />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Tabla de Asistencia</span>
+                <div className="text-sm text-gray-600">
+                  {details.length} detalles • {columns.length} fechas
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+                  <TabsTrigger value="tabla">Tabla</TabsTrigger>
+                  <TabsTrigger value="graficos">Gráficos</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="tabla">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-300">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-300 px-4 py-3 text-left font-semibold min-w-[250px]">
+                            Detalle
+                          </th>
+                          {columns.map((column) => (
+                            <th
+                              key={column.id}
+                              className="border border-gray-300 px-4 py-3 text-center font-semibold min-w-[120px]"
+                            >
+                              <div className="flex items-center justify-center space-x-2">
+                                <span>{column.nombre}</span>
+                                <div className="flex space-x-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0"
+                                    onClick={() => {
+                                      setEditingColumn({
+                                        id: column.id,
+                                        nombre: column.nombre,
+                                      })
+                                      setShowEditColumn(true)
+                                    }}
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar columna?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Se eliminará la columna "{column.nombre}" y todos sus datos. Esta acción no se
+                                          puede deshacer.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDeleteColumn(column.id)}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </div>
+                            </th>
+                          ))}
+                          <th className="border border-gray-300 px-4 py-3 text-center font-semibold min-w-[120px] bg-green-50">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {details.map((detail) => (
+                          <tr key={detail.id} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-4 py-2 font-medium bg-gray-50">
+                              <div className="flex items-center justify-between">
+                                <span>{detail.nombre}</span>
+                                <div className="flex space-x-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0"
+                                    onClick={() => {
+                                      setEditingDetail({
+                                        id: detail.id,
+                                        nombre: detail.nombre,
+                                      })
+                                      setShowEditDetail(true)
+                                    }}
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar detalle?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Se eliminará "{detail.nombre}" y todos sus datos. Esta acción no se puede
+                                          deshacer.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDeleteDetail(detail.id)}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </div>
+                            </td>
+                            {columns.map((column) => (
+                              <td key={column.id} className="border border-gray-300 px-2 py-1">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={attendanceData[detail.id]?.[column.id] || ""}
+                                  onChange={(e) => handleCellChange(detail.id, column.id, e.target.value)}
+                                  className="border-0 text-center h-8 focus:ring-1 focus:ring-blue-500"
+                                  placeholder="0"
+                                />
+                              </td>
+                            ))}
+                            <td className="border border-gray-300 px-4 py-2 text-center font-semibold bg-green-50">
+                              {calculateRowTotal(detail.id)}
+                            </td>
+                          </tr>
+                        ))}
+                        {columns.length > 0 && (
+                          <tr className="bg-blue-50 font-semibold">
+                            <td className="border border-gray-300 px-4 py-2 font-bold bg-blue-100">TOTAL</td>
+                            {columns.map((column) => (
+                              <td key={column.id} className="border border-gray-300 px-2 py-2 text-center bg-blue-100">
+                                {calculateColumnTotal(column.id)}
+                              </td>
+                            ))}
+                            <td className="border border-gray-300 px-4 py-2 text-center font-bold bg-green-100">
+                              {calculateGrandTotal()}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {columns.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No hay fechas/columnas configuradas.</p>
+                      <p className="text-sm">Agregue una fecha para comenzar a registrar asistencia.</p>
+                    </div>
+                  )}
+
+                  {columns.length > 0 && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">
+                          Total de registros: {details.length} detalles × {columns.length} fechas
+                        </span>
+                        <span className="text-lg font-semibold text-blue-600">
+                          Total General: {calculateGrandTotal()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="graficos">
+                  {columns.length === 0 || details.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <p className="text-lg font-medium">No hay datos para mostrar</p>
+                      <p className="text-sm mt-2">Agregue fechas y detalles para visualizar los gráficos</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {/* Chart by Category */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Asistencia Total por Categoría</h3>
+                        <ResponsiveContainer width="100%" height={400}>
+                          <BarChart data={getCategoryChartData()}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} interval={0} />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="total" fill="#3b82f6" name="Total" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Chart by Date */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Asistencia por Fecha</h3>
+                        <ResponsiveContainer width="100%" height={400}>
+                          <BarChart data={getDateChartData()}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} interval={0} />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            {details.map((detail, index) => (
+                              <Bar
+                                key={detail.id}
+                                dataKey={detail.nombre}
+                                stackId="a"
+                                fill={getColors()[index % getColors().length]}
+                              />
+                            ))}
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Modal para editar detalle */}
+          <Dialog open={showEditDetail} onOpenChange={setShowEditDetail}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Detalle</DialogTitle>
+                <DialogDescription>Modifique el nombre del detalle de asistencia</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editDetailName">Nombre del detalle</Label>
+                  <Input
+                    id="editDetailName"
+                    value={editingDetail?.nombre || ""}
+                    onChange={(e) => setEditingDetail((prev) => (prev ? { ...prev, nombre: e.target.value } : null))}
+                  />
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditColumn(false)}>
-                Cancelar
-              </Button>
-                    <Button onClick={handleEditColumn} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </main>
-    </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEditDetail(false)}>
+                  Cancelar
+                </Button>
+
+                <Button onClick={handleEditDetail} disabled={saving}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal para editar columna */}
+          <Dialog open={showEditColumn} onOpenChange={setShowEditColumn}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Fecha/Columna</DialogTitle>
+                <DialogDescription>Modifique el nombre de la fecha/columna</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editColumnName">Nombre de la columna</Label>
+                  <Input
+                    id="editColumnName"
+                    value={editingColumn?.nombre || ""}
+                    onChange={(e) => setEditingColumn((prev) => (prev ? { ...prev, nombre: e.target.value } : null))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEditColumn(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditColumn} disabled={saving}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </main>
+      </div>
+    </PermissionsGuard>
   )
 }

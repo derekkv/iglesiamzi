@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { PermissionsGuard } from "@/lib/permissions-guard"
 import {
   Dialog,
   DialogContent,
@@ -223,6 +224,7 @@ export default function DiscipuladoPage() {
   }
 
   return (
+        <PermissionsGuard moduleName="discipulado">
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -534,5 +536,6 @@ export default function DiscipuladoPage() {
         </Dialog>
       </main>
     </div>
+    </PermissionsGuard>
   )
 }

@@ -17,31 +17,54 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { useMonth } from "@/contexts/month-context"
 
-interface User {
-  cedula: string
-  name: string
+import { getUserPermissions } from "@/lib/auth"
+import { useMonth } from "@/contexts/month-context"
+import { useAuth } from "@/contexts/auth-context"
+
+interface ModulePermission {
+  module: {
+    id: string
+    name: string
+    display_name: string
+    description: string
+    icon: string
+  }
+  can_view: boolean
+  is_active: boolean
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null)
-  const router = useRouter()
+  const { user, logout } = useAuth()
   const { currentMonth, startNewMonth } = useMonth()
+  const router = useRouter()
+  const [permissions, setPermissions] = useState<ModulePermission[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const userData = localStorage.getItem("churchUser")
-    if (!userData) {
-      router.push("/")
+    if (!user) {
+      router.push("/login")
       return
     }
 
-    setUser(JSON.parse(userData))
-  }, [router])
+    loadPermissions()
+  }, [user, router])
+
+  const loadPermissions = async () => {
+    if (!user) return
+
+    try {
+      const userPermissions = await getUserPermissions(user.id)
+      setPermissions(userPermissions)
+    } catch (error) {
+      console.error("Error cargando permisos:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
-    localStorage.removeItem("churchUser")
-    router.push("/")
+    logout()
   }
 
   const handleCreateMonth = () => {
@@ -49,93 +72,63 @@ export default function DashboardPage() {
   }
 
   const handleModuleClick = (module: any) => {
-    if (!module.available) return
+    if (!module.hasAccess) return
 
     if (!currentMonth && module.requiresActiveMonth) {
-      // Solo bloquear módulos que requieren mes activo
       return
     }
 
     router.push(module.href)
   }
 
-  const modules = [
-    {
-      title: "Control Mensual",
-      description: "Gestión general del mes actual",
-      icon: "📊",
-      href: "/dashboard/control-mensual",
-      available: true,
-      requiresActiveMonth: false,
-    },
-    {
-      title: "Ingresos y Egresos",
-      description: "Reporte detallado de finanzas",
-      icon: "💰",
-      href: "/dashboard/ingresos-egresos",
-      available: true,
-      requiresActiveMonth: true,
-    },
-    {
-      title: "Estadística de Asistencia",
-      description: "Control de asistencia a servicios",
-      icon: "👥",
-      href: "/dashboard/asistencia",
-      available: true,
-      requiresActiveMonth: true,
-    },
-    {
-      title: "Listado de Diezmo",
-      description: "Registro de diezmos y ofrendas",
-      icon: "🙏",
-      href: "/dashboard/diezmos",
-      available: true,
-      requiresActiveMonth: true,
-    },
-    {
-      title: "Asistencia o Discipulado",
-      description: "Control de discipulado",
-      icon: "📖",
-      href: "/dashboard/discipulado",
-      available: true,
-      requiresActiveMonth: true,
-    },
-    {
-      title: "Flujo de Pago",
-      description: "Gestión de pagos y transacciones",
-      icon: "💳",
-      href: "/dashboard/flujo-pago",
-      available: true,
-      requiresActiveMonth: false,
-    },
-    {
-      title: "Inventario",
-      description: "Gestión de artículos y equipos",
-      icon: "📦",
-      href: "/dashboard/inventario",
-      available: true,
-      requiresActiveMonth: false,
-    },  
-    {
-      title: "Censo",
-      description: "Gestión de datos",
-      icon: "🐱‍🐉",
-      href: "/dashboard/censo",
-      available: false,
-      requiresActiveMonth: false,
-    },
-  ]
+  const moduleRoutes: Record<string, { href: string; requiresActiveMonth: boolean }> = {
+    Administración: { href: "/dashboard/administracion", requiresActiveMonth: false },
+    "Control Mensual": { href: "/dashboard/control-mensual", requiresActiveMonth: false },
+    "Ingresos y Egresos": { href: "/dashboard/ingresos-egresos", requiresActiveMonth: true },
+    "Estadística de Asistencia": { href: "/dashboard/asistencia", requiresActiveMonth: true },
+    "Listado de Diezmo": { href: "/dashboard/diezmos", requiresActiveMonth: true },
+    "Asistencia o Discipulado": { href: "/dashboard/discipulado", requiresActiveMonth: true },
+    "Flujo de Pago": { href: "/dashboard/flujo-pago", requiresActiveMonth: false },
+    Inventario: { href: "/dashboard/inventario", requiresActiveMonth: false },
+    Censo: { href: "/dashboard/censo", requiresActiveMonth: false },
+    Bautizo: { href: "/dashboard/bautizo", requiresActiveMonth: false },
+    Matrimonio: { href: "/dashboard/matrimonio", requiresActiveMonth: false },
+  }
 
-  if (!user) {
+  const availableModules = permissions
+    .map((permission) => {
+      const route = moduleRoutes[permission.module.display_name] || {
+        href: "#",
+        requiresActiveMonth: false,
+      }
+      return {
+        name: permission.module.name,
+        title: permission.module.display_name,
+        description: permission.module.description,
+        icon: permission.module.icon,
+        href: route.href,
+        requiresActiveMonth: route.requiresActiveMonth,
+        hasAccess: permission.can_view,
+        is_active: permission.is_active,
+      }
+    })
+    .filter((module) => module.hasAccess)
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando..</p>
+          <p className="text-gray-600">Cargando...</p>
         </div>
       </div>
     )
   }
+
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -154,7 +147,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Dashboard Iglesia</h1>
-                <p className="text-sm text-gray-600">Bienvenido, {user.name}</p>
+                <p className="text-sm text-gray-600">Bienvenido, {user.displayName}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -207,41 +200,49 @@ export default function DashboardPage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {modules.map((module, index) => {
-            const isAccessible = module.available && (!module.requiresActiveMonth || currentMonth)
-            const isBlocked = module.requiresActiveMonth && !currentMonth
+        {availableModules.length === 0 ? (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertDescription className="text-red-800">
+              ⚠️ No tienes permisos para acceder a ningún módulo. Contacta al administrador.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableModules.map((module, index) => {
+              const isAccessible = module.hasAccess && (!module.requiresActiveMonth || currentMonth)
+              const isBlocked = module.requiresActiveMonth && !currentMonth
 
-            return (
-              <Card
-                key={index}
-                className={`transition-all duration-200 ${
-                  isAccessible
-                    ? "hover:shadow-lg hover:scale-105 cursor-pointer border-blue-200"
-                    : isBlocked
-                      ? "opacity-40 cursor-not-allowed border-amber-200 bg-amber-50"
-                      : "opacity-60 cursor-not-allowed"
-                }`}
-                onClick={() => handleModuleClick(module)}
-              >
-                <CardHeader className="text-center">
-                  <div className="text-4xl mb-2">{module.icon}</div>
-                  <CardTitle className="text-lg">{module.title}</CardTitle>
-                  <CardDescription>{module.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center">
-                  {isAccessible ? (
-                    <Badge className="bg-green-100 text-green-800 border-green-200">Disponible</Badge>
-                  ) : isBlocked ? (
-                    <Badge className="bg-amber-100 text-amber-800 border-amber-200">Requiere mes activo</Badge>
-                  ) : (
-                    <Badge variant="secondary">Próximamente</Badge>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+              return (
+                <Card
+                  key={index}
+                  className={`transition-all duration-200 ${
+                    isAccessible
+                      ? "hover:shadow-lg hover:scale-105 cursor-pointer border-blue-200"
+                      : isBlocked
+                        ? "opacity-40 cursor-not-allowed border-amber-200 bg-amber-50"
+                        : "opacity-60 cursor-not-allowed"
+                  }`}
+                  onClick={() => handleModuleClick(module)}
+                >
+                  <CardHeader className="text-center">
+                    <div className="text-4xl mb-2">{module.icon}</div>
+                    <CardTitle className="text-lg">{module.title}</CardTitle>
+                    <CardDescription>{module.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    {isAccessible ? (
+                      <Badge className="bg-green-100 text-green-800 border-green-200">Disponible</Badge>
+                    ) : isBlocked ? (
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-200">Requiere mes activo</Badge>
+                    ) : (
+                      <Badge variant="secondary">Sin acceso</Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </main>
     </div>
   )

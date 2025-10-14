@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PermissionsGuard } from "@/lib/permissions-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -341,6 +342,7 @@ setSaving(true)
   }
 
   return (
+        <PermissionsGuard moduleName="flujo_pago">
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -745,5 +747,6 @@ setSaving(true)
         </Dialog>
       </div>
     </div>
+    </PermissionsGuard>
   )
 }

@@ -8,7 +8,7 @@ import {
   getDiezmosByMes,
 } from "@/lib/database"
 import { MesViewClient } from "./mes-view-client"
-
+import { PermissionsGuard } from "@/lib/permissions-guard"
 interface PageProps {
   params: Promise<{ id: string }>
 }

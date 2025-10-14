@@ -11,6 +11,11 @@ export interface DiezmoRecord {
   updated_at?: string
 }
 
+export type DiezmoWithMonth = DiezmoRecord & {
+  mes_name?: string
+}
+
+
 export class DiezmosService {
   // Ensure month exists before creating diezmos
   private async ensureMonthExists(mesId: string): Promise<void> {
@@ -60,6 +65,47 @@ export class DiezmosService {
     return data || []
   }
 
+  async searchDiezmos(filters: {
+    donador?: string
+    fechaDesde?: string
+    fechaHasta?: string
+  }): Promise<DiezmoWithMonth[]> {
+    let query = supabase
+      .from("diezmos")
+      .select(`
+        *,
+        meses:mes_id (
+          name
+        )
+      `)
+      .order("fecha", { ascending: false })
+
+    // Filtrar por donador si se proporciona
+    if (filters.donador && filters.donador.trim()) {
+      query = query.ilike("donador", `%${filters.donador.trim()}%`)
+    }
+
+    // Filtrar por rango de fechas
+    if (filters.fechaDesde) {
+      query = query.gte("fecha", filters.fechaDesde)
+    }
+    if (filters.fechaHasta) {
+      query = query.lte("fecha", filters.fechaHasta)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error("Error searching diezmos:", error)
+      throw new Error("Error al buscar los diezmos")
+    }
+
+    // Mapear los resultados para incluir el nombre del mes
+    return (data || []).map((item: any) => ({
+      ...item,
+      mes_name: item.meses?.name || "Sin mes",
+    }))
+  }
   // Get next available number for a month
   async getNextNumber(mesId: string): Promise<number> {
     const { data, error } = await supabase

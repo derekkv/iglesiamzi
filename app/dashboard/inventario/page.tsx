@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PermissionsGuard } from "@/lib/permissions-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -310,6 +311,7 @@ export default function InventarioPage() {
   }
 
   return (
+        <PermissionsGuard moduleName="inventario">
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center mb-6">
@@ -812,5 +814,6 @@ export default function InventarioPage() {
         </Dialog>
       </div>
     </div>
+    </PermissionsGuard>
   )
 }

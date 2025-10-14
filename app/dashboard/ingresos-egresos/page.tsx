@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-
+import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -52,6 +52,7 @@ import {
   type GlobalConfig,
 } from "@/lib/globalConfig";
 import { storage } from "@/lib/storage";
+import { useAuth } from "@/contexts/auth-context";
 
 interface FinancialRecord {
   id: number;
@@ -67,10 +68,11 @@ interface FinancialRecord {
 }
 
 export default function IngresosEgresosPage() {
-  const [user, setUser] = useState<any>(null);
+
   const router = useRouter();
   const { currentMonth, updateConfigurations } = useMonth();
   const [isLoadingB, setIsLoadingB] = useState(false);
+ const { user} = useAuth()
 
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -111,12 +113,6 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   useEffect(() => {
     const initializePage = async () => {
       try {
-        const userData = localStorage.getItem("churchUser");
-        if (!userData) {
-          router.push("/");
-          return;
-        }
-        setUser(JSON.parse(userData));
 
         if (!currentMonth) {
           router.push("/dashboard/control-mensual");
@@ -492,6 +488,7 @@ function formatDateForTable(dateString: string) {
 
 
   return (
+        <PermissionsGuard moduleName="ingresos_egresos">
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -926,6 +923,7 @@ function formatDateForTable(dateString: string) {
                       <th className="text-left p-3 font-medium">Detalle</th>
                       <th className="text-left p-3 font-medium">Valor</th>
                       <th className="text-left p-3 font-medium">Estado</th>
+                      <th className="text-left p-3 font-medium">Observación</th>
                       <th className="text-left p-3 font-medium">Acciones</th>
                     </tr>
                   </thead>
@@ -965,6 +963,7 @@ function formatDateForTable(dateString: string) {
                             {record.estado}
                           </Badge>
                         </td>
+                        <td>{record.observacion}</td>
                         <td className="p-3">
                           <div className="flex space-x-2">
                             <Button
@@ -1223,5 +1222,6 @@ function formatDateForTable(dateString: string) {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionsGuard>
   );
 }
