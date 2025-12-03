@@ -9,13 +9,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useMonth } from "@/contexts/month-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
+import { EditMonthModal } from "@/components/EditMonthModal"
+import { CreateMonthModal } from "@/components/CreateMonthModal"
+import { CloseMonthModal } from "@/components/CloseMonthModal"
 
 export default function ControlMensualPage() {
 
   const router = useRouter()
-  const { currentMonth, monthHistory, startNewMonth, closeCurrentMonth } = useMonth()
+  const { currentMonth, monthHistory, startNewMonth, closeCurrentMonth, editMonthDates, deleteMonth } = useMonth()
   const [selectedDate, setSelectedDate] = useState("")
   const [monthName, setMonthName] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState<any>(null)
+const [openCreateModal, setOpenCreateModal] = useState(false)
+const [openCloseModal, setOpenCloseModal] = useState(false)
+
  const { user, isLoading } = useAuth()
   useEffect(() => {
     const now = new Date()
@@ -25,13 +34,13 @@ export default function ControlMensualPage() {
 
   const handleStartNewMonth = () => {
     if (selectedDate && monthName.trim()) {
-      startNewMonth()
+    //  startNewMonth()
     }
   }
 
   const handleCloseMonth = () => {
     if (selectedDate) {
-      closeCurrentMonth()
+      //closeCurrentMonth()
     }
   }
 
@@ -118,11 +127,11 @@ export default function ControlMensualPage() {
                   </div>*/}
 
                   <div className="space-y-2 mt-6">
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleStartNewMonth}>
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setOpenCreateModal(true)}>
                       Iniciar Nuevo Mes
                     </Button>
 
-                    <Button variant="outline" className="w-full bg-transparent" onClick={handleCloseMonth}>
+                    <Button variant="outline" className="w-full bg-transparent" onClick={() => setOpenCloseModal(true)}>
                       Cerrar Mes Actual
                     </Button>
                   </div>
@@ -134,14 +143,16 @@ export default function ControlMensualPage() {
                       No hay un mes activo. Inicie un nuevo mes para comenzar a trabajar.
                     </AlertDescription>
                   </Alert>
-                  <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleStartNewMonth}>
+                  <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setOpenCreateModal(true)}>
                     Crear Nuevo Mes
                   </Button>
                 </>
               )}
             </CardContent>
           </Card>
+          <CloseMonthModal open={openCloseModal} setOpen={setOpenCloseModal} />
 
+<CreateMonthModal open={openCreateModal} setOpen={setOpenCreateModal} />
           {/* Historial de Meses */}
           <Card>
             <CardHeader>
@@ -166,13 +177,51 @@ export default function ControlMensualPage() {
                               {formatDateForTable(month.start_date)} - {month.end_date ? formatDateForTable(month.end_date) : "Activo"}
                             </p>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="secondary" className="bg-red-100">{month.status === "closed" ? "Cerrado" : "Activo"}</Badge>
-                            <Button size="sm" variant="outline" onClick={() => viewMonthDetails(month)}>
-                              Ver
-                            </Button>
-                          </div>
+                <div className="flex items-center space-x-2">
+  <Badge variant="secondary" className="bg-red-100">
+    {month.status === "closed" ? "Cerrado" : "Activo"}
+  </Badge>
+
+  <Button size="sm" variant="outline" onClick={() => viewMonthDetails(month)}>
+    Ver
+  </Button>
+
+  {/* Nuevo: Editar */}
+  <Button
+    size="sm"
+    variant="secondary"
+    className="bg-yellow-200"
+    onClick={() => {
+    setSelectedMonth(month)
+    setIsEditing(true)
+  }}
+  >
+    Editar
+  </Button>
+
+
+  {/* Nuevo: Eliminar */}
+<Button
+  size="sm"
+  variant="destructive"
+  onClick={async () => {
+    await deleteMonth(month.id)
+    toast("🗑 Mes eliminado")
+  }}
+>
+  Eliminar
+</Button>
+</div>
+
+
                         </div>
+                        {selectedMonth && (
+  <EditMonthModal
+    month={selectedMonth}
+    open={isEditing}
+    setOpen={setIsEditing}
+  />
+)}
                                {/*   <div className="flex space-x-4 mt-2 text-sm">
                           <span className="text-blue-600">Ingresos: {month?.data?.ingresos?.length || 0}</span>
                           <span className="text-red-600">Egresos: {month?.data?.egresos?.length || 0}</span>

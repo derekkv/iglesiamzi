@@ -16,6 +16,13 @@ interface StorageAdapter {
   getClosedMonths(): Promise<any[]>;
   getGlobalConfig(): Promise<any>;
   updateGlobalConfig(config: any): Promise<void>;
+  updateMonthDates: (options: {
+    id: string;
+    start_date: string;
+    end_date?: string | null;
+  }) => Promise<void>;
+
+  deleteMonth: (id: string) => Promise<void>;
 }
 
 export interface InventoryItem {
@@ -42,6 +49,36 @@ export class SupabaseAdapter implements StorageAdapter {
       throw new Error(`Supabase getMonth error: ${error.message}`);
     }
     return data;
+  }
+
+async updateMonthDates({
+  id,
+  start_date,
+  end_date,
+}: {
+  id: string
+  start_date: string
+  end_date?: string | null
+}): Promise<void> {
+  const { error } = await supabase
+    .from("meses")
+    .update({
+      start_date,
+      end_date: end_date ?? null,
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+
+  async deleteMonth(id: string) {
+    const { error } = await supabase
+      .from("meses")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
   }
 
 async saveMonth(month: any) {

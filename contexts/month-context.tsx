@@ -9,7 +9,7 @@ interface MonthData {
   year: number
   month: number
   start_date: string
-  end_date?: string
+  end_date?: string | null; 
   status: "active" | "closed"
   data: {
     ingresos: any[]
@@ -33,10 +33,12 @@ interface MonthData {
 interface MonthContextType {
   currentMonth: MonthData | null
   monthHistory: MonthData[]
-  startNewMonth: () => void
-  closeCurrentMonth: () => void
+  startNewMonth: (startDate: string, endDate: string | null) => Promise<void>
+  closeCurrentMonth: (endDate: string) => Promise<void>
   updateMonthData: (section: keyof MonthData["data"], data: any) => void
   updateConfigurations: (config: Partial<MonthData["data"]["configuraciones"]>) => void
+  editMonthDates: (id: string, startDate: string, endDate: string | null) => Promise<void>
+  deleteMonth: (id: string) => Promise<void>
 }
 
 const MonthContext = createContext<MonthContextType | undefined>(undefined)
@@ -66,7 +68,8 @@ export function MonthProvider({ children }: { children: ReactNode }) {
     loadData()
   }, [])
 
-  const createInitialMonth = async () => {
+  const createInitialMonth = async (startDate: string, endDate: string | null) => {
+
     const now = new Date()
     const monthNames = [
       "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -78,7 +81,7 @@ export function MonthProvider({ children }: { children: ReactNode }) {
       name: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
       year: now.getFullYear(),
       month: now.getMonth() + 1,
-      start_date: now.toISOString(),
+      start_date: startDate,
       status: "active",
       data: {
         ingresos: [],
@@ -106,7 +109,36 @@ export function MonthProvider({ children }: { children: ReactNode }) {
     return newMonth
   }
 
-  const startNewMonth = async () => {
+
+    const editMonthDates = async (id: string, startDate: string, endDate: string | null) => {
+    const updated = await storage.updateMonthDates({
+  id,
+  start_date: startDate,
+  end_date: endDate,
+});
+
+    if (currentMonth?.id === id) {
+      setCurrentMonth({ ...currentMonth, start_date: startDate, end_date: endDate })
+    }
+
+    setMonthHistory(prev =>
+      prev.map(m => (m.id === id ? { ...m, start_date: startDate, end_date: endDate } : m))
+    )
+  }
+
+  // 🗑 NUEVO -> Eliminar mes
+  const deleteMonth = async (id: string) => {
+    await storage.deleteMonth(id)
+
+    setMonthHistory(prev => prev.filter(m => m.id !== id))
+
+    if (currentMonth?.id === id) {
+      setCurrentMonth(null)
+    }
+  }
+
+  const startNewMonth = async (startDate: string, endDate: string | null) => {
+
     if (currentMonth) {
       // Cerrar el mes actual
       const closedMonth = {
@@ -134,7 +166,7 @@ export function MonthProvider({ children }: { children: ReactNode }) {
         name: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
         year: now.getFullYear(),
         month: now.getMonth() + 1,
-        start_date: now.toISOString(),
+        start_date: startDate,
         status: "active",
         data: {
           ingresos: [],
@@ -158,16 +190,16 @@ export function MonthProvider({ children }: { children: ReactNode }) {
       setCurrentMonth(newMonth)
     } else {
       // Si no hay mes actual, crear uno nuevo
-      await createInitialMonth()
+      await createInitialMonth(startDate, endDate)
     }
   }
 
-  const closeCurrentMonth = async () => {
+  const closeCurrentMonth = async (endDate: string) => {
     if (!currentMonth) return
 
     const closedMonth = {
       ...currentMonth,
-      end_date: new Date().toISOString(),
+      end_date: endDate,
       status: "closed" as const,
     }
 
@@ -230,6 +262,8 @@ export function MonthProvider({ children }: { children: ReactNode }) {
         startNewMonth,
         closeCurrentMonth,
         updateMonthData,
+        editMonthDates,
+        deleteMonth,
         updateConfigurations,
       }}
     >

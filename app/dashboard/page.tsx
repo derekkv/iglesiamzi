@@ -21,6 +21,8 @@ import {
 import { getUserPermissions } from "@/lib/auth"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
+import { CreateMonthModal } from "@/components/CreateMonthModal"
+
 
 interface ModulePermission {
   module: {
@@ -49,6 +51,7 @@ export default function DashboardPage() {
 
     loadPermissions()
   }, [user, router])
+const [openCreateModal, setOpenCreateModal] = useState(false)
 
   const loadPermissions = async () => {
     if (!user) return
@@ -66,10 +69,6 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     logout()
-  }
-
-  const handleCreateMonth = () => {
-    startNewMonth()
   }
 
   const handleModuleClick = (module: any) => {
@@ -169,37 +168,27 @@ export default function DashboardPage() {
           <p className="text-gray-600">Seleccione el módulo con el que desea trabajar</p>
         </div>
 
-        {!currentMonth && (
-          <Alert className="mb-6 border-amber-200 bg-amber-50">
-            <AlertDescription className="flex items-center justify-between">
-              <span className="text-amber-800">
-                ⚠️ No hay un mes activo. Debe crear un nuevo mes para acceder a los módulos de gestión.
-              </span>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
-                    Crear Mes
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Crear nuevo mes?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Se creará un nuevo período mensual con configuraciones predeterminadas. Podrá comenzar a registrar
-                      datos inmediatamente.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleCreateMonth} className="bg-green-600 hover:bg-green-700">
-                      Crear Mes
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </AlertDescription>
-          </Alert>
-        )}
+{!currentMonth && (
+  <Alert className="mb-6 border-amber-200 bg-amber-50">
+    <AlertDescription className="flex items-center justify-between">
+      <span className="text-amber-800">
+        ⚠️ No hay un mes activo. Debe crear un nuevo mes para acceder a los módulos de gestión.
+      </span>
+
+      <Button
+        size="sm"
+        className="bg-amber-600 hover:bg-amber-700 text-white"
+        onClick={() => setOpenCreateModal(true)}
+      >
+        Crear Mes
+      </Button>
+    </AlertDescription>
+
+    {/* Modal independiente */}
+    <CreateMonthModal open={openCreateModal} setOpen={setOpenCreateModal} />
+  </Alert>
+)}
+
 
         {availableModules.length === 0 ? (
           <Alert className="border-red-200 bg-red-50">
