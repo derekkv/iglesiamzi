@@ -31,8 +31,9 @@ import { censoService, type CensoRecord, type CatalogOption } from "@/lib/mod/ce
 import { useSecurityCheck } from "@/hooks/use-security-check"
 import { useAuth } from "@/contexts/auth-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
-import { Pencil, Trash2, Eye, Search, Settings, Plus } from "lucide-react"
+import { Pencil, Trash2, Eye, Search, Settings, Plus, ArrowLeft} from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { useRouter } from "next/navigation"
 
 export default function CensoPage() {
   const [records, setRecords] = useState<CensoRecord[]>([])
@@ -40,6 +41,7 @@ export default function CensoPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingB, setIsLoadingB] = useState(false)
+  const router = useRouter()
 
   // Modals
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -383,12 +385,28 @@ export default function CensoPage() {
   return (
     <PermissionsGuard moduleName="censo">
       <div className="container mx-auto py-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Censo</h1>
-            <p className="text-muted-foreground">Gestión de registros de censo</p>
-          </div>
-        </div>
+        <header className="bg-white shadow-sm border-b">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between h-16">
+                      <div className="flex items-center space-x-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push("/dashboard")}
+                          className="flex items-center space-x-2"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                          <span>Volver</span>
+                        </Button>
+                       <div>
+                  <h1 className="text-xl font-semibold text-gray-900">Gestión de registros de censo</h1>
+                </div>
+                      </div>
+                     
+                          
+                    </div>
+                  </div>
+                </header>
 
         <Tabs defaultValue="list" className="w-full">
           <TabsList className="grid w-full grid-cols-2">

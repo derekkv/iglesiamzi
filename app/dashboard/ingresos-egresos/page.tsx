@@ -62,7 +62,7 @@ interface FinancialRecord {
   categoria_principal: string;
   detalle: string;
   observacion: string;
-  monto: number;
+  monto: string | number
   estado: "Procesado" | "Pendiente";
   mes_id: string;
 }
@@ -106,7 +106,7 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
     categoria_principal: "",
     detalle: "",
     observacion: "",
-    monto: 0,
+    monto: "",
     estado: "Pendiente" as "Procesado" | "Pendiente",
   });
 
@@ -203,7 +203,7 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoadingB(true);
+   
 
     if (
       !formData.fecha ||
@@ -214,20 +214,24 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
       !formData.monto
     ) {
       setError("Por favor complete todos los campos obligatorios");
+      setIsLoadingB(false);
       return;
     }
-
+// @ts-ignore
     if (formData.monto <= 0) {
       setError("El valor debe ser mayor a 0");
+      setIsLoadingB(false);
       return;
     }
 
     if (!currentMonth) {
       setError("No hay un mes activo seleccionado");
+      setIsLoadingB(false);
       return;
     }
 
     try {
+       setIsLoadingB(true);
       const recordData = {
         mes_id: currentMonth.id,
         ministerio: formData.ministerio,
@@ -256,7 +260,8 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
         categoria_principal: "",
         detalle: "",
         observacion: "",
-        monto: 0,
+        // @ts-ignore
+        monto: "",
         estado: "Pendiente",
       });
       setIsAddModalOpen(false);
@@ -288,6 +293,7 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
       categoria_principal: record.categoria_principal,
       detalle: record.detalle,
       observacion: record.observacion,
+      // @ts-ignore
       monto: record.monto,
       estado: record.estado,
     });
@@ -297,7 +303,7 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoadingB(true);
+    
 
     if (!editingRecord) return;
 
@@ -312,13 +318,14 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
       setError("Por favor complete todos los campos obligatorios");
       return;
     }
-
+// @ts-ignore
     if (formData.monto <= 0) {
       setError("El valor debe ser mayor a 0");
       return;
     }
 
     try {
+      setIsLoadingB(true);
       const updates = {
         ministerio: formData.ministerio,
         categoria_principal: formData.categoria_principal,
@@ -446,10 +453,12 @@ const removeConfiguration = async (
 
   const totalIngresos = records
     .filter((r) => r.tipo === "Ingreso")
+    // @ts-ignore
     .reduce((sum, r) => sum + r.monto, 0);
 
   const totalEgresos = records
     .filter((r) => r.tipo === "Egreso")
+    // @ts-ignore
     .reduce((sum, r) => sum + r.monto, 0);
 
   const balance = totalIngresos - totalEgresos;
@@ -779,7 +788,8 @@ function formatDateForTable(dateString: string) {
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              monto: Number.parseFloat(e.target.value) || 0,
+                              // @ts-ignore
+                              monto: Number.parseFloat(e.target.value),
                             })
                           }
                           required
@@ -1152,7 +1162,8 @@ function formatDateForTable(dateString: string) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      monto: Number.parseFloat(e.target.value) || 0,
+                      // @ts-ignore
+                      monto: Number.parseFloat(e.target.value),
                     })
                   }
                   required
