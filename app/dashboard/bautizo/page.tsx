@@ -118,7 +118,7 @@ export default function BautizoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setIsSaving(true)
+    
 
     if (!formData.nombre_bautizado || !formData.nombre_padre || !formData.nombre_madre) {
       setError("Por favor complete todos los campos obligatorios")
@@ -127,6 +127,7 @@ export default function BautizoPage() {
     }
 
     try {
+      setIsSaving(true)
       const bautizoData: BautizoInput = {
         numero: formData.numero,
         fecha: formData.fecha,

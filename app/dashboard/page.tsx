@@ -22,6 +22,7 @@ import { getUserPermissions } from "@/lib/auth"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateMonthModal } from "@/components/CreateMonthModal"
+import { ChangePasswordModal } from "@/components/ChangePasswordModal"
 
 
 interface ModulePermission {
@@ -157,6 +158,9 @@ const [openCreateModal, setOpenCreateModal] = useState(false)
               <Button variant="outline" onClick={handleLogout}>
                 Cerrar Sesión
               </Button>
+              <ChangePasswordModal userId={user.id}>
+
+              </ChangePasswordModal>
             </div>
           </div>
         </div>
