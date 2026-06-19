@@ -71,16 +71,17 @@ export function MonthProvider({ children }: { children: ReactNode }) {
   const createInitialMonth = async (startDate: string, endDate: string | null) => {
 
     const now = new Date()
+    const selectedDate = new Date(startDate)
     const monthNames = [
       "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ]
 
     const newMonth: MonthData = {
-      id: `${now.getFullYear()}-${now.getMonth() + 1}-${Date.now()}`,
-      name: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
+      id: `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${Date.now()}`,
+      name: `${monthNames[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,
       start_date: startDate,
       status: "active",
       data: {
@@ -110,21 +111,57 @@ export function MonthProvider({ children }: { children: ReactNode }) {
   }
 
 
-    const editMonthDates = async (id: string, startDate: string, endDate: string | null) => {
-    const updated = await storage.updateMonthDates({
-  id,
-  start_date: startDate,
-  end_date: endDate,
-});
+const editMonthDates = async (
+  id: string,
+  startDate: string,
+  endDate: string | null
+) => {
+  const date = new Date(startDate)
 
-    if (currentMonth?.id === id) {
-      setCurrentMonth({ ...currentMonth, start_date: startDate, end_date: endDate })
-    }
+  const monthNames = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ]
 
-    setMonthHistory(prev =>
-      prev.map(m => (m.id === id ? { ...m, start_date: startDate, end_date: endDate } : m))
-    )
+  const name = `${monthNames[date.getMonth()]} ${date.getFullYear()}`
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+
+  await storage.updateMonthDates({
+    id,
+    start_date: startDate,
+    end_date: endDate,
+    name,
+    year,
+    month,
+  })
+
+  if (currentMonth?.id === id) {
+    setCurrentMonth({
+      ...currentMonth,
+      start_date: startDate,
+      end_date: endDate,
+      name,
+      year,
+      month,
+    })
   }
+
+  setMonthHistory(prev =>
+    prev.map(m =>
+      m.id === id
+        ? {
+            ...m,
+            start_date: startDate,
+            end_date: endDate,
+            name,
+            year,
+            month,
+          }
+        : m
+    )
+  )
+}
 
   // 🗑 NUEVO -> Eliminar mes
   const deleteMonth = async (id: string) => {
@@ -156,6 +193,7 @@ export function MonthProvider({ children }: { children: ReactNode }) {
 
       // Crear nuevo mes preservando configuraciones
       const now = new Date()
+      const selectedDate = new Date(startDate)
       const monthNames = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"

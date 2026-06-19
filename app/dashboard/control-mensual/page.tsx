@@ -186,7 +186,7 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
     Ver
   </Button>
 
-  {/* Nuevo: Editar */}
+  {/* Nuevo: Editar
   <Button
     size="sm"
     variant="secondary"
@@ -198,9 +198,9 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
   >
     Editar
   </Button>
+ 
 
 
-  {/* Nuevo: Eliminar */}
 <Button
   size="sm"
   variant="destructive"
@@ -211,6 +211,7 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
 >
   Eliminar
 </Button>
+*/}
 </div>
 
 

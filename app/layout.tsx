@@ -9,7 +9,11 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 
 export const metadata: Metadata = {
-  title: "Iglesia",
+  title: "Regalo de Dios",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

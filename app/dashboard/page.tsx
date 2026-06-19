@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Download, Check } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
@@ -37,6 +39,52 @@ interface ModulePermission {
   is_active: boolean
 }
 
+
+ function DownloadSeparator({
+  fileUrl = "#",
+  fileName = "archivo.pdf",
+  label = "Descargar archivo",
+}) {
+  const [downloaded, setDownloaded] = useState(false);
+ 
+  const handleDownload = () => {
+    const link = document.createElement("a");
+    link.href = fileUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+ 
+    setDownloaded(true);
+    setTimeout(() => setDownloaded(false), 2000);
+  };
+ 
+  return (
+    <div className="flex items-center w-full my-8">
+      <div className="flex-grow border-t border-gray-300" />
+ 
+      <button
+        onClick={handleDownload}
+        className="mx-4 flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-150 hover:scale-105 hover:bg-blue-700 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      >
+        {downloaded ? (
+          <span className="flex items-center gap-2">
+            <Check size={16} />
+            Descargado
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <Download size={16} />
+            {label}
+          </span>
+        )}
+      </button>
+ 
+      <div className="flex-grow border-t border-gray-300" />
+    </div>
+  );
+}
+ 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
   const { currentMonth, startNewMonth } = useMonth()
@@ -136,18 +184,11 @@ const [openCreateModal, setOpenCreateModal] = useState(false)
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                  />
-                </svg>
+              <div className="w-15 h-15 rounded-lg flex items-center justify-center">
+                <img src="/logo.png" alt="Logo" className="w-15 h-15" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Dashboard Iglesia</h1>
+                <h1 className="text-xl font-semibold text-gray-900">Regalo de Dios - Panel de control</h1>
                 <p className="text-sm text-gray-600">Bienvenido, {user.displayName}</p>
               </div>
             </div>
@@ -237,6 +278,8 @@ const [openCreateModal, setOpenCreateModal] = useState(false)
             })}
           </div>
         )}
+
+        <DownloadSeparator fileUrl="/regalo-de-dios-setup.exe" fileName="regalo-de-dios-setup.exe" label="Descargar" />
       </main>
     </div>
   )

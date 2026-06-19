@@ -17,10 +17,13 @@ interface StorageAdapter {
   getGlobalConfig(): Promise<any>;
   updateGlobalConfig(config: any): Promise<void>;
   updateMonthDates: (options: {
-    id: string;
-    start_date: string;
-    end_date?: string | null;
-  }) => Promise<void>;
+    id: string
+    start_date: string
+    end_date?: string | null
+    name: string
+    year: number
+    month: number
+  }) => Promise<void>
 
   deleteMonth: (id: string) => Promise<void>;
 }
@@ -55,20 +58,29 @@ async updateMonthDates({
   id,
   start_date,
   end_date,
+  name,
+  year,
+  month,
 }: {
   id: string
   start_date: string
   end_date?: string | null
+  name: string
+  year: number
+  month: number
 }): Promise<void> {
   const { error } = await supabase
     .from("meses")
     .update({
       start_date,
       end_date: end_date ?? null,
+      name,
+      year,
+      month,
     })
-    .eq("id", id);
+    .eq("id", id)
 
-  if (error) throw error;
+  if (error) throw error
 }
 
 
