@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ import {
 } from "@/lib/globalConfig";
 import { storage } from "@/lib/storage";
 import { useAuth } from "@/contexts/auth-context";
+import { useSecurityCheck } from "@/contexts/security-context"
 
 interface FinancialRecord {
   id: number;
@@ -65,9 +67,11 @@ interface FinancialRecord {
   monto: string | number
   estado: "Procesado" | "Pendiente";
   mes_id: string;
+  created_at: string;
 }
 
 export default function IngresosEgresosPage() {
+const { checkAndExecute } = useSecurityCheck()
 
   const router = useRouter();
   const { currentMonth, updateConfigurations } = useMonth();
@@ -167,6 +171,7 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
           monto: ingreso.monto,
           estado: ingreso.estado,
           mes_id: ingreso.mes_id,
+          created_at: ingreso.created_at
         })) || [];
 
       const expenseRecords: FinancialRecord[] =
@@ -181,6 +186,7 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
           monto: egreso.monto,
           estado: egreso.estado,
           mes_id: egreso.mes_id,
+          created_at: egreso.created_at,
         })) || [];
 
       const allRecords: FinancialRecord[] = [
@@ -494,7 +500,7 @@ function formatDateForTable(dateString: string) {
   const year = date.getUTCFullYear();
   return `${day}/${month}/${year}`; // DD/MM/YYYY
 }
-
+  console.log(records)
 
   return (
         <PermissionsGuard moduleName="ingresos_egresos">
@@ -940,7 +946,7 @@ function formatDateForTable(dateString: string) {
                   <tbody>
                     
                     {records.map((record) => (
-                      <tr key={record.id} className="border-b hover:bg-gray-50">
+                      <tr key={record.id + "-" + record.tipo} className="border-b hover:bg-gray-50">
                         <td className="p-3">
                         {formatDateForTable(record.fecha)}
                      
@@ -976,10 +982,15 @@ function formatDateForTable(dateString: string) {
                         <td>{record.observacion}</td>
                         <td className="p-3">
                           <div className="flex space-x-2">
+                            {/*MICHE*/}
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleEdit(record)}
+                              onClick={() =>
+  checkAndExecute(record.created_at, () => {
+    handleEdit(record)
+  })
+}
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -989,7 +1000,11 @@ function formatDateForTable(dateString: string) {
                                   size="sm"
                                   variant="outline"
                                   className="text-red-600 hover:text-red-700 bg-transparent"
-                                  onClick={() => handleDelete(record.id)}
+                                                                onClick={() =>
+  checkAndExecute(record.created_at, () => {
+    handleDelete(record.id)
+  })
+}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>

@@ -41,6 +41,7 @@ export function useSecurityCheck(): UseSecurityCheckReturn {
 
   // Función principal que verifica y ejecuta
   const checkAndExecute = (createdAt: string, callback: () => void) => {
+    console.log("useSecurityCheck render")
     // Si es admin, ejecutar directamente
     if (user?.username === "Jaime Salas") {
       callback()
