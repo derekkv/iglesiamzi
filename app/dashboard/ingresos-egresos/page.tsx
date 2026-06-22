@@ -85,6 +85,8 @@ const { checkAndExecute } = useSecurityCheck()
   const [editingRecord, setEditingRecord] = useState<FinancialRecord | null>(
     null
   );
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+
   const [error, setError] = useState("");
   const [deleteRecordId, setDeleteRecordId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,7 +98,12 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   ubicaciones: [],
   estados: [],
 });
-
+const handleDeleteClick = (record: FinancialRecord) => {
+  checkAndExecute(record.created_at, () => {
+    setDeleteRecordId(record.id)
+    setIsDeleteDialogOpen(true)
+  })
+}
   const [newMinisterio, setNewMinisterio] = useState("");
   const [newCategoria, setNewCategoria] = useState("");
   const [newDetalle, setNewDetalle] = useState("");
@@ -500,7 +507,6 @@ function formatDateForTable(dateString: string) {
   const year = date.getUTCFullYear();
   return `${day}/${month}/${year}`; // DD/MM/YYYY
 }
-  console.log(records)
 
   return (
         <PermissionsGuard moduleName="ingresos_egresos">
@@ -994,44 +1000,46 @@ function formatDateForTable(dateString: string) {
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-red-600 hover:text-red-700 bg-transparent"
-                                                                onClick={() =>
-  checkAndExecute(record.created_at, () => {
-    handleDelete(record.id)
-  })
-}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    ¿Eliminar registro?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción no se puede deshacer. El
-                                    registro será eliminado permanentemente.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>
-                                    Cancelar
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={confirmDelete}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <AlertDialog
+  open={isDeleteDialogOpen}
+  onOpenChange={setIsDeleteDialogOpen}
+>
+  <Button
+    size="sm"
+    variant="outline"
+    className="text-red-600 hover:text-red-700 bg-transparent"
+    onClick={() => handleDeleteClick(record)}
+  >
+    <Trash2 className="w-4 h-4" />
+  </Button>
+
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>
+        ¿Eliminar registro?
+      </AlertDialogTitle>
+      <AlertDialogDescription>
+        Esta acción no se puede deshacer. El registro será eliminado permanentemente.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+
+    <AlertDialogFooter>
+      <AlertDialogCancel>
+        Cancelar
+      </AlertDialogCancel>
+
+      <AlertDialogAction
+        onClick={async () => {
+          await confirmDelete()
+          setIsDeleteDialogOpen(false)
+        }}
+        className="bg-red-600 hover:bg-red-700"
+      >
+        Eliminar
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
                           </div>
                         </td>
                       </tr>

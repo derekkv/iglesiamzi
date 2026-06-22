@@ -63,7 +63,6 @@ export function SecurityCheckProvider({
     callback: () => void
   ) => {
 
-    console.log("CLICK", createdAt)
     if (user?.username === "Jaime Salas") {
       callback()
       return
@@ -73,7 +72,6 @@ export function SecurityCheckProvider({
       callback()
       return
     }
-  console.log("ABRIENDO MODAL")
     setPendingCallback(() => callback)
     setIsDialogOpen(true)
   }

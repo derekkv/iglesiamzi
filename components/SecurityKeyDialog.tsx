@@ -25,7 +25,6 @@ export function SecurityKeyDialog() {
     handleValidateKey,
   } = useSecurityCheck()
 
-    console.log("Dialog render", isDialogOpen)
     
   return (
     <Dialog
