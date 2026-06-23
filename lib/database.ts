@@ -165,39 +165,6 @@ export interface CensoConfiguraciones {
 
 
 
-export const editMonth = async (month: any) => {
-  const newStart = prompt("Nueva fecha inicio (YYYY-MM-DD):", month.start_date.split("T")[0])
-  if (!newStart) return
-  
-  const newEnd = prompt("Nueva fecha cierre (YYYY-MM-DD):", month.end_date ? month.end_date.split("T")[0] : "")
-  
-  const { error } = await supabase.rpc("update_month_dates", {
-    p_id: month.id,
-    p_start_date: newStart,
-    p_end_date: newEnd || null
-  })
-
-  if (error) {
-    alert("❌ Error al actualizar: " + error.message)
-  } else {
-    alert("✔ Mes actualizado")
-  }
-}
-
-export const deleteMonth = async (month: any) => {
-  if (!confirm("¿Seguro que deseas eliminar este mes? ❌")) return
-
-  const { error } = await supabase.rpc("delete_month", {
-    p_id: month.id,
-  })
-
-  if (error) {
-    alert("❌ Error al eliminar: " + error.message)
-  } else {
-    alert("🗑 Mes eliminado")
-  }
-}
-
 
 export async function getMesById(mesId: string) {
 
@@ -260,6 +227,7 @@ export async function getDiscipuladoData(mesId: string) {
   const { data: participantes, error: participantesError } = await supabase
     .from("discipulado_participantes")
     .select("*")
+    .eq("mes_id", mesId)
     .order("name", { ascending: true })
 
   if (participantesError) throw participantesError

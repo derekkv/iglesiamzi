@@ -34,41 +34,15 @@ export interface DiscipuladoData {
 class DiscipuladoService {
   private supabase = supabase
 
-  private async ensureMonthExists(mesId: string): Promise<void> {
 
-    const { data: existingMonth } = await this.supabase.from("meses").select("id").eq("id", mesId).single()
-
-    if (!existingMonth) {
-      // Parse mesId to get year and month
-      const [year, month] = mesId.split("-").map(Number)
-      const startDate = new Date(year, month - 1, 1)
-      const endDate = new Date(year, month, 0)
-
-      const { error } = await this.supabase.from("meses").insert({
-        id: mesId,
-        name: `${year}-${month.toString().padStart(2, "0")}`,
-        year: year,
-        month: month,
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-        status: "active",
-      })
-
-      if (error) {
-        throw error
-      }
-    }
-  }
 
   // Participants CRUD
   async getParticipants(mesId: string): Promise<Participant[]> {
 
-    await this.ensureMonthExists(mesId)
-
     const { data, error } = await this.supabase
       .from("discipulado_participantes")
       .select("*")
-
+      .eq("mes_id", mesId)
       .order("name")
 
     if (error) {
@@ -80,11 +54,10 @@ class DiscipuladoService {
 
   async addParticipant(mesId: string, name: string): Promise<Participant> {
 
-    await this.ensureMonthExists(mesId)
-
     const { data, error } = await this.supabase
       .from("discipulado_participantes")
       .insert({
+        mes_id: mesId,
         name: name.trim(),
       })
       .select()
@@ -125,8 +98,6 @@ class DiscipuladoService {
   // Dates CRUD
   async getDates(mesId: string): Promise<DiscipuladoDate[]> {
 
-    await this.ensureMonthExists(mesId)
-
     const { data, error } = await this.supabase
       .from("discipulado_fechas")
       .select("*")
@@ -141,8 +112,6 @@ class DiscipuladoService {
   }
 
   async addDate(mesId: string, fecha: string): Promise<DiscipuladoDate> {
-
-    await this.ensureMonthExists(mesId)
 
     const { data, error } = await this.supabase
       .from("discipulado_fechas")
@@ -172,8 +141,6 @@ class DiscipuladoService {
   // Attendance CRUD
   async getAttendance(mesId: string): Promise<AttendanceRecord[]> {
 
-    await this.ensureMonthExists(mesId)
-
     const { data, error } = await this.supabase.from("discipulado_asistencia").select("*").eq("mes_id", mesId)
 
     if (error) {
@@ -189,8 +156,6 @@ class DiscipuladoService {
     fechaId: number,
     status: "A" | "J" | "F" | "AT" | "none",
   ): Promise<AttendanceRecord | null> {
-
-    await this.ensureMonthExists(mesId)
 
     if (status === "none") {
       // Delete the record if status is 'none'
@@ -232,8 +197,6 @@ class DiscipuladoService {
 
   // Get all data for a month
   async getDiscipuladoData(mesId: string): Promise<DiscipuladoData> {
-
-    await this.ensureMonthExists(mesId)
 
     const [participants, dates, attendance] = await Promise.all([
       this.getParticipants(mesId),

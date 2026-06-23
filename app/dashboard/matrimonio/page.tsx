@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { useSecurityCheck } from "@/hooks/use-security-check"
+import { useSecurityCheck } from "@/contexts/security-context"
 import { matrimonioService, type Matrimonio, type MatrimonioInput } from "@/lib/mod/matrimonio-service"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,13 +33,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Trash2, Edit, Plus } from "lucide-react"
+import { Trash2, Edit, Plus, Lock, ArrowLeft } from "lucide-react"
 
-export default function MatrimonioPage() {
+function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { user } = useAuth()
   const { toast } = useToast()
-  const { checkAndExecute, SecurityKeyDialog } = useSecurityCheck()
+  const { checkAndExecute } = useSecurityCheck()
 
   const [matrimonios, setMatrimonios] = useState<Matrimonio[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -238,6 +238,12 @@ export default function MatrimonioPage() {
     }
   }
 
+  const handleDeleteRequest = (matrimonio: Matrimonio) => {
+    checkAndExecute(matrimonio.created_at, () => {
+      setDeleteMatrimonioId(matrimonio.id)
+    })
+  }
+
   const confirmDelete = async () => {
     if (!deleteMatrimonioId) return
 
@@ -284,22 +290,34 @@ export default function MatrimonioPage() {
   }
 
   return (
-    <PermissionsGuard moduleName="matrimonio">
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-4">
-                <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                  ← Volver al Dashboard
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/dashboard")}
+                  className="flex items-center space-x-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Volver</span>
                 </Button>
                 <h1 className="text-xl font-semibold text-gray-900">Registro de Matrimonios</h1>
               </div>
               <div className="flex items-center space-x-4">
-                <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar Matrimonio
-                </Button>
+                {!canEdit && (
+                  <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                    <Lock className="w-3 h-3" /> Solo lectura
+                  </span>
+                )}
+                {canEdit && (
+                  <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Agregar Matrimonio
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -323,7 +341,7 @@ export default function MatrimonioPage() {
                         <th className="text-left p-3 font-medium">Cédula Esposo</th>
                         <th className="text-left p-3 font-medium">Cédula Esposa</th>
                         <th className="text-left p-3 font-medium">Observación</th>
-                        <th className="text-left p-3 font-medium">Acciones</th>
+                        {canEdit && <th className="text-left p-3 font-medium">Acciones</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -335,21 +353,23 @@ export default function MatrimonioPage() {
                           <td className="p-3">{matrimonio.cedula_esposo}</td>
                           <td className="p-3">{matrimonio.cedula_esposa}</td>
                           <td className="p-3">{matrimonio.observacion || "-"}</td>
-                          <td className="p-3">
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="outline" onClick={() => handleEdit(matrimonio)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700 bg-transparent"
-                                onClick={() => setDeleteMatrimonioId(matrimonio.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </td>
+                          {canEdit && (
+                            <td className="p-3">
+                              <div className="flex space-x-2">
+                                <Button size="sm" variant="outline" onClick={() => handleEdit(matrimonio)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 hover:text-red-700 bg-transparent"
+                                  onClick={() => handleDeleteRequest(matrimonio)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -358,9 +378,11 @@ export default function MatrimonioPage() {
               ) : (
                 <div className="text-center py-12">
                   <p className="text-gray-500 mb-4">No hay matrimonios registrados</p>
-                  <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
-                    Agregar Primer Matrimonio
-                  </Button>
+                  {canEdit && (
+                    <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
+                      Agregar Primer Matrimonio
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -570,9 +592,15 @@ export default function MatrimonioPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Security Key Dialog */}
-        <SecurityKeyDialog />
+
       </div>
+  )
+}
+
+export default function MatrimonioPage() {
+  return (
+    <PermissionsGuard moduleName="matrimonio">
+      {(canEdit) => <MatrimonioContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

@@ -35,8 +35,9 @@ import {
   type DiscipuladoDate,
   type AttendanceRecord,
 } from "@/lib/mod/discipulado-service"
-import { Trash2, Plus, ArrowLeft, Edit } from "lucide-react"
-import { useMonth } from "@/contexts/month-context";
+import { Trash2, Plus, ArrowLeft, Edit, Lock } from "lucide-react"
+import { useMonth } from "@/contexts/month-context"
+import { useSecurityCheck } from "@/contexts/security-context"
 
 interface DiscipuladoData {
   participants: Participant[]
@@ -56,9 +57,10 @@ const getAttendanceColor = (status: string) => {
   return option ? option.color : ""
 }
 
-export default function DiscipuladoPage() {
+function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
-  const { currentMonth } = useMonth();
+  const { currentMonth } = useMonth()
+  const { checkAndExecute } = useSecurityCheck()
   const [data, setData] = useState<DiscipuladoData>({
     participants: [],
     dates: [],
@@ -72,7 +74,7 @@ export default function DiscipuladoPage() {
   const [newParticipantName, setNewParticipantName] = useState("")
   const [newDate, setNewDate] = useState("")
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
-    const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -155,7 +157,7 @@ export default function DiscipuladoPage() {
       setShowAddDate(false)
     } catch (error) {
       console.error("Error adding date:", error)
-    }finally {
+    } finally {
       setSaving(false)
     }
   }
@@ -183,7 +185,7 @@ export default function DiscipuladoPage() {
     } catch (error) {
       console.error("Error updating attendance:", error)
     }
-  }     
+  }
 
   const getDateStats = (dateId: number) => {
     const records = data.attendance.filter((a) => a.fecha_id === dateId)
@@ -214,7 +216,7 @@ export default function DiscipuladoPage() {
 
   if (loading) {
     return (
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando datos de discipulado...</p>
@@ -224,19 +226,20 @@ export default function DiscipuladoPage() {
   }
 
   return (
-        <PermissionsGuard moduleName="discipulado">
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => router.push("/dashboard")}
-                className="back-button flex items-center px-3 py-2 hover:bg-gray-100 rounded-md transition-colors"
+                className="flex items-center space-x-2"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="w-4 h-4" />
                 <span>Volver</span>
-              </button>
+              </Button>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Asistencia o Discipulado</h1>
                 <p className="text-sm text-gray-600">
@@ -244,9 +247,17 @@ export default function DiscipuladoPage() {
                 </p>
               </div>
             </div>
-            <Badge variant="outline" className="text-blue-600 border-blue-200">
-              {currentMonth?.name}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {!canEdit && (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Solo lectura
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                {currentMonth?.name}
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
@@ -267,72 +278,72 @@ export default function DiscipuladoPage() {
           </CardContent>
         </Card>
 
-        <div className="flex flex-wrap gap-4 mb-6">
-          <Dialog open={showAddParticipant} onOpenChange={setShowAddParticipant}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Participante
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Agregar Participante</DialogTitle>
-                <DialogDescription>Ingrese el nombre del nuevo participante</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="participantName">Nombre del Participante</Label>
-                  <Input
-                    id="participantName"
-                    value={newParticipantName}
-                    onChange={(e) => setNewParticipantName(e.target.value)}
-                    placeholder="Nombre completo"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAddParticipant(false)}>
-                  Cancelar
+        {canEdit && (
+          <div className="flex flex-wrap gap-4 mb-6">
+            <Dialog open={showAddParticipant} onOpenChange={setShowAddParticipant}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Participante
                 </Button>
-             
-                    <Button onClick={handleAddParticipant} disabled={saving || !newParticipantName.trim()}>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agregar Participante</DialogTitle>
+                  <DialogDescription>Ingrese el nombre del nuevo participante</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="participantName">Nombre del Participante</Label>
+                    <Input
+                      id="participantName"
+                      value={newParticipantName}
+                      onChange={(e) => setNewParticipantName(e.target.value)}
+                      placeholder="Nombre completo"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowAddParticipant(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleAddParticipant} disabled={saving || !newParticipantName.trim()}>
                     {saving ? "Guardando..." : "Agregar"}
                   </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-          <Dialog open={showAddDate} onOpenChange={setShowAddDate}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Fecha
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Agregar Fecha</DialogTitle>
-                <DialogDescription>Seleccione una fecha para registrar asistencia</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="newDate">Fecha</Label>
-                  <Input id="newDate" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAddDate(false)}>
-                  Cancelar
+            <Dialog open={showAddDate} onOpenChange={setShowAddDate}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Fecha
                 </Button>
-          
-                 <Button onClick={handleAddDate} disabled={saving || !newDate || data.dates.some((d) => d.fecha === newDate)}>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agregar Fecha</DialogTitle>
+                  <DialogDescription>Seleccione una fecha para registrar asistencia</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="newDate">Fecha</Label>
+                    <Input id="newDate" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowAddDate(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleAddDate} disabled={saving || !newDate || data.dates.some((d) => d.fecha === newDate)}>
                     {saving ? "Guardando..." : "Agregar"}
                   </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
 
         <Card>
           <CardHeader>
@@ -360,30 +371,34 @@ export default function DiscipuladoPage() {
                               year: "numeric",
                             })}
                           </span>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar fecha?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Se eliminará la fecha {dateObj.fecha} y todos los registros de asistencia asociados.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteDate(dateObj.id)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {canEdit && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar fecha?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Se eliminará la fecha {dateObj.fecha} y todos los registros de asistencia asociados.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      checkAndExecute(dateObj.created_at || new Date().toISOString(), () => handleDeleteDate(dateObj.id))
+                                    }
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </th>
                     ))}
@@ -399,43 +414,51 @@ export default function DiscipuladoPage() {
                         <td className="border border-gray-300 px-4 py-2">
                           <div className="flex items-center justify-between">
                             <span>{participant.name}</span>
-                            <div className="flex space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingParticipant(participant)
-                                  setShowEditParticipant(true)
-                                }}
-                                className="h-6 w-6 p-0"
-                              >
-                                <Edit className="w-3 h-3" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500">
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar participante?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Se eliminará a {participant.name} y todos sus registros de asistencia.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteParticipant(participant.id)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                    >
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
+                            {canEdit && (
+                              <div className="flex space-x-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    checkAndExecute(participant.created_at || new Date().toISOString(), () => {
+                                      setEditingParticipant(participant)
+                                      setShowEditParticipant(true)
+                                    })
+                                  }
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500">
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Eliminar participante?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Se eliminará a {participant.name} y todos sus registros de asistencia.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() =>
+                                          checkAndExecute(participant.created_at || new Date().toISOString(), () =>
+                                            handleDeleteParticipant(participant.id)
+                                          )
+                                        }
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            )}
                           </div>
                         </td>
                         {data.dates.map((dateObj) => {
@@ -445,6 +468,7 @@ export default function DiscipuladoPage() {
                               <Select
                                 value={status}
                                 onValueChange={(value) => handleAttendanceChange(participant.id, dateObj.id, value)}
+                                disabled={!canEdit}
                               >
                                 <SelectTrigger className={`w-full h-8 ${getAttendanceColor(status)}`}>
                                   <SelectValue placeholder="-" />
@@ -506,36 +530,44 @@ export default function DiscipuladoPage() {
           </CardContent>
         </Card>
 
-        <Dialog open={showEditParticipant} onOpenChange={setShowEditParticipant}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Participante</DialogTitle>
-              <DialogDescription>Modifique el nombre del participante</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editParticipantName">Nombre del Participante</Label>
-                <Input
-                  id="editParticipantName"
-                  value={editingParticipant?.name || ""}
-                  onChange={(e) => setEditingParticipant((prev) => (prev ? { ...prev, name: e.target.value } : null))}
-                  placeholder="Nombre completo"
-                />
+        {canEdit && (
+          <Dialog open={showEditParticipant} onOpenChange={setShowEditParticipant}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Participante</DialogTitle>
+                <DialogDescription>Modifique el nombre del participante</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editParticipantName">Nombre del Participante</Label>
+                  <Input
+                    id="editParticipantName"
+                    value={editingParticipant?.name || ""}
+                    onChange={(e) => setEditingParticipant((prev) => (prev ? { ...prev, name: e.target.value } : null))}
+                    placeholder="Nombre completo"
+                  />
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditParticipant(false)}>
-                Cancelar
-              </Button>
-         
-                  <Button onClick={handleEditParticipant} disabled={saving || !editingParticipant?.name.trim()}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEditParticipant(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditParticipant} disabled={saving || !editingParticipant?.name.trim()}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </main>
     </div>
+  )
+}
+
+export default function DiscipuladoPage() {
+  return (
+    <PermissionsGuard moduleName="discipulado">
+      {(canEdit) => <DiscipuladoContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

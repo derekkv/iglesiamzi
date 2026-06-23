@@ -1,18 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { useSecurityCheck } from "@/contexts/security-context"
+import { useAuth } from "@/contexts/auth-context"
+import { PermissionsGuard } from "@/lib/permissions-guard"
+import { censoService, type CensoRecord, type CatalogOption } from "@/lib/mod/censo-service"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,19 +23,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
-import { censoService, type CensoRecord, type CatalogOption } from "@/lib/mod/censo-service"
-import { useSecurityCheck } from "@/hooks/use-security-check"
-import { useAuth } from "@/contexts/auth-context"
-import { PermissionsGuard } from "@/lib/permissions-guard"
-import { Pencil, Trash2, Eye, Search, Settings, Plus, ArrowLeft} from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
-import { useRouter } from "next/navigation"
 
-export default function CensoPage() {
+import { Pencil, Trash2, Eye, Search, Plus, ArrowLeft } from "lucide-react"
+
+// Componentes Modularizados
+import { CensoForm } from "./components/CensoForm"
+import { CensoDetailView } from "./components/CensoDetailView"
+import { CatalogManager } from "./components/CatalogManager"
+
+function CensoContent({ canEdit }: { canEdit: boolean }) {
   const [records, setRecords] = useState<CensoRecord[]>([])
   const [filteredRecords, setFilteredRecords] = useState<CensoRecord[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -43,28 +39,27 @@ export default function CensoPage() {
   const [isLoadingB, setIsLoadingB] = useState(false)
   const router = useRouter()
 
-  // Modals
+  // Modales
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isCatalogDialogOpen, setIsCatalogDialogOpen] = useState(false)
 
-  // Current record
+  // Current record y datos del formulario
   const [currentRecord, setCurrentRecord] = useState<CensoRecord | null>(null)
   const [formData, setFormData] = useState<CensoRecord>({
     cedula: "",
     apellidos_nombres: "",
   })
 
-  // Catalog management
+  // Gestión de Catálogos
   const [catalogType, setCatalogType] = useState<string>("")
   const [catalogOptions, setCatalogOptions] = useState<CatalogOption[]>([])
   const [allCatalogs, setAllCatalogs] = useState<Record<string, CatalogOption[]>>({})
-  const [newCatalogValue, setNewCatalogValue] = useState("")
 
   const { toast } = useToast()
-  const { checkAndExecute, SecurityKeyDialog } = useSecurityCheck()
+  const { checkAndExecute } = useSecurityCheck()
   const { user } = useAuth()
 
   useEffect(() => {
@@ -132,15 +127,6 @@ export default function CensoPage() {
     }
   }
 
-  const handleAdd = () => {
-    setFormData({
-      cedula: "",
-      apellidos_nombres: "",
-      sueldo: 0,
-    })
-    setIsAddDialogOpen(true)
-  }
-
   const handleEdit = (record: CensoRecord) => {
     checkAndExecute(record.created_at || "", () => {
       setCurrentRecord(record)
@@ -155,6 +141,10 @@ export default function CensoPage() {
   }
 
   const handleDelete = (record: CensoRecord) => {
+    if (!canEdit) {
+      toast({ title: "Sin permiso", description: "No tiene permiso de edición en este módulo", variant: "destructive" })
+      return
+    }
     checkAndExecute(record.created_at || "", () => {
       setCurrentRecord(record)
       setIsDeleteDialogOpen(true)
@@ -162,6 +152,10 @@ export default function CensoPage() {
   }
 
   const handleSave = async () => {
+    if (!canEdit) {
+      toast({ title: "Sin permiso", description: "No tiene permiso de edición en este módulo", variant: "destructive" })
+      return
+    }
     if (!formData.cedula || !formData.apellidos_nombres) {
       toast({
         title: "Error",
@@ -178,6 +172,7 @@ export default function CensoPage() {
         title: "Éxito",
         description: "Registro creado correctamente",
       })
+      setFormData({ cedula: "", apellidos_nombres: "" })
       setIsAddDialogOpen(false)
       loadRecords()
     } catch (error: any) {
@@ -193,6 +188,10 @@ export default function CensoPage() {
   }
 
   const handleUpdate = async () => {
+    if (!canEdit) {
+      toast({ title: "Sin permiso", description: "No tiene permiso de edición en este módulo", variant: "destructive" })
+      return
+    }
     if (!currentRecord?.id || !formData.cedula || !formData.apellidos_nombres) {
       toast({
         title: "Error",
@@ -224,6 +223,10 @@ export default function CensoPage() {
   }
 
   const confirmDelete = async () => {
+    if (!canEdit) {
+      toast({ title: "Sin permiso", description: "No tiene permiso de edición en este módulo", variant: "destructive" })
+      return
+    }
     if (!currentRecord?.id) return
 
     try {
@@ -252,19 +255,16 @@ export default function CensoPage() {
     setIsCatalogDialogOpen(true)
   }
 
-  const handleAddCatalogOption = async () => {
-    if (!newCatalogValue.trim()) return
-
+  const handleAddCatalogOption = async (value: string) => {
     try {
       await censoService.createCatalogOption({
         tipo: catalogType,
-        valor: newCatalogValue.trim(),
+        valor: value,
       })
       toast({
         title: "Éxito",
         description: "Opción agregada correctamente",
       })
-      setNewCatalogValue("")
       loadCatalogOptions(catalogType)
       loadAllCatalogs()
     } catch (error: any) {
@@ -315,103 +315,34 @@ export default function CensoPage() {
     return labels[tipo] || tipo
   }
 
-  const renderFormField = (
-    label: string,
-    field: keyof CensoRecord,
-    type: "text" | "date" | "number" | "select" | "textarea" = "text",
-    selectType?: string,
-  ) => {
-    if (type === "select" && selectType) {
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={field}>{label}</Label>
-          <div className="flex gap-2">
-            <Select
-              value={(formData[field] as string) || ""}
-              onValueChange={(value) => setFormData({ ...formData, [field]: value })}
-            >
-              <SelectTrigger id={field}>
-                <SelectValue placeholder={`Seleccionar ${label}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {allCatalogs[selectType]?.map((option) => (
-                  <SelectItem key={option.id} value={option.valor}>
-                    {option.valor}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="button" variant="outline" size="icon" onClick={() => handleManageCatalog(selectType)}>
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )
-    }
-
-    if (type === "textarea") {
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={field}>{label}</Label>
-          <Textarea
-            id={field}
-            value={(formData[field] as string) || ""}
-            onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
-            placeholder={label}
-          />
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-2">
-        <Label htmlFor={field}>{label}</Label>
-        <Input
-          id={field}
-          type={type}
-          value={(formData[field] as string) || ""}
-          onChange={(e) =>
-            setFormData({
-              ...formData,
-              [field]: type === "number" ? Number.parseFloat(e.target.value) || 0 : e.target.value,
-            })
-          }
-          placeholder={label}
-        />
-      </div>
-    )
-  }
-
   return (
-    <PermissionsGuard moduleName="censo">
-      <div className="container mx-auto py-6 space-y-6">
+    <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                      <div className="flex items-center space-x-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => router.push("/dashboard")}
-                          className="flex items-center space-x-2"
-                        >
-                          <ArrowLeft className="w-4 h-4" />
-                          <span>Volver</span>
-                        </Button>
-                       <div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/dashboard")}
+                  className="flex items-center space-x-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Volver</span>
+                </Button>
+                <div>
                   <h1 className="text-xl font-semibold text-gray-900">Gestión de registros de censo</h1>
                 </div>
-                      </div>
-                     
-                          
-                    </div>
-                  </div>
-                </header>
+              </div>
+            </div>
+          </div>
+        </header>
 
-        <Tabs defaultValue="list" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <Tabs defaultValue="list" className="w-full">
+          <TabsList className={canEdit ? "grid w-full grid-cols-2" : "grid w-full grid-cols-1"}>
             <TabsTrigger value="list">Lista de Registros</TabsTrigger>
-            <TabsTrigger value="add">Agregar Nuevo</TabsTrigger>
+            {canEdit && <TabsTrigger value="add">Agregar Nuevo</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="list" className="space-y-4">
@@ -466,10 +397,10 @@ export default function CensoPage() {
                                   <Button variant="ghost" size="icon" onClick={() => handleView(record)}>
                                     <Eye className="h-4 w-4" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(record)}>
+                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(record)} disabled={!canEdit}>
                                     <Pencil className="h-4 w-4" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(record)}>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(record)} disabled={!canEdit}>
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
@@ -492,410 +423,94 @@ export default function CensoPage() {
                 <CardDescription>Complete el formulario para agregar una nueva persona</CardDescription>
               </CardHeader>
               <CardContent>
-                <form
+                <CensoForm
+                  formData={formData}
+                  onChangeFormData={setFormData}
+                  allCatalogs={allCatalogs}
+                  onManageCatalog={handleManageCatalog}
                   onSubmit={(e) => {
                     e.preventDefault()
                     handleSave()
                   }}
-                  className="space-y-6"
-                >
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* DATOS PERSONALES */}
-                    <div className="space-y-4 bg-green-50 dark:bg-green-950/20 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold bg-green-100 dark:bg-green-900 p-2 rounded">
-                        DATOS PERSONALES
-                      </h3>
-                      {renderFormField("Cédula *", "cedula")}
-                      {renderFormField("Apellidos y Nombres *", "apellidos_nombres")}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Fecha de Nacimiento", "fecha_nacimiento", "date")}
-                        {renderFormField("Edad", "edad", "number")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Si a Cristo", "si_a_cristo", "select", "si_a_cristo")}
-                        {renderFormField("Bautizo", "bautizo", "select", "bautizo")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Tipo de Sangre", "tipo_sangre", "select", "tipo_sangre")}
-                        {renderFormField("Estado Civil", "estado_civil", "select", "estado_civil")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Sexo", "sexo", "select", "sexo")}
-                        {renderFormField("Capacidad Especial", "capacidad_esp", "select", "capacidad_esp")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Porcentaje", "porcentaje", "number")}
-                        {renderFormField("Tipo de Discapacidad", "tipo_discapacidad")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {renderFormField("Celular", "celular")}
-                        {renderFormField("Convencional", "convencional")}
-                        {renderFormField("Familiar", "familiar")}
-                      </div>
-                      {renderFormField("Cónyuge", "conyuge")}
-                      {renderFormField("Correo", "correo")}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Nivel de Estudio", "nivel_estudio", "select", "nivel_estudio")}
-                        {renderFormField("Curso", "curso")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Acumula Décimos", "acumula_decimos", "select", "acumula_decimos")}
-                        {renderFormField("Hoja de Vida", "hoja_vida", "select", "hoja_vida")}
-                      </div>
-                      {renderFormField("Estado", "estado", "select", "estado")}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Fecha Registro SAITE", "fecha_registro_saite", "date")}
-                        {renderFormField("Fecha Registro IESS", "fecha_registro_iess", "date")}
-                      </div>
-                      {renderFormField("Dirección", "direccion", "textarea")}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Ciudad", "ciudad")}
-                        {renderFormField("Parroquia", "parroquia")}
-                      </div>
-                      {renderFormField("Barrio", "barrio")}
-                    </div>
-
-                    {/* DATOS IGLESIA */}
-                    <div className="space-y-4 bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold bg-orange-100 dark:bg-orange-900 p-2 rounded">
-                        DATOS IGLESIA
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Jornada de Trabajo", "jornada_trabajo", "select", "jornada_trabajo")}
-                        {renderFormField("Cargo", "cargo", "select", "cargo")}
-                      </div>
-                      {renderFormField("Local", "local", "select", "local")}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Fecha Ingreso", "fecha_ingreso", "date")}
-                        {renderFormField("Fecha Reingreso", "fecha_reingreso", "date")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Fecha Salida", "fecha_salida", "date")}
-                        {renderFormField("Días por Mes", "dias_por_mes", "number")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Horas Diarias", "horas_diarias", "number")}
-                        {renderFormField("Horas Semanal", "horas_semanal", "number")}
-                      </div>
-                      {renderFormField("Sueldo", "sueldo", "number")}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {renderFormField("Pagos", "pagos", "select", "pagos")}
-                        {renderFormField("Banco", "banco", "select", "banco")}
-                      </div>
-                      {renderFormField("# Cuenta", "numero_cuenta")}
-                      {renderFormField("Intersección", "interseccion", "textarea")}
-                      {renderFormField("Redil", "redil")}
-                      {renderFormField("Niños", "ninos", "textarea")}
-                      {renderFormField("Otros", "otros", "textarea")}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setFormData({ cedula: "", apellidos_nombres: "" })
-                      }}
-                    >
-                      Limpiar
-                    </Button>
-                    <Button type="submit" disabled={isLoadingB}>
-                      {isLoadingB ? "Guardando..." : "Guardar Registro"}
-                    </Button>
-                  </div>
-                </form>
+                  onCancel={() => setFormData({ cedula: "", apellidos_nombres: "", sueldo: 0 })}
+                  isSaving={isLoadingB}
+                  submitLabel="Guardar Registro"
+                />
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
 
-        {/* View Details Dialog */}
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Detalles del Registro</DialogTitle>
-              <DialogDescription>Información completa de la persona</DialogDescription>
-            </DialogHeader>
-            {currentRecord && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold bg-green-100 dark:bg-green-900 p-2 rounded">DATOS PERSONALES</h3>
-                  <div className="space-y-2 text-sm">
-                    <p>
-                      <strong>Cédula:</strong> {currentRecord.cedula}
-                    </p>
-                    <p>
-                      <strong>Apellidos y Nombres:</strong> {currentRecord.apellidos_nombres}
-                    </p>
-                    <p>
-                      <strong>Fecha de Nacimiento:</strong> {currentRecord.fecha_nacimiento || "-"}
-                    </p>
-                    <p>
-                      <strong>Edad:</strong> {currentRecord.edad || "-"}
-                    </p>
-                    <p>
-                      <strong>Si a Cristo:</strong> {currentRecord.si_a_cristo || "-"}
-                    </p>
-                    <p>
-                      <strong>Bautizo:</strong> {currentRecord.bautizo || "-"}
-                    </p>
-                    <p>
-                      <strong>Tipo de Sangre:</strong> {currentRecord.tipo_sangre || "-"}
-                    </p>
-                    <p>
-                      <strong>Estado Civil:</strong> {currentRecord.estado_civil || "-"}
-                    </p>
-                    <p>
-                      <strong>Sexo:</strong> {currentRecord.sexo || "-"}
-                    </p>
-                    <p>
-                      <strong>Capacidad Especial:</strong> {currentRecord.capacidad_esp || "-"}
-                    </p>
-                    <p>
-                      <strong>Porcentaje:</strong> {currentRecord.porcentaje || "-"}
-                    </p>
-                    <p>
-                      <strong>Tipo de Discapacidad:</strong> {currentRecord.tipo_discapacidad || "-"}
-                    </p>
-                    <p>
-                      <strong>Celular:</strong> {currentRecord.celular || "-"}
-                    </p>
-                    <p>
-                      <strong>Convencional:</strong> {currentRecord.convencional || "-"}
-                    </p>
-                    <p>
-                      <strong>Familiar:</strong> {currentRecord.familiar || "-"}
-                    </p>
-                    <p>
-                      <strong>Cónyuge:</strong> {currentRecord.conyuge || "-"}
-                    </p>
-                    <p>
-                      <strong>Correo:</strong> {currentRecord.correo || "-"}
-                    </p>
-                    <p>
-                      <strong>Nivel de Estudio:</strong> {currentRecord.nivel_estudio || "-"}
-                    </p>
-                    <p>
-                      <strong>Curso:</strong> {currentRecord.curso || "-"}
-                    </p>
-                    <p>
-                      <strong>Acumula Décimos:</strong> {currentRecord.acumula_decimos || "-"}
-                    </p>
-                    <p>
-                      <strong>Hoja de Vida:</strong> {currentRecord.hoja_vida || "-"}
-                    </p>
-                    <p>
-                      <strong>Estado:</strong> {currentRecord.estado || "-"}
-                    </p>
-                    <p>
-                      <strong>Fecha Registro SAITE:</strong> {currentRecord.fecha_registro_saite || "-"}
-                    </p>
-                    <p>
-                      <strong>Fecha Registro IESS:</strong> {currentRecord.fecha_registro_iess || "-"}
-                    </p>
-                    <p>
-                      <strong>Dirección:</strong> {currentRecord.direccion || "-"}
-                    </p>
-                    <p>
-                      <strong>Ciudad:</strong> {currentRecord.ciudad || "-"}
-                    </p>
-                    <p>
-                      <strong>Parroquia:</strong> {currentRecord.parroquia || "-"}
-                    </p>
-                    <p>
-                      <strong>Barrio:</strong> {currentRecord.barrio || "-"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button onClick={() => setIsViewDialogOpen(false)}>Cerrar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Modal de Detalle */}
+        <CensoDetailView
+          isOpen={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+          record={currentRecord}
+        />
 
-        {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Editar Registro</DialogTitle>
-              <DialogDescription>Modifique los datos de la persona</DialogDescription>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleUpdate()
-              }}
-              className="space-y-6"
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* DATOS PERSONALES */}
-                <div className="space-y-4 bg-green-50 dark:bg-green-950/20 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold bg-green-100 dark:bg-green-900 p-2 rounded">DATOS PERSONALES</h3>
-                  {renderFormField("Cédula *", "cedula")}
-                  {renderFormField("Apellidos y Nombres *", "apellidos_nombres")}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Fecha de Nacimiento", "fecha_nacimiento", "date")}
-                    {renderFormField("Edad", "edad", "number")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Si a Cristo", "si_a_cristo", "select", "si_a_cristo")}
-                    {renderFormField("Bautizo", "bautizo", "select", "bautizo")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Tipo de Sangre", "tipo_sangre", "select", "tipo_sangre")}
-                    {renderFormField("Estado Civil", "estado_civil", "select", "estado_civil")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Sexo", "sexo", "select", "sexo")}
-                    {renderFormField("Capacidad Especial", "capacidad_esp", "select", "capacidad_esp")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Porcentaje", "porcentaje", "number")}
-                    {renderFormField("Tipo de Discapacidad", "tipo_discapacidad")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {renderFormField("Celular", "celular")}
-                    {renderFormField("Convencional", "convencional")}
-                    {renderFormField("Familiar", "familiar")}
-                  </div>
-                  {renderFormField("Cónyuge", "conyuge")}
-                  {renderFormField("Correo", "correo")}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Nivel de Estudio", "nivel_estudio", "select", "nivel_estudio")}
-                    {renderFormField("Curso", "curso")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Acumula Décimos", "acumula_decimos", "select", "acumula_decimos")}
-                    {renderFormField("Hoja de Vida", "hoja_vida", "select", "hoja_vida")}
-                  </div>
-                  {renderFormField("Estado", "estado", "select", "estado")}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Fecha Registro SAITE", "fecha_registro_saite", "date")}
-                    {renderFormField("Fecha Registro IESS", "fecha_registro_iess", "date")}
-                  </div>
-                  {renderFormField("Dirección", "direccion", "textarea")}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Ciudad", "ciudad")}
-                    {renderFormField("Parroquia", "parroquia")}
-                  </div>
-                  {renderFormField("Barrio", "barrio")}
-                </div>
+        {/* Modal de Edición */}
+        <AlertDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <AlertDialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Editar Registro</AlertDialogTitle>
+              <AlertDialogDescription>Modifique los datos de la persona</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-2">
+              <CensoForm
+                formData={formData}
+                onChangeFormData={setFormData}
+                allCatalogs={allCatalogs}
+                onManageCatalog={handleManageCatalog}
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleUpdate()
+                }}
+                onCancel={() => setIsEditDialogOpen(false)}
+                isSaving={isLoadingB}
+                submitLabel="Actualizar"
+              />
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
 
-                {/* DATOS IGLESIA */}
-                <div className="space-y-4 bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold bg-orange-100 dark:bg-orange-900 p-2 rounded">DATOS IGLESIA</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Jornada de Trabajo", "jornada_trabajo", "select", "jornada_trabajo")}
-                    {renderFormField("Cargo", "cargo", "select", "cargo")}
-                  </div>
-                  {renderFormField("Local", "local", "select", "local")}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Fecha Ingreso", "fecha_ingreso", "date")}
-                    {renderFormField("Fecha Reingreso", "fecha_reingreso", "date")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Fecha Salida", "fecha_salida", "date")}
-                    {renderFormField("Días por Mes", "dias_por_mes", "number")}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Horas Diarias", "horas_diarias", "number")}
-                    {renderFormField("Horas Semanal", "horas_semanal", "number")}
-                  </div>
-                  {renderFormField("Sueldo", "sueldo", "number")}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderFormField("Pagos", "pagos", "select", "pagos")}
-                    {renderFormField("Banco", "banco", "select", "banco")}
-                  </div>
-                  {renderFormField("# Cuenta", "numero_cuenta")}
-                  {renderFormField("Intersección", "interseccion", "textarea")}
-                  {renderFormField("Redil", "redil")}
-                  {renderFormField("Niños", "ninos", "textarea")}
-                  {renderFormField("Otros", "otros", "textarea")}
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isLoadingB}>
-                  {isLoadingB ? "Actualizando..." : "Actualizar"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Confirmation Dialog */}
+        {/* Modal de Confirmación de Borrado */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+              <AlertDialogTitle>¿Está seguro de eliminar este registro?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente el registro de{" "}
-                <strong>{currentRecord?.apellidos_nombres}</strong>.
+                Esta acción no se puede deshacer. Se eliminará de forma permanente el registro de{" "}
+                {currentRecord?.apellidos_nombres}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} disabled={isLoadingB}>
+              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} disabled={isLoadingB} className="bg-red-600 hover:bg-red-700">
                 {isLoadingB ? "Eliminando..." : "Eliminar"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Catalog Management Dialog */}
-        <Dialog open={isCatalogDialogOpen} onOpenChange={setIsCatalogDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Gestionar {getCatalogLabel(catalogType)}</DialogTitle>
-              <DialogDescription>Agregue o elimine opciones para este campo</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Nueva opción"
-                  value={newCatalogValue}
-                  onChange={(e) => setNewCatalogValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault()
-                      handleAddCatalogOption()
-                    }
-                  }}
-                />
-                <Button onClick={handleAddCatalogOption}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar
-                </Button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {catalogOptions.map((option) => (
-                  <div key={option.id} className="flex items-center justify-between p-2 border rounded">
-                    <span>{option.valor}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => option.id && handleDeleteCatalogOption(option.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => setIsCatalogDialogOpen(false)}>Cerrar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <SecurityKeyDialog />
+        {/* Modal de Configuración de Opciones de Catálogos */}
+        <CatalogManager
+          isOpen={isCatalogDialogOpen}
+          onOpenChange={setIsCatalogDialogOpen}
+          catalogType={catalogType}
+          catalogLabel={getCatalogLabel(catalogType)}
+          options={catalogOptions}
+          onAddOption={handleAddCatalogOption}
+          onDeleteOption={handleDeleteCatalogOption}
+        />
+        </main>
       </div>
+  )
+}
+
+export default function CensoPage() {
+  return (
+    <PermissionsGuard moduleName="censo">
+      {(canEdit) => <CensoContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

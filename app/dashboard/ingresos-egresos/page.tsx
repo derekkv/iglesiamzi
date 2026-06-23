@@ -45,7 +45,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Edit, Settings, Plus } from "lucide-react";
+import { Trash2, Edit, Settings, Plus, Lock, ArrowLeft } from "lucide-react";
 import { useMonth } from "@/contexts/month-context";
 import {
   getGlobalConfig,
@@ -70,7 +70,7 @@ interface FinancialRecord {
   created_at: string;
 }
 
-export default function IngresosEgresosPage() {
+function IngresosEgresosContent({ canEdit }: { canEdit: boolean }) {
 const { checkAndExecute } = useSecurityCheck()
 
   const router = useRouter();
@@ -99,6 +99,10 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   estados: [],
 });
 const handleDeleteClick = (record: FinancialRecord) => {
+  if (!canEdit) {
+    setError("No tiene permiso de edición en este módulo");
+    return;
+  }
   checkAndExecute(record.created_at, () => {
     setDeleteRecordId(record.id)
     setIsDeleteDialogOpen(true)
@@ -216,6 +220,10 @@ const handleDeleteClick = (record: FinancialRecord) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!canEdit) {
+      setError("No tiene permiso de edición en este módulo");
+      return;
+    }
    
 
     if (
@@ -298,6 +306,10 @@ const handleDeleteClick = (record: FinancialRecord) => {
 }
 
   const handleEdit = (record: FinancialRecord) => {
+    if (!canEdit) {
+      setError("No tiene permiso de edición en este módulo");
+      return;
+    }
     setEditingRecord(record);
     setFormData({
       fecha: formatDateForInput(record.fecha),
@@ -316,6 +328,10 @@ const handleDeleteClick = (record: FinancialRecord) => {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!canEdit) {
+      setError("No tiene permiso de edición en este módulo");
+      return;
+    }
     
 
     if (!editingRecord) return;
@@ -373,6 +389,10 @@ const handleDeleteClick = (record: FinancialRecord) => {
   };
 
   const confirmDelete = async () => {
+    if (!canEdit) {
+      setError("No tiene permiso de edición en este módulo");
+      return;
+    }
     if (!deleteRecordId || !currentMonth) return;
 
     try {
@@ -402,6 +422,10 @@ const handleDeleteClick = (record: FinancialRecord) => {
 const handleAddConfiguration = async (
   type: "ministerio" | "categoria" | "detalle"
 ) => {
+  if (!canEdit) {
+    setError("No tiene permiso de edición en este módulo");
+    return;
+  }
   let newValue = "";
   switch (type) {
     case "ministerio": newValue = newMinisterio.trim(); break;
@@ -509,20 +533,30 @@ function formatDateForTable(dateString: string) {
 }
 
   return (
-        <PermissionsGuard moduleName="ingresos_egresos">
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                ← Volver al Dashboard
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
               </Button>
               <h1 className="text-xl font-semibold text-gray-900">
                 Ingresos y Egresos
               </h1>
             </div>
             <div className="flex items-center space-x-4">
+              {!canEdit && (
+                <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                  <Lock className="w-3 h-3" /> Solo lectura
+                </span>
+              )}
               <Badge
                 variant="outline"
                 className="text-blue-600 border-blue-200"
@@ -535,7 +569,7 @@ function formatDateForTable(dateString: string) {
                 onOpenChange={setIsConfigModalOpen}
               >
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" disabled={!canEdit}>
                     <Settings className="w-4 h-4 mr-2" />
                     Configurar
                   </Button>
@@ -673,7 +707,7 @@ function formatDateForTable(dateString: string) {
 
               <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Button className="bg-blue-600 hover:bg-blue-700" disabled={!canEdit}>
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Registro
                   </Button>
@@ -997,6 +1031,7 @@ function formatDateForTable(dateString: string) {
     handleEdit(record)
   })
 }
+                              disabled={!canEdit}
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -1009,6 +1044,7 @@ function formatDateForTable(dateString: string) {
     variant="outline"
     className="text-red-600 hover:text-red-700 bg-transparent"
     onClick={() => handleDeleteClick(record)}
+    disabled={!canEdit}
   >
     <Trash2 className="w-4 h-4" />
   </Button>
@@ -1256,6 +1292,13 @@ function formatDateForTable(dateString: string) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function IngresosEgresosPage() {
+  return (
+    <PermissionsGuard moduleName="ingresos_egresos">
+      {(canEdit) => <IngresosEgresosContent canEdit={canEdit} />}
     </PermissionsGuard>
   );
 }

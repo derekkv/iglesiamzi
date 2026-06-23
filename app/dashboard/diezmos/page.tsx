@@ -26,15 +26,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-import { ArrowLeft, Plus, Trash2, Edit2, Search } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Edit2, Search, Lock } from "lucide-react"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
 import { useMonth } from "@/contexts/month-context"
+import { useSecurityCheck } from "@/contexts/security-context"
+import { toast } from "sonner"
 
-export default function DiezmosPage() {
+function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
+  const { checkAndExecute } = useSecurityCheck()
   const [activeMonth, setActiveMonth] = useState<{ id: string; name: string } | null>(null)
   const [records, setRecords] = useState<DiezmoRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +44,7 @@ export default function DiezmosPage() {
   const { currentMonth } = useMonth()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DiezmoRecord | null>(null)
   const [editingRecord, setEditingRecord] = useState<DiezmoRecord | null>(null)
 
   const [searchResults, setSearchResults] = useState<DiezmoWithMonth[]>([])
@@ -160,24 +163,36 @@ export default function DiezmosPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDeleteRequest = (record: DiezmoRecord) => {
+    checkAndExecute(record.created_at || new Date().toISOString(), () => {
+      setDeleteTarget(record)
+    })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await diezmosService.deleteDiezmo(id)
-      setRecords((prev) => prev.filter((record) => record.id !== id))
+      await diezmosService.deleteDiezmo(deleteTarget.id)
+      setRecords((prev) => prev.filter((r) => r.id !== deleteTarget.id))
+      toast.success("Diezmo eliminado")
     } catch (error) {
       console.error("Error deleting diezmo:", error)
-      alert("Error al eliminar el diezmo")
+      toast.error("Error al eliminar el diezmo")
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
   const openEditModal = (record: DiezmoRecord) => {
-    setEditingRecord(record)
-    setFormData({
-      fecha: record.fecha,
-      donador: record.donador,
-      valor: record.valor.toString(),
+    checkAndExecute(record.created_at || new Date().toISOString(), () => {
+      setEditingRecord(record)
+      setFormData({
+        fecha: record.fecha,
+        donador: record.donador,
+        valor: record.valor.toString(),
+      })
+      setShowEditModal(true)
     })
-    setShowEditModal(true)
   }
 
   const resetForm = () => {
@@ -220,33 +235,39 @@ export default function DiezmosPage() {
   }
 
   return (
-    <PermissionsGuard moduleName="diezmos">
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/dashboard")}
-                  className="flex items-center space-x-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Volver</span>
-                </Button>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Listado de Diezmos</h1>
-                  <p className="text-sm text-gray-600">Mes activo: {activeMonth?.name}</p>
-                </div>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Listado de Diezmos</h1>
+                <p className="text-sm text-gray-600">Mes activo: {activeMonth?.name}</p>
               </div>
-              <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center space-x-2">
-                    <Plus className="w-4 h-4" />
-                    <span>Agregar Diezmo</span>
-                  </Button>
-                </DialogTrigger>
+            </div>
+            <div className="flex items-center space-x-3">
+              {!canEdit && (
+                <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                  <Lock className="w-3 h-3" /> Solo lectura
+                </span>
+              )}
+              {canEdit && (
+                <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+                  <DialogTrigger asChild>
+                    <Button className="flex items-center space-x-2">
+                      <Plus className="w-4 h-4" />
+                      <span>Agregar Diezmo</span>
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Agregar Nuevo Diezmo</DialogTitle>
@@ -301,10 +322,12 @@ export default function DiezmosPage() {
                     </Button>
                   </DialogFooter>
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+              )}
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Tabs defaultValue="mes" className="w-full">
@@ -349,7 +372,7 @@ export default function DiezmosPage() {
                           <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Fecha</th>
                           <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Donador</th>
                           <th className="border border-gray-300 px-4 py-3 text-right font-semibold">Valor</th>
-                          <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Acciones</th>
+                          {canEdit && <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -361,43 +384,28 @@ export default function DiezmosPage() {
                             <td className="border border-gray-300 px-4 py-3 text-right font-medium">
                               ${Number(record.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}
                             </td>
-                            <td className="border border-gray-300 px-4 py-3">
-                              <div className="flex items-center justify-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openEditModal(record)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600">
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>¿Eliminar registro?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Se eliminará el diezmo #{record.numero} de {record.donador}. Esta acción no se
-                                        puede deshacer.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDelete(record.id)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Eliminar
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </td>
+                            {canEdit && (
+                              <td className="border border-gray-300 px-4 py-3">
+                                <div className="flex items-center justify-center space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openEditModal(record)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-red-600"
+                                    onClick={() => handleDeleteRequest(record)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -584,8 +592,33 @@ export default function DiezmosPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Delete Confirmation */}
+          <AlertDialog open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar diezmo?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se eliminará el diezmo #{deleteTarget?.numero} de {deleteTarget?.donador}. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </main>
       </div>
+  )
+}
+
+export default function DiezmosPage() {
+  return (
+    <PermissionsGuard moduleName="diezmos">
+      {(canEdit) => <DiezmosContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

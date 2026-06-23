@@ -32,7 +32,7 @@ import {
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
-import { Pencil, Trash2, RefreshCw, Copy, Check } from "lucide-react"
+import { Pencil, Trash2, RefreshCw, Copy, Check, ArrowLeft } from "lucide-react"
 import { getSecurityKeys, regenerateAllKeys} from "@/lib/security-keys"
 
 interface User {
@@ -63,7 +63,7 @@ interface SecurityKey {
   created_at: string
 }
 
-export default function AdministracionPage() {
+function AdministracionContent({ canEdit }: { canEdit: boolean }) {
   const [users, setUsers] = useState<User[]>([])
   const [modules, setModules] = useState<Module[]>([])
   const [securityKeys, setSecurityKeys] = useState<SecurityKey[]>([])
@@ -127,6 +127,11 @@ export default function AdministracionPage() {
   }
 
   const handleCreateUser = async () => {
+    if (!canEdit) {
+      toast.error("No tiene permisos para crear usuarios")
+      return
+    }
+
     if (!newUserForm.username || !newUserForm.password || !newUserForm.displayName) {
       toast.error("Complete los campos requeridos")
       return
@@ -182,6 +187,11 @@ export default function AdministracionPage() {
   }
 
   const handleUpdateUser = async () => {
+    if (!canEdit) {
+      toast.error("No tiene permisos para editar usuarios")
+      return
+    }
+
     if (!selectedUser) return
 
     if (!editUserForm.displayName) {
@@ -206,6 +216,11 @@ export default function AdministracionPage() {
   }
 
   const handleDeleteUser = async (userId: string, username: string) => {
+    if (!canEdit) {
+      toast.error("No tiene permisos para eliminar usuarios")
+      return
+    }
+
     if (!confirm(`¿Está seguro de eliminar al usuario "${username}"?`)) {
       return
     }
@@ -230,6 +245,11 @@ export default function AdministracionPage() {
   }
 
   const handleTogglePermission = async (moduleId: string, currentValue: boolean) => {
+    if (!canEdit) {
+      toast.error("No tiene permisos para modificar permisos")
+      return
+    }
+
     if (!selectedUser) return
 
     if (!currentUser?.id) {
@@ -237,10 +257,14 @@ export default function AdministracionPage() {
       return
     }
 
+    const existingPermission = userPermissions.find((p) => p.module_id === moduleId)
+    const currentEditValue = existingPermission?.can_edit || false
+
     const permissionData = {
       userId: selectedUser.id,
       moduleId,
       canView: !currentValue,
+      canEdit: !currentValue ? currentEditValue : false,
       grantedBy: currentUser.id,
     }
 
@@ -257,6 +281,40 @@ export default function AdministracionPage() {
     }
   }
 
+  const handleToggleEditPermission = async (moduleId: string, canView: boolean, canEditValue: boolean) => {
+    if (!canEdit) {
+      toast.error("No tiene permisos para modificar permisos")
+      return
+    }
+
+    if (!selectedUser) return
+
+    if (!currentUser?.id) {
+      toast.error("Error: Usuario no autenticado")
+      return
+    }
+
+    const permissionData = {
+      userId: selectedUser.id,
+      moduleId,
+      canView,
+      canEdit: !canEditValue,
+      grantedBy: currentUser.id,
+    }
+
+    const result = await setUserPermission(permissionData)
+
+    if (result.success) {
+      toast.success("Permiso de edición actualizado")
+      const updatedResult = await getUserPermissions(selectedUser.id)
+      if (updatedResult.success) {
+        setUserPermissions(updatedResult.permissions || [])
+      }
+    } else {
+      toast.error("Error al actualizar permiso de edición")
+    }
+  }
+
   const handleCopyKey = (keyCode: string) => {
     navigator.clipboard.writeText(keyCode)
     setCopiedKey(keyCode)
@@ -265,6 +323,11 @@ export default function AdministracionPage() {
   }
 
   const handleRegenerateKeys = async () => {
+    if (!canEdit) {
+      toast.error("No tiene permisos para regenerar claves")
+      return
+    }
+
     if (!confirm("¿Está seguro de regenerar todas las claves? Las claves actuales quedarán inválidas.")) {
       return
     }
@@ -291,14 +354,19 @@ export default function AdministracionPage() {
   }
 
   return (
-    <PermissionsGuard moduleName="administracion">
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-4">
-                <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                  ← Volver
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/dashboard")}
+                  className="flex items-center space-x-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Volver</span>
                 </Button>
                 <h1 className="text-xl font-semibold text-gray-900">Administración del Sistema</h1>
               </div>
@@ -324,7 +392,7 @@ export default function AdministracionPage() {
                 </div>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button>+ Crear Usuario</Button>
+                    <Button disabled={!canEdit}>+ Crear Usuario</Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
                     <DialogHeader>
@@ -472,13 +540,14 @@ export default function AdministracionPage() {
                               <Button variant="outline" size="sm" onClick={() => handleOpenPermissions(user)}>
                                 Permisos
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleOpenEdit(user)}>
+                              <Button variant="outline" size="sm" onClick={() => handleOpenEdit(user)} disabled={!canEdit}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteUser(user.id, user.username)}
+                                disabled={!canEdit}
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
@@ -658,14 +727,15 @@ export default function AdministracionPage() {
             <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Permisos de {selectedUser?.displayName}</DialogTitle>
-                <DialogDescription>Configure los módulos que puede ver este usuario</DialogDescription>
+                <DialogDescription>Configure los permisos de Vista y Edición por módulo para este usuario</DialogDescription>
               </DialogHeader>
               <div className="py-4 overflow-y-auto flex-1">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Módulo</TableHead>
-                      <TableHead className="text-center">Acceso</TableHead>
+                      <TableHead className="text-center">Ver</TableHead>
+                      <TableHead className="text-center">Editar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -685,7 +755,18 @@ export default function AdministracionPage() {
                           <TableCell className="text-center">
                             <Checkbox
                               checked={permission?.can_view || false}
+                              disabled={!canEdit}
                               onCheckedChange={() => handleTogglePermission(module.id, permission?.can_view || false)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={permission?.can_edit || false}
+                              disabled={!canEdit || !permission?.can_view}
+                              onCheckedChange={() => {
+                                if (!permission?.can_view) return
+                                handleToggleEditPermission(module.id, permission?.can_view || false, permission?.can_edit || false)
+                              }}
                             />
                           </TableCell>
                         </TableRow>
@@ -701,6 +782,14 @@ export default function AdministracionPage() {
           </Dialog>
         </main>
       </div>
+  )
+}
+
+export default function AdministracionPage() {
+  return (
+    <PermissionsGuard moduleName="administracion">
+      {(canEdit) => <AdministracionContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }
+

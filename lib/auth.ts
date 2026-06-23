@@ -23,8 +23,6 @@ export async function login(
   credentials: LoginCredentials,
 ): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
   try {
-
-
     // Buscar usuario por username
     const { data: user, error } = await supabase
       .from("users")
@@ -71,12 +69,11 @@ export async function login(
 // Función para obtener permisos del usuario con información del módulo
 export async function getUserPermissions(userId: string) {
   try {
- 
-
     const { data, error } = await supabase
       .from("user_permissions")
       .select(`
         can_view,
+        can_edit,
         module:system_modules(
           id,
           name,
@@ -97,11 +94,9 @@ export async function getUserPermissions(userId: string) {
   }
 }
 
-// Función para verificar si un usuario tiene acceso a un módulo
+// Función para verificar si un usuario tiene acceso de vista a un módulo
 export async function hasModuleAccess(userId: string, moduleName: string): Promise<boolean> {
   try {
-
-
     const { data, error } = await supabase
       .from("user_permissions")
       .select(`
@@ -121,14 +116,12 @@ export async function hasModuleAccess(userId: string, moduleName: string): Promi
   }
 }
 
-
+// Verificar permiso de vista (acceso al módulo)
 export async function checkUserPermission(
   userId: string,
   moduleName: string,
 ): Promise<{ success: boolean; hasPermission: boolean; error?: string }> {
   try {
-
-
     const { data, error } = await supabase
       .from("user_permissions")
       .select(
@@ -141,14 +134,49 @@ export async function checkUserPermission(
       .eq("system_modules.name", moduleName)
       .single()
 
-if (error) {
-  console.log("No se encontró permiso para", moduleName, "error:", error.message)
-  return { success: true, hasPermission: false }
-}
+    if (error) {
+      console.log("No se encontró permiso para", moduleName, "error:", error.message)
+      return { success: true, hasPermission: false }
+    }
 
     return { success: true, hasPermission: data?.can_view || false }
   } catch (error) {
     console.error("Error verificando permiso:", error)
     return { success: false, hasPermission: false, error: "Error al verificar permisos" }
+  }
+}
+
+// Verificar permiso completo (vista Y edición) de un módulo
+export async function checkUserEditPermission(
+  userId: string,
+  moduleName: string,
+): Promise<{ success: boolean; canView: boolean; canEdit: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("user_permissions")
+      .select(
+        `
+        can_view,
+        can_edit,
+        module:system_modules!inner(name)
+      `,
+      )
+      .eq("user_id", userId)
+      .eq("system_modules.name", moduleName)
+      .single()
+
+    if (error) {
+      console.log("No se encontró permiso para", moduleName, "error:", error.message)
+      return { success: true, canView: false, canEdit: false }
+    }
+
+    return {
+      success: true,
+      canView: data?.can_view || false,
+      canEdit: data?.can_edit || false,
+    }
+  } catch (error) {
+    console.error("Error verificando permiso de edición:", error)
+    return { success: false, canView: false, canEdit: false, error: "Error al verificar permisos" }
   }
 }

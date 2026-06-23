@@ -4,12 +4,12 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { checkUserPermission } from "./auth"
+import { checkUserEditPermission } from "./auth"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 
 interface PermissionsGuardProps {
-  children: React.ReactNode
+  children: (canEdit: boolean) => React.ReactNode
   moduleName: string
   fallbackPath?: string
 }
@@ -17,11 +17,9 @@ interface PermissionsGuardProps {
 export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashboard" }: PermissionsGuardProps) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [permState, setPermState] = useState<{ canView: boolean; canEdit: boolean } | null>(null)
 
   useEffect(() => {
-
-
     const checkPermission = async () => {
       if (isLoading) return
 
@@ -31,21 +29,21 @@ export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashbo
         return
       }
 
-      const result = await checkUserPermission(user.id, moduleName)
+      const result = await checkUserEditPermission(user.id, moduleName)
 
-      if (!result.success || !result.hasPermission) {
+      if (!result.success || !result.canView) {
         toast.error("No tiene permiso para acceder a este módulo")
         router.push(fallbackPath)
         return
       }
 
-      setHasPermission(true)
+      setPermState({ canView: result.canView, canEdit: result.canEdit })
     }
 
     checkPermission()
   }, [user, isLoading, moduleName, router, fallbackPath])
 
-  if (isLoading || hasPermission === null) {
+  if (isLoading || permState === null) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -56,18 +54,18 @@ export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashbo
     )
   }
 
-  if (!hasPermission) {
+  if (!permState.canView) {
     return null
   }
 
-  return <>{children}</>
+  return <>{children(permState.canEdit)}</>
 }
 
-export function withPermissions(Component: React.ComponentType, moduleName: string) {
+export function withPermissions(Component: React.ComponentType<{ canEdit: boolean }>, moduleName: string) {
   return function PermissionsWrappedComponent(props: any) {
     return (
       <PermissionsGuard moduleName={moduleName}>
-        <Component {...props} />
+        {(canEdit) => <Component {...props} canEdit={canEdit} />}
       </PermissionsGuard>
     )
   }

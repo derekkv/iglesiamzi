@@ -356,62 +356,6 @@ async addEgreso(mesId: string, ingreso: any) {
       .eq("mes_id", id)
       .single();
 
-
-   /*   const { data: asistencia } = await supabase
-      .from("asistencia")
-      .select("*")
-      .eq("mes_id", id);
-
-    const { data: diezmos } = await supabase
-      .from("diezmos")
-      .select("*")
-      .eq("mes_id", id);
-
-    // Obtener configuraciones
-
-
-    // Obtener y reconstruir datos de discipulado
-    const { data: participantes } = await supabase
-      .from("discipulado_participantes")
-      .select("id, nombre")
-      .eq("mes_id", id)
-      .order("nombre");
-
-    const { data: fechas } = await supabase
-      .from("discipulado_fechas")
-      .select("id, fecha")
-      .eq("mes_id", id)
-      .order("fecha");
-
-    const { data: asistencias } = await supabase
-      .from("discipulado_asistencia")
-      .select(`
-        estado,
-        discipulado_fechas(fecha),
-        discipulado_participantes(nombre)
-      `)
-      .eq("mes_id", id);
-
-    // Reconstruir objeto de discipulado
-    const discipulado = {
-      participants: participantes?.map(p => p.nombre) || [],
-      dates: fechas?.map(f => f.fecha) || [],
-      attendance: {} as Record<string, Record<string, string>>
-    };
-
-    // Llenar el objeto de attendance
-    asistencias?.forEach(a => {
-      const fecha = a.discipulado_fechas?.fecha;
-      const participante = a.discipulado_participantes?.nombre;
-      
-      if (fecha && participante) {
-        if (!discipulado.attendance[fecha]) {
-          discipulado.attendance[fecha] = {};
-        }
-        discipulado.attendance[fecha][participante] = a.estado;
-      }
-    });*/
-
     return {
       ...mes,
       start_date: mes.start_date,
@@ -419,9 +363,6 @@ async addEgreso(mesId: string, ingreso: any) {
       data: {
         ingresos: ingresos || [],
         egresos: egresos || [],
-  /*       asistencia: asistencia || [],
-        diezmos: diezmos || [],
-        discipulado,*/
         configuraciones: {
           ministerios: configuraciones?.ministerios || [],
           categoriasPrincipales: configuraciones?.categorias_principales || [],

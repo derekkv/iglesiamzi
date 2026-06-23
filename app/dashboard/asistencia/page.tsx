@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Plus, Trash2, Edit2 } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Edit2, Lock } from "lucide-react"
 import { attendanceService, type AttendanceDetail, type AttendanceColumn } from "@/lib/mod/attendance-service"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
@@ -36,7 +36,7 @@ interface AttendanceDataMap {
   [detalleId: number]: { [columnaId: number]: number }
 }
 import { useMonth } from "@/contexts/month-context"
-export default function AsistenciaPage() {
+function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
 
   const { currentMonth, updateConfigurations } = useMonth() // Mock month for now
@@ -311,8 +311,7 @@ export default function AsistenciaPage() {
   }
 
   return (
-    <PermissionsGuard moduleName="asistencia">
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -332,77 +331,86 @@ export default function AsistenciaPage() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <Dialog open={showAddColumn} onOpenChange={setShowAddColumn}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="flex items-center space-x-2">
-                      <Plus className="w-4 h-4" />
-                      <span>Agregar Fecha</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Agregar Nueva Fecha/Columna</DialogTitle>
-                      <DialogDescription>
-                        Ingrese el nombre para la nueva columna (ej: "Dom 15/12", "Miércoles", etc.)
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="columnName">Nombre de la columna</Label>
-                        <Input
-                          id="columnName"
-                          value={newColumnName}
-                          onChange={(e) => setNewColumnName(e.target.value)}
-                          placeholder="Ej: Dom 15/12"
-                        />
+                {!canEdit && (
+                  <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                    <Lock className="w-3 h-3" /> Solo lectura
+                  </span>
+                )}
+                {canEdit && (
+                  <Dialog open={showAddColumn} onOpenChange={setShowAddColumn}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="flex items-center space-x-2">
+                        <Plus className="w-4 h-4" />
+                        <span>Agregar Fecha</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Agregar Nueva Fecha/Columna</DialogTitle>
+                        <DialogDescription>
+                          Ingrese el nombre para la nueva columna (ej: "Dom 15/12", "Miércoles", etc.)
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="columnName">Nombre de la columna</Label>
+                          <Input
+                            id="columnName"
+                            value={newColumnName}
+                            onChange={(e) => setNewColumnName(e.target.value)}
+                            placeholder="Ej: Dom 15/12"
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowAddColumn(false)}>
-                        Cancelar
-                      </Button>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowAddColumn(false)}>
+                          Cancelar
+                        </Button>
 
-                      <Button onClick={handleAddColumn} disabled={saving}>
-                        {saving ? "Guardando..." : "Agregar"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                        <Button onClick={handleAddColumn} disabled={saving}>
+                          {saving ? "Guardando..." : "Agregar"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
 
-                <Dialog open={showAddDetail} onOpenChange={setShowAddDetail}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
-                      <Plus className="w-4 h-4" />
-                      <span>Agregar Detalle</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Agregar Nuevo Detalle</DialogTitle>
-                      <DialogDescription>Ingrese el nombre del nuevo detalle de asistencia</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="detailName">Nombre del detalle</Label>
-                        <Input
-                          id="detailName"
-                          value={newDetail}
-                          onChange={(e) => setNewDetail(e.target.value)}
-                          placeholder="Ej: ADULTOS MAYORES"
-                        />
+                {canEdit && (
+                  <Dialog open={showAddDetail} onOpenChange={setShowAddDetail}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
+                        <Plus className="w-4 h-4" />
+                        <span>Agregar Detalle</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Agregar Nuevo Detalle</DialogTitle>
+                        <DialogDescription>Ingrese el nombre del nuevo detalle de asistencia</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="detailName">Nombre del detalle</Label>
+                          <Input
+                            id="detailName"
+                            value={newDetail}
+                            onChange={(e) => setNewDetail(e.target.value)}
+                            placeholder="Ej: ADULTOS MAYORES"
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowAddDetail(false)}>
-                        Cancelar
-                      </Button>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowAddDetail(false)}>
+                          Cancelar
+                        </Button>
 
-                      <Button onClick={handleAddDetail} disabled={saving}>
-                        {saving ? "Guardando..." : "Agregar"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                        <Button onClick={handleAddDetail} disabled={saving}>
+                          {saving ? "Guardando..." : "Agregar"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </div>
           </div>
@@ -440,47 +448,49 @@ export default function AsistenciaPage() {
                             >
                               <div className="flex items-center justify-center space-x-2">
                                 <span>{column.nombre}</span>
-                                <div className="flex space-x-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
-                                    onClick={() => {
-                                      setEditingColumn({
-                                        id: column.id,
-                                        nombre: column.nombre,
-                                      })
-                                      setShowEditColumn(true)
-                                    }}
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Eliminar columna?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Se eliminará la columna "{column.nombre}" y todos sus datos. Esta acción no se
-                                          puede deshacer.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleDeleteColumn(column.id)}
-                                          className="bg-red-600 hover:bg-red-700"
-                                        >
-                                          Eliminar
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
+                                {canEdit && (
+                                  <div className="flex space-x-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      onClick={() => {
+                                        setEditingColumn({
+                                          id: column.id,
+                                          nombre: column.nombre,
+                                        })
+                                        setShowEditColumn(true)
+                                      }}
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>¿Eliminar columna?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Se eliminará la columna "{column.nombre}" y todos sus datos. Esta acción no se
+                                            puede deshacer.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDeleteColumn(column.id)}
+                                            className="bg-red-600 hover:bg-red-700"
+                                          >
+                                            Eliminar
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                )}
                               </div>
                             </th>
                           ))}
@@ -495,47 +505,49 @@ export default function AsistenciaPage() {
                             <td className="border border-gray-300 px-4 py-2 font-medium bg-gray-50">
                               <div className="flex items-center justify-between">
                                 <span>{detail.nombre}</span>
-                                <div className="flex space-x-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
-                                    onClick={() => {
-                                      setEditingDetail({
-                                        id: detail.id,
-                                        nombre: detail.nombre,
-                                      })
-                                      setShowEditDetail(true)
-                                    }}
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Eliminar detalle?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Se eliminará "{detail.nombre}" y todos sus datos. Esta acción no se puede
-                                          deshacer.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleDeleteDetail(detail.id)}
-                                          className="bg-red-600 hover:bg-red-700"
-                                        >
-                                          Eliminar
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
+                                {canEdit && (
+                                  <div className="flex space-x-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      onClick={() => {
+                                        setEditingDetail({
+                                          id: detail.id,
+                                          nombre: detail.nombre,
+                                        })
+                                        setShowEditDetail(true)
+                                      }}
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600">
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>¿Eliminar detalle?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Se eliminará "{detail.nombre}" y todos sus datos. Esta acción no se puede
+                                            deshacer.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDeleteDetail(detail.id)}
+                                            className="bg-red-600 hover:bg-red-700"
+                                          >
+                                            Eliminar
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                )}
                               </div>
                             </td>
                             {columns.map((column) => (
@@ -702,6 +714,13 @@ export default function AsistenciaPage() {
           </Dialog>
         </main>
       </div>
+  )
+}
+
+export default function AsistenciaPage() {
+  return (
+    <PermissionsGuard moduleName="asistencia">
+      {(canEdit) => <AsistenciaContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

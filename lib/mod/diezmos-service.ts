@@ -17,38 +17,6 @@ export type DiezmoWithMonth = DiezmoRecord & {
 
 
 export class DiezmosService {
-  // Ensure month exists before creating diezmos
-  private async ensureMonthExists(mesId: string): Promise<void> {
-
-    const { data: existingMonth } = await supabase.from("meses").select("id").eq("id", mesId).single()
-
-    if (!existingMonth) {
-      // Parse mesId to get year and month (format: "YYYY-MM")
-      const [yearStr, monthStr] = mesId.split("-")
-      const year = Number.parseInt(yearStr)
-      const month = Number.parseInt(monthStr)
-
-      // Calculate start and end dates for the month
-      const startDate = new Date(year, month - 1, 1)
-      const endDate = new Date(year, month, 0) // Last day of the month
-
-      const { error } = await supabase.from("meses").insert({
-        id: mesId,
-        name: mesId,
-        year,
-        month,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        status: "active",
-      })
-
-      if (error) {
-        throw error
-      }
-    } else {
-    }
-  }
-
   // Get all diezmos for a specific month
   async getDiezmosByMonth(mesId: string): Promise<DiezmoRecord[]> {
 
@@ -124,9 +92,6 @@ export class DiezmosService {
 
   // Create a new diezmo
   async createDiezmo(diezmo: Omit<DiezmoRecord, "id" | "created_at" | "updated_at">): Promise<DiezmoRecord> {
-
-    // Ensure month exists
-    await this.ensureMonthExists(diezmo.mes_id)
 
     const { data, error } = await supabase
       .from("diezmos")

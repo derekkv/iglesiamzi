@@ -26,14 +26,13 @@ export interface UserPermissionData {
   userId: string
   moduleId: string
   canView: boolean
+  canEdit: boolean
   grantedBy: string
 }
-
 
 // Crear nuevo usuario
 export async function createUser(userData: CreateUserData) {
   try {
-
     // Verificar si el username ya existe
     const { data: existing } = await supabase.from("users").select("id").eq("username", userData.username).single()
 
@@ -73,7 +72,6 @@ export async function createUser(userData: CreateUserData) {
 // Obtener todos los usuarios
 export async function getAllUsers() {
   try {
-
     const { data, error } = await supabase.from("users").select("*").order("created_at", { ascending: false })
 
     if (error) throw error
@@ -88,7 +86,6 @@ export async function getAllUsers() {
 // Actualizar usuario
 export async function updateUser(userId: string, userData: UpdateUserData) {
   try {
-
     const { data, error } = await supabase.from("users").update(userData).eq("id", userId).select().single()
 
     if (error) throw error
@@ -103,7 +100,6 @@ export async function updateUser(userId: string, userData: UpdateUserData) {
 // Eliminar usuario
 export async function deleteUser(userId: string) {
   try {
-
     const { error } = await supabase.from("users").delete().eq("id", userId)
 
     if (error) throw error
@@ -118,7 +114,6 @@ export async function deleteUser(userId: string) {
 // Obtener todos los módulos
 export async function getAllModules() {
   try {
-
     const { data, error } = await supabase.from("system_modules").select("*").order("sort_order", { ascending: true })
 
     if (error) throw error
@@ -130,10 +125,9 @@ export async function getAllModules() {
   }
 }
 
-// Obtener permisos de un usuario
+// Obtener permisos de un usuario (incluye can_edit)
 export async function getUserPermissions(userId: string) {
   try {
-
     const { data, error } = await supabase
       .from("user_permissions")
       .select(`
@@ -151,11 +145,10 @@ export async function getUserPermissions(userId: string) {
   }
 }
 
-// Asignar o actualizar permiso
+// Asignar o actualizar permiso (con can_view y can_edit separados)
 export async function setUserPermission(permissionData: UserPermissionData) {
   try {
-
-    // Si canView es false, eliminar el permiso
+    // Si canView es false, eliminar el permiso completamente
     if (!permissionData.canView) {
       const { error } = await supabase
         .from("user_permissions")
@@ -167,7 +160,7 @@ export async function setUserPermission(permissionData: UserPermissionData) {
       return { success: true, permission: null }
     }
 
-    // Si canView es true, crear o actualizar el permiso
+    // Crear o actualizar el permiso con can_view y can_edit
     const { data, error } = await supabase
       .from("user_permissions")
       .upsert(
@@ -175,6 +168,7 @@ export async function setUserPermission(permissionData: UserPermissionData) {
           user_id: permissionData.userId,
           module_id: permissionData.moduleId,
           can_view: true,
+          can_edit: permissionData.canEdit,
           granted_by: permissionData.grantedBy,
         },
         {
@@ -195,7 +189,6 @@ export async function setUserPermission(permissionData: UserPermissionData) {
 // Eliminar permiso
 export async function removeUserPermission(userId: string, moduleId: string) {
   try {
-
     const { error } = await supabase.from("user_permissions").delete().eq("user_id", userId).eq("module_id", moduleId)
 
     if (error) throw error
@@ -210,7 +203,6 @@ export async function removeUserPermission(userId: string, moduleId: string) {
 // Cambiar contraseña
 export async function changePassword(userId: string, newPassword: string) {
   try {
-
     const passwordHash = await bcrypt.hash(newPassword, 10)
 
     const { error } = await supabase.from("users").update({ password_hash: passwordHash }).eq("id", userId)

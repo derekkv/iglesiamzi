@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Lock, ArrowLeft } from "lucide-react"
+import { useSecurityCheck } from "@/contexts/security-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,7 +36,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { storage, type InventoryItem } from "@/lib/storage"
 import { getGlobalConfig, updateGlobalConfig, type GlobalConfig } from "@/lib/globalConfig"
 
-export default function InventarioPage() {
+function InventarioContent({ canEdit }: { canEdit: boolean }) {
+  const router = useRouter()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [config, setConfig] = useState<GlobalConfig | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -44,6 +48,8 @@ export default function InventarioPage() {
   const [filterUbicacion, setFilterUbicacion] = useState("all")
   const [filterMinisterio, setFilterMinisterio] = useState("all")
   const [filterEstado, setFilterEstado] = useState("all")
+
+  const { checkAndExecute } = useSecurityCheck()
 
   const [isSaving, setIsSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -311,22 +317,42 @@ export default function InventarioPage() {
   }
 
   return (
-        <PermissionsGuard moduleName="inventario">
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Button variant="outline" onClick={() => window.history.back()} className="mr-4">
-            ← Volver
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">Inventario</h1>
-            <p className="text-gray-600">Gestión de artículos y equipos de la iglesia</p>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Inventario</h1>
+                <p className="text-sm text-gray-600">Gestión de artículos y equipos de la iglesia</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              {!canEdit && (
+                <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                  <Lock className="w-3 h-3" /> Solo lectura
+                </span>
+              )}
+            </div>
           </div>
         </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <div className="flex justify-between items-center mb-6">
           <div></div>
           <div className="flex space-x-2">
+            {canEdit && (
             <Dialog open={isConfigModalOpen} onOpenChange={setIsConfigModalOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">⚙️ Configuración</Button>
@@ -411,7 +437,9 @@ export default function InventarioPage() {
                 </Tabs>
               </DialogContent>
             </Dialog>
+            )}
 
+            {canEdit && (
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
               <DialogTrigger asChild>
                 <Button>➕ Agregar Artículo</Button>
@@ -524,6 +552,7 @@ export default function InventarioPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
 
@@ -647,7 +676,7 @@ export default function InventarioPage() {
                     <th className="text-left p-2 font-semibold">Ministerio</th>
                     <th className="text-left p-2 font-semibold">Estado</th>
                     <th className="text-left p-2 font-semibold">Fecha</th>
-                    <th className="text-left p-2 font-semibold">Acciones</th>
+                    {canEdit && <th className="text-left p-2 font-semibold">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -663,6 +692,7 @@ export default function InventarioPage() {
                         <Badge className={getEstadoBadgeColor(item.estado)}>{item.estado}</Badge>
                       </td>
                       <td className="p-2 text-sm text-gray-600">{item.fechaRegistro}</td>
+                      {canEdit && (
                       <td className="p-2">
                         <div className="flex space-x-1">
                           <Button size="sm" variant="outline" onClick={() => openEditModal(item)}>
@@ -695,6 +725,7 @@ export default function InventarioPage() {
                           </AlertDialog>
                         </div>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -812,8 +843,15 @@ export default function InventarioPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </main>
     </div>
+  )
+}
+
+export default function InventarioPage() {
+  return (
+    <PermissionsGuard moduleName="inventario">
+      {(canEdit) => <InventarioContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PermissionsGuard } from "@/lib/permissions-guard"
+import { useRouter } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -28,7 +30,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { paymentFlowService, type PaymentTable, type PaymentRow } from "@/lib/mod/payment-flow-service"
 
-export default function FlujoPagoPage() {
+function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
+  const router = useRouter()
   const [tables, setTables] = useState<PaymentTable[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateTableModalOpen, setIsCreateTableModalOpen] = useState(false)
@@ -77,6 +80,10 @@ export default function FlujoPagoPage() {
 
   // Table functions
   const handleCreateTable = async () => {
+    if (!canEdit) {
+      alert("No tiene permiso de edición en este módulo")
+      return
+    }
     if (!newTableName.trim()) {
       alert("Por favor ingrese un nombre para la tabla")
       return
@@ -96,6 +103,10 @@ setSaving(true)
   }
 
   const handleEditTable = async () => {
+    if (!canEdit) {
+      alert("No tiene permiso de edición en este módulo")
+      return
+    }
     if (!editTableName.trim() || !editingTable) {
       alert("Por favor ingrese un nombre válido")
       return
@@ -127,6 +138,10 @@ setSaving(true)
   }
 
   const handleDeleteTable = async (tableId: string) => {
+    if (!canEdit) {
+      alert("No tiene permiso de edición en este módulo")
+      return
+    }
     try {
       await paymentFlowService.deleteTable(tableId)
       setTables((prev) => prev.filter((table) => table.id !== tableId))
@@ -148,6 +163,10 @@ setSaving(true)
 
   // Row functions
   const handleAddRow = async () => {
+    if (!canEdit) {
+      alert("No tiene permiso de edición en este módulo")
+      return
+    }
     if (
       !selectedTable ||
       !rowFormData.fecha ||
@@ -185,6 +204,10 @@ setSaving(true)
   }
 
   const handleEditRow = async () => {
+    if (!canEdit) {
+      alert("No tiene permiso de edición en este módulo")
+      return
+    }
     if (
       !selectedTable ||
       !editingRow ||
@@ -232,6 +255,10 @@ setSaving(true)
   }
 
   const handleDeleteRow = async (rowId: string) => {
+    if (!canEdit) {
+      alert("No tiene permiso de edición en este módulo")
+      return
+    }
     if (!selectedTable) return
 
     try {
@@ -342,23 +369,30 @@ setSaving(true)
   }
 
   return (
-        <PermissionsGuard moduleName="flujo_pago">
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center mb-6">
-          <button
-            onClick={() => window.history.back()}
-            className="mr-4 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-            style={{ color: "#374151" }}
-          >
-            ← Volver
-          </button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">Flujo de Pago</h1>
-            <p className="text-gray-600">Gestión de tablas de pagos y beneficiarios</p>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Flujo de Pago</h1>
+                <p className="text-sm text-gray-600">Gestión de tablas de pagos y beneficiarios</p>
+              </div>
+            </div>
           </div>
         </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -372,7 +406,7 @@ setSaving(true)
           <div className="flex space-x-2">
             <Dialog open={isCreateTableModalOpen} onOpenChange={setIsCreateTableModalOpen}>
               <DialogTrigger asChild>
-                <Button>➕ Nueva Tabla</Button>
+                <Button disabled={!canEdit}>➕ Nueva Tabla</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -401,7 +435,7 @@ setSaving(true)
               </DialogContent>
             </Dialog>
 
-            {selectedTable && <Button onClick={() => setIsAddRowModalOpen(true)}>➕ Agregar Fila</Button>}
+            {selectedTable && <Button onClick={() => setIsAddRowModalOpen(true)} disabled={!canEdit}>➕ Agregar Fila</Button>}
           </div>
         </div>
 
@@ -494,12 +528,12 @@ setSaving(true)
                 <Button variant="outline" onClick={() => generatePDF(selectedTable)}>
                   📄 Descargar PDF
                 </Button>
-                <Button variant="outline" onClick={() => openEditTableModal(selectedTable)}>
+                <Button variant="outline" onClick={() => openEditTableModal(selectedTable)} disabled={!canEdit}>
                   ✏️ Editar Tabla
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive">🗑️ Eliminar Tabla</Button>
+                    <Button variant="destructive" disabled={!canEdit}>🗑️ Eliminar Tabla</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -548,12 +582,12 @@ setSaving(true)
                           <td className="p-3 text-right font-medium">{formatCurrency(row.valor)}</td>
                           <td className="p-3">
                             <div className="flex justify-center space-x-1">
-                              <Button size="sm" variant="outline" onClick={() => openEditRowModal(row)}>
+                              <Button size="sm" variant="outline" onClick={() => openEditRowModal(row)} disabled={!canEdit}>
                                 ✏️
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="destructive">
+                                  <Button size="sm" variant="destructive" disabled={!canEdit}>
                                     🗑️
                                   </Button>
                                 </AlertDialogTrigger>
@@ -745,8 +779,15 @@ setSaving(true)
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </main>
     </div>
+  )
+}
+
+export default function FlujoPagoPage() {
+  return (
+    <PermissionsGuard moduleName="flujo_pago">
+      {(canEdit) => <FlujoPagoContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

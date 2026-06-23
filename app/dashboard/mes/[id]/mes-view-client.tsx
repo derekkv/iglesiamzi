@@ -2,9 +2,11 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { PermissionsGuard } from "@/lib/permissions-guard"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { ArrowLeft } from "lucide-react"
 
 interface MesViewClientProps {
   selectedMonth: any
@@ -369,54 +371,64 @@ export function MesViewClient({ selectedMonth }: MesViewClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => router.push("/dashboard/control-mensual")}>
-                ← Volver al Control
-              </Button>
-              <h1 className="text-xl font-semibold text-gray-900">{selectedMonth.name}</h1>
+    <PermissionsGuard moduleName="control_mensual">
+      {() => (
+        <div className="min-h-screen bg-gray-50">
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push("/dashboard/control-mensual")}
+                    className="flex items-center space-x-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Volver</span>
+                  </Button>
+                  <h1 className="text-xl font-semibold text-gray-900">{selectedMonth.name}</h1>
+                </div>
+                <Badge variant="outline" className="text-gray-600 border-gray-200">
+                  Modo Solo Lectura
+                </Badge>
+              </div>
             </div>
-            <Badge variant="outline" className="text-gray-600 border-gray-200">
-              Modo Solo Lectura
-            </Badge>
+          </header>
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex flex-col lg:flex-row gap-8">
+              <div className="lg:w-64 flex-shrink-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Módulos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <nav className="space-y-1">
+                      {modules.map((module) => (
+                        <button
+                          key={module.id}
+                          onClick={() => setActiveModule(module.id)}
+                          className={`w-full text-left px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors ${
+                            activeModule === module.id
+                              ? "bg-blue-50 border-r-2 border-blue-500 text-blue-700"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span className="text-lg">{module.icon}</span>
+                          <span className="font-medium">{module.name}</span>
+                        </button>
+                      ))}
+                    </nav>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="flex-1">{renderContent()}</div>
+            </div>
           </div>
         </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="lg:w-64 flex-shrink-0">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Módulos</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <nav className="space-y-1">
-                  {modules.map((module) => (
-                    <button
-                      key={module.id}
-                      onClick={() => setActiveModule(module.id)}
-                      className={`w-full text-left px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors ${
-                        activeModule === module.id
-                          ? "bg-blue-50 border-r-2 border-blue-500 text-blue-700"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      <span className="text-lg">{module.icon}</span>
-                      <span className="font-medium">{module.name}</span>
-                    </button>
-                  ))}
-                </nav>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex-1">{renderContent()}</div>
-        </div>
-      </div>
-    </div>
+      )}
+    </PermissionsGuard>
   )
 }

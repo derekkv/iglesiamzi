@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { useSecurityCheck } from "@/hooks/use-security-check"
+import { useSecurityCheck } from "@/contexts/security-context"
 import { bautizoService, type Bautizo, type BautizoInput } from "@/lib/mod/bautizo-service"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,13 +33,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Trash2, Edit, Plus } from "lucide-react"
+import { Trash2, Edit, Plus, Lock, ArrowLeft } from "lucide-react"
 
-export default function BautizoPage() {
+function BautizoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { user } = useAuth()
   const { toast } = useToast()
-  const { checkAndExecute, SecurityKeyDialog } = useSecurityCheck()
+  const { checkAndExecute } = useSecurityCheck()
 
   const [bautizos, setBautizos] = useState<Bautizo[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -77,7 +77,7 @@ export default function BautizoPage() {
     }
 
     initializePage()
-  }, [router])
+  }, [])
 
   const loadBautizos = async () => {
     try {
@@ -94,6 +94,10 @@ export default function BautizoPage() {
   }
 
   const handleOpenAddModal = async () => {
+    if (!canEdit) {
+      toast({ title: "Sin permiso", description: "No tiene permiso de edición en este módulo", variant: "destructive" })
+      return
+    }
     try {
       const nextNumber = await bautizoService.getNextNumber()
       setFormData({
@@ -118,7 +122,6 @@ export default function BautizoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    
 
     if (!formData.nombre_bautizado || !formData.nombre_padre || !formData.nombre_madre) {
       setError("Por favor complete todos los campos obligatorios")
@@ -244,6 +247,12 @@ export default function BautizoPage() {
     }
   }
 
+  const handleDeleteRequest = (bautizo: Bautizo) => {
+    checkAndExecute(bautizo.created_at, () => {
+      setDeleteBautizoId(bautizo.id)
+    })
+  }
+
   const confirmDelete = async () => {
     if (!deleteBautizoId) return
 
@@ -278,71 +287,73 @@ export default function BautizoPage() {
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirigiendo...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <PermissionsGuard moduleName="bautizo">
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-4">
-                <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                  ← Volver al Dashboard
-                </Button>
-                <h1 className="text-xl font-semibold text-gray-900">Registro de Bautizos</h1>
-              </div>
-              <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
+              </Button>
+              <h1 className="text-xl font-semibold text-gray-900">Registro de Bautizos</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              {!canEdit && (
+                <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                  <Lock className="w-3 h-3" /> Solo lectura
+                </span>
+              )}
+              {canEdit && (
                 <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Agregar Bautizo
                 </Button>
-              </div>
+              )}
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bautizos Registrados</CardTitle>
-              <CardDescription>Lista de todos los bautizos registrados</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {bautizos.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-medium">N°</th>
-                        <th className="text-left p-3 font-medium">Fecha</th>
-                        <th className="text-left p-3 font-medium">Nombre Bautizado</th>
-                        <th className="text-left p-3 font-medium">Padre</th>
-                        <th className="text-left p-3 font-medium">Madre</th>
-                        <th className="text-left p-3 font-medium">Padrinos</th>
-                        <th className="text-left p-3 font-medium">Observación</th>
-                        <th className="text-left p-3 font-medium">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bautizos.map((bautizo) => (
-                        <tr key={bautizo.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3">{bautizo.numero}</td>
-                          <td className="p-3">{formatDateForTable(bautizo.fecha)}</td>
-                          <td className="p-3">{bautizo.nombre_bautizado}</td>
-                          <td className="p-3">{bautizo.nombre_padre}</td>
-                          <td className="p-3">{bautizo.nombre_madre}</td>
-                          <td className="p-3">{bautizo.padrinos || "-"}</td>
-                          <td className="p-3">{bautizo.observacion || "-"}</td>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Bautizos Registrados</CardTitle>
+            <CardDescription>Lista de todos los bautizos registrados</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {bautizos.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium">N°</th>
+                      <th className="text-left p-3 font-medium">Fecha</th>
+                      <th className="text-left p-3 font-medium">Nombre Bautizado</th>
+                      <th className="text-left p-3 font-medium">Padre</th>
+                      <th className="text-left p-3 font-medium">Madre</th>
+                      <th className="text-left p-3 font-medium">Padrinos</th>
+                      <th className="text-left p-3 font-medium">Observación</th>
+                      {canEdit && <th className="text-left p-3 font-medium">Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bautizos.map((bautizo) => (
+                      <tr key={bautizo.id} className="border-b hover:bg-gray-50">
+                        <td className="p-3">{bautizo.numero}</td>
+                        <td className="p-3">{formatDateForTable(bautizo.fecha)}</td>
+                        <td className="p-3">{bautizo.nombre_bautizado}</td>
+                        <td className="p-3">{bautizo.nombre_padre}</td>
+                        <td className="p-3">{bautizo.nombre_madre}</td>
+                        <td className="p-3">{bautizo.padrinos || "-"}</td>
+                        <td className="p-3">{bautizo.observacion || "-"}</td>
+                        {canEdit && (
                           <td className="p-3">
                             <div className="flex space-x-2">
                               <Button size="sm" variant="outline" onClick={() => handleEdit(bautizo)}>
@@ -352,254 +363,261 @@ export default function BautizoPage() {
                                 size="sm"
                                 variant="outline"
                                 className="text-red-600 hover:text-red-700 bg-transparent"
-                                onClick={() => setDeleteBautizoId(bautizo.id)}
+                                onClick={() => handleDeleteRequest(bautizo)}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 mb-4">No hay bautizos registrados</p>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">No hay bautizos registrados</p>
+                {canEdit && (
                   <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
                     Agregar Primer Bautizo
                   </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </main>
-
-        {/* Add Modal */}
-        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Agregar Nuevo Bautizo</DialogTitle>
-              <DialogDescription>Complete la información del bautizo</DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="numero">Número *</Label>
-                  <Input
-                    id="numero"
-                    type="number"
-                    value={formData.numero}
-                    onChange={(e) => setFormData({ ...formData, numero: Number.parseInt(e.target.value) || 1 })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="fecha">Fecha *</Label>
-                  <Input
-                    id="fecha"
-                    type="date"
-                    value={formData.fecha}
-                    onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                    required
-                  />
-                </div>
+                )}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
 
+      {/* Add Modal */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Agregar Nuevo Bautizo</DialogTitle>
+            <DialogDescription>Complete la información del bautizo</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="nombre_bautizado">Nombre del Bautizado *</Label>
+                <Label htmlFor="numero">Número *</Label>
                 <Input
-                  id="nombre_bautizado"
-                  value={formData.nombre_bautizado}
-                  onChange={(e) => setFormData({ ...formData, nombre_bautizado: e.target.value })}
-                  placeholder="Ej: Juan Carlos Pérez"
+                  id="numero"
+                  type="number"
+                  value={formData.numero}
+                  onChange={(e) => setFormData({ ...formData, numero: Number.parseInt(e.target.value) || 1 })}
                   required
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="nombre_padre">Nombre del Padre *</Label>
-                  <Input
-                    id="nombre_padre"
-                    value={formData.nombre_padre}
-                    onChange={(e) => setFormData({ ...formData, nombre_padre: e.target.value })}
-                    placeholder="Ej: Carlos Pérez"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="nombre_madre">Nombre de la Madre *</Label>
-                  <Input
-                    id="nombre_madre"
-                    value={formData.nombre_madre}
-                    onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })}
-                    placeholder="Ej: María García"
-                    required
-                  />
-                </div>
-              </div>
-
               <div>
-                <Label htmlFor="padrinos">Padrinos</Label>
+                <Label htmlFor="fecha">Fecha *</Label>
                 <Input
-                  id="padrinos"
-                  value={formData.padrinos}
-                  onChange={(e) => setFormData({ ...formData, padrinos: e.target.value })}
-                  placeholder="Ej: José López y Ana Martínez (opcional)"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="observacion">Observación</Label>
-                <Textarea
-                  id="observacion"
-                  value={formData.observacion}
-                  onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
-                  placeholder="Observaciones adicionales (opcional)"
-                />
-              </div>
-
-              {error && (
-                <Alert className="border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-700">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSaving}>
-                  {isSaving ? "Guardando..." : "Guardar Bautizo"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Modal */}
-        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Editar Bautizo</DialogTitle>
-              <DialogDescription>Modifique la información del bautizo</DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleUpdate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-numero">Número *</Label>
-                  <Input
-                    id="edit-numero"
-                    type="number"
-                    value={formData.numero}
-                    onChange={(e) => setFormData({ ...formData, numero: Number.parseInt(e.target.value) || 1 })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-fecha">Fecha *</Label>
-                  <Input
-                    id="edit-fecha"
-                    type="date"
-                    value={formData.fecha}
-                    onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="edit-nombre_bautizado">Nombre del Bautizado *</Label>
-                <Input
-                  id="edit-nombre_bautizado"
-                  value={formData.nombre_bautizado}
-                  onChange={(e) => setFormData({ ...formData, nombre_bautizado: e.target.value })}
+                  id="fecha"
+                  type="date"
+                  value={formData.fecha}
+                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
                   required
                 />
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-nombre_padre">Nombre del Padre *</Label>
-                  <Input
-                    id="edit-nombre_padre"
-                    value={formData.nombre_padre}
-                    onChange={(e) => setFormData({ ...formData, nombre_padre: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-nombre_madre">Nombre de la Madre *</Label>
-                  <Input
-                    id="edit-nombre_madre"
-                    value={formData.nombre_madre}
-                    onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
+            <div>
+              <Label htmlFor="nombre_bautizado">Nombre del Bautizado *</Label>
+              <Input
+                id="nombre_bautizado"
+                value={formData.nombre_bautizado}
+                onChange={(e) => setFormData({ ...formData, nombre_bautizado: e.target.value })}
+                placeholder="Ej: Juan Carlos Pérez"
+                required
+              />
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="edit-padrinos">Padrinos</Label>
+                <Label htmlFor="nombre_padre">Nombre del Padre *</Label>
                 <Input
-                  id="edit-padrinos"
-                  value={formData.padrinos}
-                  onChange={(e) => setFormData({ ...formData, padrinos: e.target.value })}
+                  id="nombre_padre"
+                  value={formData.nombre_padre}
+                  onChange={(e) => setFormData({ ...formData, nombre_padre: e.target.value })}
+                  placeholder="Ej: Carlos Pérez"
+                  required
                 />
               </div>
-
               <div>
-                <Label htmlFor="edit-observacion">Observación</Label>
-                <Textarea
-                  id="edit-observacion"
-                  value={formData.observacion}
-                  onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
-                  placeholder="Observaciones adicionales (opcional)"
+                <Label htmlFor="nombre_madre">Nombre de la Madre *</Label>
+                <Input
+                  id="nombre_madre"
+                  value={formData.nombre_madre}
+                  onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })}
+                  placeholder="Ej: María García"
+                  required
                 />
               </div>
+            </div>
 
-              {error && (
-                <Alert className="border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-700">{error}</AlertDescription>
-                </Alert>
-              )}
+            <div>
+              <Label htmlFor="padrinos">Padrinos</Label>
+              <Input
+                id="padrinos"
+                value={formData.padrinos}
+                onChange={(e) => setFormData({ ...formData, padrinos: e.target.value })}
+                placeholder="Ej: José López y Ana Martínez (opcional)"
+              />
+            </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSaving}>
-                  {isSaving ? "Guardando..." : "Actualizar Bautizo"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+            <div>
+              <Label htmlFor="observacion">Observación</Label>
+              <Textarea
+                id="observacion"
+                value={formData.observacion}
+                onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
+                placeholder="Observaciones adicionales (opcional)"
+              />
+            </div>
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteBautizoId !== null} onOpenChange={() => setDeleteBautizoId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar bautizo?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción no se puede deshacer. El registro será eliminado permanentemente.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-                Eliminar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            {error && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
+              </Alert>
+            )}
 
-        {/* Security Key Dialog */}
-        <SecurityKeyDialog />
-      </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSaving}>
+                {isSaving ? "Guardando..." : "Guardar Bautizo"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Bautizo</DialogTitle>
+            <DialogDescription>Modifique la información del bautizo</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-numero">Número *</Label>
+                <Input
+                  id="edit-numero"
+                  type="number"
+                  value={formData.numero}
+                  onChange={(e) => setFormData({ ...formData, numero: Number.parseInt(e.target.value) || 1 })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-fecha">Fecha *</Label>
+                <Input
+                  id="edit-fecha"
+                  type="date"
+                  value={formData.fecha}
+                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-nombre_bautizado">Nombre del Bautizado *</Label>
+              <Input
+                id="edit-nombre_bautizado"
+                value={formData.nombre_bautizado}
+                onChange={(e) => setFormData({ ...formData, nombre_bautizado: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-nombre_padre">Nombre del Padre *</Label>
+                <Input
+                  id="edit-nombre_padre"
+                  value={formData.nombre_padre}
+                  onChange={(e) => setFormData({ ...formData, nombre_padre: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-nombre_madre">Nombre de la Madre *</Label>
+                <Input
+                  id="edit-nombre_madre"
+                  value={formData.nombre_madre}
+                  onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-padrinos">Padrinos</Label>
+              <Input
+                id="edit-padrinos"
+                value={formData.padrinos}
+                onChange={(e) => setFormData({ ...formData, padrinos: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-observacion">Observación</Label>
+              <Textarea
+                id="edit-observacion"
+                value={formData.observacion}
+                onChange={(e) => setFormData({ ...formData, observacion: e.target.value })}
+                placeholder="Observaciones adicionales (opcional)"
+              />
+            </div>
+
+            {error && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSaving}>
+                {isSaving ? "Guardando..." : "Actualizar Bautizo"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteBautizoId !== null} onOpenChange={() => setDeleteBautizoId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar bautizo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El registro será eliminado permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+export default function BautizoPage() {
+  return (
+    <PermissionsGuard moduleName="bautizo">
+      {(canEdit) => <BautizoContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

@@ -5,6 +5,7 @@ export interface AttendanceDetail {
   mes_id: string
   nombre: string
   orden: number
+  created_at: string
 }
 
 export interface AttendanceColumn {
@@ -12,6 +13,8 @@ export interface AttendanceColumn {
   mes_id: string
   nombre: string
   orden: number
+  created_at: string
+
 }
 
 export interface AttendanceData {
@@ -20,6 +23,8 @@ export interface AttendanceData {
   detalle_id: number
   columna_id: number
   cantidad: number
+  created_at: string
+
 }
 
 export class AttendanceService {
@@ -56,8 +61,6 @@ export class AttendanceService {
   }
 
   async createDetail(mesId: string, nombre: string): Promise<AttendanceDetail> {
-
-    await this.ensureMonthExists(mesId)
 
     const orden = await this.getNextOrder("asistencia_detalles", mesId)
 
@@ -112,8 +115,6 @@ export class AttendanceService {
   }
 
   async createColumn(mesId: string, nombre: string): Promise<AttendanceColumn> {
-
-    await this.ensureMonthExists(mesId)
 
     const orden = await this.getNextOrder("asistencia_columnas", mesId)
 
@@ -188,8 +189,6 @@ export class AttendanceService {
   // Inicializar detalles por defecto para un mes nuevo
   async initializeDefaultDetails(mesId: string): Promise<void> {
 
-    await this.ensureMonthExists(mesId)
-
     const defaultDetails = [
       "HOMBRES ASIST. GRAL",
       "MUJERES ASIST. GRAL.",
@@ -211,6 +210,7 @@ export class AttendanceService {
       mes_id: mesId,
       nombre,
       orden: index,
+      
     }))
 
     const { error } = await this.supabase.from("asistencia_detalles").insert(detailsToInsert)
@@ -221,49 +221,7 @@ export class AttendanceService {
     }
   }
 
-  // Ensure month exists before creating related records
-  private async ensureMonthExists(mesId: string): Promise<void> {
 
-    // Check if month already exists
-    const { data: existingMonth, error: checkError } = await this.supabase
-      .from("meses")
-      .select("id")
-      .eq("id", mesId)
-      .single()
-
-    if (checkError && checkError.code !== "PGRST116") {
-      // PGRST116 = no rows returned
-      console.error("[v0] Error checking if month exists:", checkError)
-      throw checkError
-    }
-
-    if (existingMonth) {
-      return
-    }
-
-    const [year, month] = mesId.split("-").map(Number)
-    const monthDate = new Date(year, month - 1, 1)
-    const endDate = new Date(year, month, 0) // Last day of the month
-
-    // Create the month if it doesn't exist
-    const { error: insertError } = await this.supabase.from("meses").insert({
-      id: mesId,
-      name: mesId, // Use 'name' instead of 'nombre'
-      year: year,
-      month: month,
-      start_date: monthDate.toISOString(),
-      end_date: endDate.toISOString(),
-      status: "active",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-
-    if (insertError) {
-      console.error("[v0] Error creating month:", insertError)
-      throw insertError
-    }
-
-  }
 }
 
 export const attendanceService = new AttendanceService()

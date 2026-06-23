@@ -14,7 +14,9 @@ import { EditMonthModal } from "@/components/EditMonthModal"
 import { CreateMonthModal } from "@/components/CreateMonthModal"
 import { CloseMonthModal } from "@/components/CloseMonthModal"
 
-export default function ControlMensualPage() {
+import { Lock, ArrowLeft } from "lucide-react"
+
+function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
 
   const router = useRouter()
   const { currentMonth, monthHistory, startNewMonth, closeCurrentMonth, editMonthDates, deleteMonth } = useMonth()
@@ -70,20 +72,32 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
 }
 
   return (
-        <PermissionsGuard moduleName="control_mensual">
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                ← Volver al Dashboard
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver</span>
               </Button>
               <h1 className="text-xl font-semibold text-gray-900">Control Mensual</h1>
             </div>
-            <Badge variant="outline" className="text-blue-600 border-blue-200">
-              {currentMonth?.name || "Sin mes activo"}
-            </Badge>
+            <div className="flex items-center space-x-4">
+              {!canEdit && (
+                <span className="flex items-center gap-1 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                  <Lock className="w-3 h-3" /> Solo lectura
+                </span>
+              )}
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                {currentMonth?.name || "Sin mes activo"}
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
@@ -127,13 +141,16 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
                   </div>*/}
 
                   <div className="space-y-2 mt-6">
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setOpenCreateModal(true)}>
-                      Iniciar Nuevo Mes
-                    </Button>
-
-                    <Button variant="outline" className="w-full bg-transparent" onClick={() => setOpenCloseModal(true)}>
-                      Cerrar Mes Actual
-                    </Button>
+                    {canEdit && (
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setOpenCreateModal(true)}>
+                        Iniciar Nuevo Mes
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button variant="outline" className="w-full bg-transparent" onClick={() => setOpenCloseModal(true)}>
+                        Cerrar Mes Actual
+                      </Button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -143,9 +160,11 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
                       No hay un mes activo. Inicie un nuevo mes para comenzar a trabajar.
                     </AlertDescription>
                   </Alert>
-                  <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setOpenCreateModal(true)}>
-                    Crear Nuevo Mes
-                  </Button>
+                  {canEdit && (
+                    <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setOpenCreateModal(true)}>
+                      Crear Nuevo Mes
+                    </Button>
+                  )}
                 </>
               )}
             </CardContent>
@@ -239,6 +258,13 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
         </div>
       </main>
     </div>
+  )
+}
+
+export default function ControlMensualPage() {
+  return (
+    <PermissionsGuard moduleName="control_mensual">
+      {(canEdit) => <ControlMensualContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }
