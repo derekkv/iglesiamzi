@@ -557,8 +557,9 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
                                   min="0"
                                   value={attendanceData[detail.id]?.[column.id] || ""}
                                   onChange={(e) => handleCellChange(detail.id, column.id, e.target.value)}
-                                  className="border-0 text-center h-8 focus:ring-1 focus:ring-blue-500"
+                                  className="border-0 text-center h-8 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                   placeholder="0"
+                                  disabled={!canEdit}
                                 />
                               </td>
                             ))}

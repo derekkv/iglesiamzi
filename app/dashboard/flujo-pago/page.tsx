@@ -335,7 +335,17 @@ setSaving(true)
             </tr>
           </thead>
           <tbody>
-            ${table.rows.map((row) => ``).join("")}
+            ${table.rows
+              .map(
+                (row) => `
+              <tr>
+                <td>${row.fecha}</td>
+                <td>${row.beneficiarios}</td>
+                <td>${row.detalle}</td>
+                <td class="text-right">${formatCurrency(row.valor)}</td>
+              </tr>`
+              )
+              .join("")}
             <tr class="total-row">
               <td colspan="3"><strong>TOTAL</strong></td>
               <td class="text-right"><strong>${formatCurrency(getTotalValue(table))}</strong></td>
