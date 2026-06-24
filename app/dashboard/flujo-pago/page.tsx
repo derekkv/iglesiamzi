@@ -29,9 +29,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { paymentFlowService, type PaymentTable, type PaymentRow } from "@/lib/mod/payment-flow-service"
+import { useSecurityCheck } from "@/contexts/security-context"
 
 function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
+  const { checkAndExecute } = useSecurityCheck()
   const [tables, setTables] = useState<PaymentTable[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateTableModalOpen, setIsCreateTableModalOpen] = useState(false)
@@ -39,8 +41,10 @@ function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
   const [isAddRowModalOpen, setIsAddRowModalOpen] = useState(false)
   const [isEditRowModalOpen, setIsEditRowModalOpen] = useState(false)
   const [selectedTable, setSelectedTable] = useState<PaymentTable | null>(null)
+  const [pendingDeleteTable, setPendingDeleteTable] = useState<PaymentTable | null>(null)
   const [editingTable, setEditingTable] = useState<PaymentTable | null>(null)
   const [editingRow, setEditingRow] = useState<PaymentRow | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = useState<PaymentRow | null>(null)
   const [newTableName, setNewTableName] = useState("")
   const [editTableName, setEditTableName] = useState("")
   const [saving, setSaving] = useState(false)
@@ -156,9 +160,11 @@ setSaving(true)
   }
 
   const openEditTableModal = (table: PaymentTable) => {
-    setEditingTable(table)
-    setEditTableName(table.nombre)
-    setIsEditTableModalOpen(true)
+    checkAndExecute(table.fechaCreacion || new Date().toISOString(), () => {
+      setEditingTable(table)
+      setEditTableName(table.nombre)
+      setIsEditTableModalOpen(true)
+    })
   }
 
   // Row functions
@@ -278,14 +284,16 @@ setSaving(true)
   }
 
   const openEditRowModal = (row: PaymentRow) => {
-    setEditingRow(row)
-    setRowFormData({
-      fecha: row.fecha,
-      beneficiarios: row.beneficiarios,
-      detalle: row.detalle,
-      valor: row.valor.toString(),
+    checkAndExecute(row.fecha || new Date().toISOString(), () => {
+      setEditingRow(row)
+      setRowFormData({
+        fecha: row.fecha,
+        beneficiarios: row.beneficiarios,
+        detalle: row.detalle,
+        valor: row.valor.toString(),
+      })
+      setIsEditRowModalOpen(true)
     })
-    setIsEditRowModalOpen(true)
   }
 
   const getTotalValue = (table: PaymentTable) => {
@@ -472,38 +480,20 @@ setSaving(true)
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={!canEdit}
                         onClick={(e) => {
                           e.stopPropagation()
-                          openEditTableModal(table)
+                          checkAndExecute(table.fechaCreacion || new Date().toISOString(), () => { setEditingTable(table); setEditTableName(table.nombre); setIsEditTableModalOpen(true) })
                         }}
                       >
                         ✏️
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="destructive" onClick={(e) => e.stopPropagation()}>
-                            🗑️
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar tabla?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción no se puede deshacer. Se eliminará permanentemente la tabla "{table.nombre}" y
-                              todas sus filas.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteTable(table.id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Button size="sm" variant="destructive" disabled={!canEdit} onClick={(e) => {
+                          e.stopPropagation()
+                          checkAndExecute(table.fechaCreacion || new Date().toISOString(), () => setPendingDeleteTable(table))
+                        }}>
+                        🗑️
+                      </Button>
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -538,32 +528,14 @@ setSaving(true)
                 <Button variant="outline" onClick={() => generatePDF(selectedTable)}>
                   📄 Descargar PDF
                 </Button>
-                <Button variant="outline" onClick={() => openEditTableModal(selectedTable)} disabled={!canEdit}>
+                <Button variant="outline" onClick={() => checkAndExecute(selectedTable.fechaCreacion || new Date().toISOString(), () => { setEditingTable(selectedTable); setEditTableName(selectedTable.nombre); setIsEditTableModalOpen(true) })} disabled={!canEdit}>
                   ✏️ Editar Tabla
                 </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" disabled={!canEdit}>🗑️ Eliminar Tabla</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar tabla?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Se eliminará permanentemente la tabla "{selectedTable.nombre}"
-                        y todas sus filas.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDeleteTable(selectedTable.id)}
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button variant="destructive" disabled={!canEdit} onClick={() => {
+                  checkAndExecute(selectedTable.fechaCreacion || new Date().toISOString(), () => setPendingDeleteTable(selectedTable))
+                }}>
+                  🗑️ Eliminar Tabla
+                </Button>
               </div>
             </div>
 
@@ -592,33 +564,14 @@ setSaving(true)
                           <td className="p-3 text-right font-medium">{formatCurrency(row.valor)}</td>
                           <td className="p-3">
                             <div className="flex justify-center space-x-1">
-                              <Button size="sm" variant="outline" onClick={() => openEditRowModal(row)} disabled={!canEdit}>
+                              <Button size="sm" variant="outline" onClick={() => checkAndExecute(row.fecha || new Date().toISOString(), () => { setEditingRow(row); setRowFormData({ fecha: row.fecha, beneficiarios: row.beneficiarios, detalle: row.detalle, valor: row.valor.toString() }); setIsEditRowModalOpen(true) })} disabled={!canEdit}>
                                 ✏️
                               </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="destructive" disabled={!canEdit}>
-                                    🗑️
+                              <Button size="sm" variant="destructive" disabled={!canEdit} onClick={() => {
+                                    checkAndExecute(row.fecha || new Date().toISOString(), () => setPendingDeleteRow(row))
+                                  }}>
+                                    Eliminar
                                   </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar fila?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminará permanentemente esta fila de pago.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteRow(row.id)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                    >
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
                             </div>
                           </td>
                         </tr>
@@ -789,6 +742,44 @@ setSaving(true)
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* AlertDialog para confirmar eliminar tabla */}
+        <AlertDialog open={!!pendingDeleteTable} onOpenChange={(open) => { if (!open) setPendingDeleteTable(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar tabla?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente la tabla y todas sus filas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingDeleteTable(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => {
+                if (pendingDeleteTable) handleDeleteTable(pendingDeleteTable.id)
+                setPendingDeleteTable(null)
+              }}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* AlertDialog para confirmar eliminar fila */}
+        <AlertDialog open={!!pendingDeleteRow} onOpenChange={(open) => { if (!open) setPendingDeleteRow(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar fila?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta accion no se puede deshacer. Se eliminara permanentemente esta fila de pago.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingDeleteRow(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => {
+                if (pendingDeleteRow) handleDeleteRow(pendingDeleteRow.id)
+                setPendingDeleteRow(null)
+              }}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   )

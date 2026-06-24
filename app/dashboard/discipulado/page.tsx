@@ -75,6 +75,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
   const [newDate, setNewDate] = useState("")
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
   const [saving, setSaving] = useState(false)
+  const [unlockedCells, setUnlockedCells] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const loadData = async () => {
@@ -463,25 +464,42 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
                         </td>
                         {data.dates.map((dateObj) => {
                           const status = getAttendanceStatus(participant.id, dateObj.id)
+                          const created = new Date(dateObj.created_at || "")
+                          const now = new Date()
+                          const needsKey = (now.getTime() - created.getTime()) / (1000 * 60 * 60) >= 6
+                          const cellKey = `${participant.id}-${dateObj.id}`
                           return (
                             <td key={dateObj.id} className="border border-gray-300 px-2 py-2 text-center">
-                              <Select
-                                value={status}
-                                onValueChange={(value) => handleAttendanceChange(participant.id, dateObj.id, value)}
-                                disabled={!canEdit}
-                              >
-                                <SelectTrigger className={`w-full h-8 ${getAttendanceColor(status)}`}>
-                                  <SelectValue placeholder="-" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">-</SelectItem>
-                                  {ATTENDANCE_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.value}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              {canEdit && needsKey && !unlockedCells.has(cellKey) ? (
+                                <div
+                                  className={`w-full h-8 flex items-center justify-center cursor-pointer rounded text-sm ${getAttendanceColor(status)}`}
+                                  onClick={() => {
+                                    checkAndExecute(dateObj.created_at || new Date().toISOString(), () => {
+                                      setUnlockedCells(prev => new Set([...prev, cellKey]))
+                                    })
+                                  }}
+                                >
+                                  {status === "none" ? "-" : status}
+                                </div>
+                              ) : (
+                                <Select
+                                  value={status}
+                                  onValueChange={(value) => handleAttendanceChange(participant.id, dateObj.id, value)}
+                                  disabled={!canEdit}
+                                >
+                                  <SelectTrigger className={`w-full h-8 ${getAttendanceColor(status)}`}>
+                                    <SelectValue placeholder="-" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">-</SelectItem>
+                                    {ATTENDANCE_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.value}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </td>
                           )
                         })}

@@ -192,17 +192,19 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const openEditModal = (item: InventoryItem) => {
-    setEditingItem(item)
-    setFormData({
-      cantidad: item.cantidad.toString(),
-      codigo: item.codigo,
-      detalle: item.detalle,
-      numeroSerie: item.numeroSerie,
-      ubicacion: item.ubicacion,
-      ministerio: item.ministerio,
-      estado: item.estado,
+    checkAndExecute(item.fechaRegistro || new Date().toISOString(), () => {
+      setEditingItem(item)
+      setFormData({
+        cantidad: item.cantidad.toString(),
+        codigo: item.codigo,
+        detalle: item.detalle,
+        numeroSerie: item.numeroSerie,
+        ubicacion: item.ubicacion,
+        ministerio: item.ministerio,
+        estado: item.estado,
+      })
+      setIsEditModalOpen(true)
     })
-    setIsEditModalOpen(true)
   }
 
   // Config functions
@@ -715,7 +717,7 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => handleDeleteItem(item.id)}
+                                  onClick={() => checkAndExecute(item.fechaRegistro || new Date().toISOString(), () => handleDeleteItem(item.id))}
                                   className="bg-red-600 hover:bg-red-700"
                                 >
                                   Eliminar

@@ -31,6 +31,7 @@ import {
 } from "@/lib/admin"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
+import { useSecurityCheck } from "@/contexts/security-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { Pencil, Trash2, RefreshCw, Copy, Check, ArrowLeft } from "lucide-react"
 import { getSecurityKeys, regenerateAllKeys} from "@/lib/security-keys"
@@ -76,6 +77,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const { user: currentUser, isLoading: authLoading } = useAuth()
+  const { checkAndExecute } = useSecurityCheck()
   const router = useRouter()
 
   // Formulario de nuevo usuario
@@ -176,14 +178,16 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const handleOpenEdit = (user: User) => {
-    setSelectedUser(user)
-    setEditUserForm({
-      displayName: user.displayName,
-      email: user.email || "",
-      phone: user.phone || "",
-      is_active: user.is_active,
+    checkAndExecute(user.created_at || new Date().toISOString(), () => {
+      setSelectedUser(user)
+      setEditUserForm({
+        displayName: user.displayName,
+        email: user.email || "",
+        phone: user.phone || "",
+        is_active: user.is_active,
+      })
+      setIsEditDialogOpen(true)
     })
-    setIsEditDialogOpen(true)
   }
 
   const handleUpdateUser = async () => {
@@ -546,7 +550,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDeleteUser(user.id, user.username)}
+                                onClick={() => checkAndExecute(user.created_at || new Date().toISOString(), () => handleDeleteUser(user.id, user.username))}
                                 disabled={!canEdit}
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
