@@ -30,10 +30,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { paymentFlowService, type PaymentTable, type PaymentRow } from "@/lib/mod/payment-flow-service"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useAuth } from "@/contexts/auth-context"
 
 function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { checkAndExecute } = useSecurityCheck()
+  const { user } = useAuth()
   const [tables, setTables] = useState<PaymentTable[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateTableModalOpen, setIsCreateTableModalOpen] = useState(false)
@@ -94,7 +96,7 @@ function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
     }
 setSaving(true)
     try {
-      const newTable = await paymentFlowService.createTable(newTableName)
+      const newTable = await paymentFlowService.createTable(newTableName, { user_id: user!.id, user_name: user!.username })
       setTables((prev) => [newTable, ...prev])
       setNewTableName("")
       setIsCreateTableModalOpen(false)
@@ -117,7 +119,7 @@ setSaving(true)
     }
 setSaving(true)
     try {
-      await paymentFlowService.updateTable(editingTable.id, editTableName)
+      await paymentFlowService.updateTable(editingTable.id, editTableName, { user_id: user!.id, user_name: user!.username })
 
       const updatedTable = {
         ...editingTable,
@@ -147,7 +149,7 @@ setSaving(true)
       return
     }
     try {
-      await paymentFlowService.deleteTable(tableId)
+      await paymentFlowService.deleteTable(tableId, { user_id: user!.id, user_name: user!.username })
       setTables((prev) => prev.filter((table) => table.id !== tableId))
 
       if (selectedTable?.id === tableId) {
@@ -190,7 +192,7 @@ setSaving(true)
         beneficiarios: rowFormData.beneficiarios,
         detalle: rowFormData.detalle,
         valor: Number.parseFloat(rowFormData.valor),
-      })
+      }, { user_id: user!.id, user_name: user!.username })
 
       const updatedTable = {
         ...selectedTable,
@@ -232,7 +234,7 @@ setSaving(true)
         beneficiarios: rowFormData.beneficiarios,
         detalle: rowFormData.detalle,
         valor: Number.parseFloat(rowFormData.valor),
-      })
+      }, { user_id: user!.id, user_name: user!.username })
 
       const updatedRow: PaymentRow = {
         ...editingRow,
@@ -268,7 +270,7 @@ setSaving(true)
     if (!selectedTable) return
 
     try {
-      await paymentFlowService.deleteRow(rowId)
+      await paymentFlowService.deleteRow(rowId, { user_id: user!.id, user_name: user!.username })
 
       const updatedTable = {
         ...selectedTable,

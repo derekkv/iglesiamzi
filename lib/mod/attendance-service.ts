@@ -1,4 +1,5 @@
 import { supabase } from "../supabase"
+import { auditService, type AuditInfo } from "./audit-service"
 
 export interface AttendanceDetail {
   id: number
@@ -60,43 +61,25 @@ export class AttendanceService {
     return data || []
   }
 
-  async createDetail(mesId: string, nombre: string): Promise<AttendanceDetail> {
-
+  async createDetail(mesId: string, nombre: string, audit?: AuditInfo): Promise<AttendanceDetail> {
     const orden = await this.getNextOrder("asistencia_detalles", mesId)
-
-    const { data, error } = await this.supabase
-      .from("asistencia_detalles")
-      .insert({
-        mes_id: mesId,
-        nombre,
-        orden,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("[v0] Error creating detail:", error)
-      throw error
-    }
+    const { data, error } = await this.supabase.from("asistencia_detalles").insert({ mes_id: mesId, nombre, orden }).select().single()
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "crear", description: `Detalle: ${nombre}`, details: { id: data.id, nombre, mes_id: mesId } })
     return data
   }
 
-  async updateDetail(id: number, nombre: string): Promise<void> {
+  async updateDetail(id: number, nombre: string, audit?: AuditInfo): Promise<void> {
     const { error } = await this.supabase.from("asistencia_detalles").update({ nombre }).eq("id", id)
-
-    if (error) {
-      console.error("[v0] Error updating detail:", error)
-      throw error
-    }
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "editar", description: `Detalle renombrado a: ${nombre}`, details: { id, nuevo_nombre: nombre } })
   }
 
-  async deleteDetail(id: number): Promise<void> {
+  async deleteDetail(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await this.supabase.from("asistencia_detalles").select("nombre").eq("id", id).single()
     const { error } = await this.supabase.from("asistencia_detalles").delete().eq("id", id)
-
-    if (error) {
-      console.error("[v0] Error deleting detail:", error)
-      throw error
-    }
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "eliminar", description: `Detalle: ${data?.nombre}`, details: { id, nombre: data?.nombre } })
   }
 
   // Columnas (fechas)
@@ -114,43 +97,25 @@ export class AttendanceService {
     return data || []
   }
 
-  async createColumn(mesId: string, nombre: string): Promise<AttendanceColumn> {
-
+  async createColumn(mesId: string, nombre: string, audit?: AuditInfo): Promise<AttendanceColumn> {
     const orden = await this.getNextOrder("asistencia_columnas", mesId)
-
-    const { data, error } = await this.supabase
-      .from("asistencia_columnas")
-      .insert({
-        mes_id: mesId,
-        nombre,
-        orden,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("[v0] Error creating column:", error)
-      throw error
-    }
+    const { data, error } = await this.supabase.from("asistencia_columnas").insert({ mes_id: mesId, nombre, orden }).select().single()
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "crear", description: `Columna/Fecha: ${nombre}`, details: { id: data.id, nombre, mes_id: mesId } })
     return data
   }
 
-  async updateColumn(id: number, nombre: string): Promise<void> {
+  async updateColumn(id: number, nombre: string, audit?: AuditInfo): Promise<void> {
     const { error } = await this.supabase.from("asistencia_columnas").update({ nombre }).eq("id", id)
-
-    if (error) {
-      console.error("[v0] Error updating column:", error)
-      throw error
-    }
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "editar", description: `Columna renombrada a: ${nombre}`, details: { id, nuevo_nombre: nombre } })
   }
 
-  async deleteColumn(id: number): Promise<void> {
+  async deleteColumn(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await this.supabase.from("asistencia_columnas").select("nombre").eq("id", id).single()
     const { error } = await this.supabase.from("asistencia_columnas").delete().eq("id", id)
-
-    if (error) {
-      console.error("[v0] Error deleting column:", error)
-      throw error
-    }
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "eliminar", description: `Columna: ${data?.nombre}`, details: { id, nombre: data?.nombre } })
   }
 
   // Datos de asistencia

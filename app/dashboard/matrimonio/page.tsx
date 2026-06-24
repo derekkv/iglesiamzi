@@ -134,7 +134,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
         observacion: formData.observacion,
       }
 
-      await matrimonioService.create(matrimonioData)
+      await matrimonioService.create(matrimonioData, { user_id: user!.id, user_name: user!.username })
       await loadMatrimonios()
 
       toast({
@@ -215,7 +215,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
         observacion: formData.observacion,
       }
 
-      await matrimonioService.update(editingMatrimonio.id, updates)
+      await matrimonioService.update(editingMatrimonio.id, updates, { user_id: user!.id, user_name: user!.username })
       await loadMatrimonios()
 
       toast({
@@ -248,7 +248,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     if (!deleteMatrimonioId) return
 
     try {
-      await matrimonioService.delete(deleteMatrimonioId)
+      await matrimonioService.delete(deleteMatrimonioId, { user_id: user!.id, user_name: user!.username })
       await loadMatrimonios()
 
       toast({

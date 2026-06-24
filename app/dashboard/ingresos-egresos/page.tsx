@@ -265,9 +265,9 @@ const handleDeleteClick = (record: FinancialRecord) => {
       };
 
       if (formData.tipo === "Ingreso") {
-        await storage.addIngreso(currentMonth.id, recordData);
+        await storage.addIngreso(currentMonth.id, recordData, { user_id: user!.id, user_name: user!.username });
       } else {
-        await storage.addEgreso(currentMonth.id, recordData);
+        await storage.addEgreso(currentMonth.id, recordData, { user_id: user!.id, user_name: user!.username });
       }
 
       // Recargar registros
@@ -366,9 +366,9 @@ const handleDeleteClick = (record: FinancialRecord) => {
       };
 
       if (editingRecord.tipo === "Ingreso") {
-        await storage.updateIngreso(editingRecord.id, updates);
+        await storage.updateIngreso(editingRecord.id, updates, { user_id: user!.id, user_name: user!.username });
       } else {
-        await storage.updateEgreso(editingRecord.id, updates);
+        await storage.updateEgreso(editingRecord.id, updates, { user_id: user!.id, user_name: user!.username });
       }
 
       // Recargar registros
@@ -401,9 +401,9 @@ const handleDeleteClick = (record: FinancialRecord) => {
 
       if (recordToDelete) {
         if (recordToDelete.tipo === "Ingreso") {
-          await storage.deleteIngreso(deleteRecordId);
+          await storage.deleteIngreso(deleteRecordId, { user_id: user!.id, user_name: user!.username });
         } else {
-          await storage.deleteEgreso(deleteRecordId);
+          await storage.deleteEgreso(deleteRecordId, { user_id: user!.id, user_name: user!.username });
         }
 
         // Recargar registros

@@ -38,6 +38,7 @@ import {
 import { Trash2, Plus, ArrowLeft, Edit, Lock } from "lucide-react"
 import { useMonth } from "@/contexts/month-context"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useAuth } from "@/contexts/auth-context"
 
 interface DiscipuladoData {
   participants: Participant[]
@@ -61,6 +62,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { currentMonth } = useMonth()
   const { checkAndExecute } = useSecurityCheck()
+  const { user } = useAuth()
   const [data, setData] = useState<DiscipuladoData>({
     participants: [],
     dates: [],
@@ -110,7 +112,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
     setSaving(true)
 
     try {
-      await discipuladoService.addParticipant(currentMonth.id, newParticipantName.trim())
+      await discipuladoService.addParticipant(currentMonth.id, newParticipantName.trim(), { user_id: user!.id, user_name: user!.username })
       await refreshData()
       setNewParticipantName("")
       setShowAddParticipant(false)
@@ -125,7 +127,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
     if (!editingParticipant || !editingParticipant.name.trim()) return
     setSaving(true)
     try {
-      await discipuladoService.updateParticipant(editingParticipant.id, editingParticipant.name.trim())
+      await discipuladoService.updateParticipant(editingParticipant.id, editingParticipant.name.trim(), { user_id: user!.id, user_name: user!.username })
       await refreshData()
       setEditingParticipant(null)
       setShowEditParticipant(false)
@@ -138,7 +140,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
 
   const handleDeleteParticipant = async (participantId: number) => {
     try {
-      await discipuladoService.deleteParticipant(participantId)
+      await discipuladoService.deleteParticipant(participantId, { user_id: user!.id, user_name: user!.username })
       await refreshData()
     } catch (error) {
       console.error("Error deleting participant:", error)
@@ -152,7 +154,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
     if (dateExists) return
 
     try {
-      await discipuladoService.addDate(currentMonth.id, newDate)
+      await discipuladoService.addDate(currentMonth.id, newDate, { user_id: user!.id, user_name: user!.username })
       await refreshData()
       setNewDate("")
       setShowAddDate(false)
@@ -165,7 +167,7 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
 
   const handleDeleteDate = async (dateId: number) => {
     try {
-      await discipuladoService.deleteDate(dateId)
+      await discipuladoService.deleteDate(dateId, { user_id: user!.id, user_name: user!.username })
       await refreshData()
     } catch (error) {
       console.error("Error deleting date:", error)

@@ -1,4 +1,5 @@
 import { supabase } from "../supabase"
+import { auditService, type AuditInfo } from "./audit-service"
 
 export interface DiezmoRecord {
   id: number
@@ -90,60 +91,35 @@ export class DiezmosService {
     return data && data.length > 0 ? data[0].numero + 1 : 1
   }
 
-  // Create a new diezmo
-  async createDiezmo(diezmo: Omit<DiezmoRecord, "id" | "created_at" | "updated_at">): Promise<DiezmoRecord> {
-
+  async createDiezmo(diezmo: Omit<DiezmoRecord, "id" | "created_at" | "updated_at">, audit?: AuditInfo): Promise<DiezmoRecord> {
     const { data, error } = await supabase
       .from("diezmos")
-      .insert({
-        mes_id: diezmo.mes_id,
-        numero: diezmo.numero,
-        fecha: diezmo.fecha,
-        donador: diezmo.donador,
-        valor: diezmo.valor,
-      })
+      .insert({ mes_id: diezmo.mes_id, numero: diezmo.numero, fecha: diezmo.fecha, donador: diezmo.donador, valor: diezmo.valor })
       .select()
       .single()
-
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "diezmos", action: "crear", description: `Diezmo #${data.numero} - ${data.donador} ($${data.valor})`, details: { numero: data.numero, fecha: data.fecha, donador: data.donador, valor: data.valor, mes_id: data.mes_id } })
     return data
   }
 
-  // Update an existing diezmo
-  async updateDiezmo(
-    id: number,
-    updates: Partial<Omit<DiezmoRecord, "id" | "created_at" | "updated_at">>,
-  ): Promise<DiezmoRecord> {
-
+  async updateDiezmo(id: number, updates: Partial<Omit<DiezmoRecord, "id" | "created_at" | "updated_at">>, audit?: AuditInfo): Promise<DiezmoRecord> {
+    const { data: antes } = audit ? await supabase.from("diezmos").select("numero,fecha,donador,valor").eq("id", id).single() : { data: null }
     const { data, error } = await supabase
       .from("diezmos")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single()
-
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "diezmos", action: "editar", description: `Diezmo #${data.numero} - ${data.donador}`, details: { antes: { numero: antes?.numero, fecha: antes?.fecha, donador: antes?.donador, valor: antes?.valor }, despues: { numero: data.numero, fecha: data.fecha, donador: data.donador, valor: data.valor } } })
     return data
   }
 
-  // Delete a diezmo
-  async deleteDiezmo(id: number): Promise<void> {
-
+  async deleteDiezmo(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await supabase.from("diezmos").select("numero,donador,valor,fecha").eq("id", id).single()
     const { error } = await supabase.from("diezmos").delete().eq("id", id)
-
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "diezmos", action: "eliminar", description: `Diezmo #${data?.numero} - ${data?.donador}`, details: { id, numero: data?.numero, donador: data?.donador, valor: data?.valor } })
   }
 
   // Get total value of diezmos for a month

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 
 export interface CensoRecord {
   id?: number
@@ -78,33 +79,35 @@ export const censoService = {
     return data
   },
 
-  async create(record: CensoRecord): Promise<CensoRecord> {
+  async create(record: CensoRecord, audit?: AuditInfo): Promise<CensoRecord> {
     const { data, error } = await supabase
       .from("censo")
       .insert([{ ...record, updated_at: new Date().toISOString() }])
       .select()
       .single()
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "censo", action: "crear", description: `Censo - ${data.apellidos_nombres}`, details: { cedula: record.cedula, nombre: record.apellidos_nombres, cargo: record.cargo, local: record.local, celular: record.celular, estado_civil: record.estado_civil } })
     return data
   },
 
-  async update(id: number, record: Partial<CensoRecord>): Promise<CensoRecord> {
+  async update(id: number, record: Partial<CensoRecord>, audit?: AuditInfo): Promise<CensoRecord> {
+    const { data: antes } = audit ? await supabase.from("censo").select("apellidos_nombres,cedula,cargo,local,celular,estado_civil").eq("id", id).single() : { data: null }
     const { data, error } = await supabase
       .from("censo")
       .update({ ...record, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single()
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "censo", action: "editar", description: `Censo - ${data.apellidos_nombres}`, details: { antes, despues: { apellidos_nombres: data.apellidos_nombres, cedula: data.cedula, cargo: data.cargo, local: data.local, celular: data.celular, estado_civil: data.estado_civil } } })
     return data
   },
 
-  async delete(id: number): Promise<void> {
+  async delete(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await supabase.from("censo").select("apellidos_nombres,cedula,cargo,local").eq("id", id).single()
     const { error } = await supabase.from("censo").delete().eq("id", id)
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "censo", action: "eliminar", description: `Censo - ${data?.apellidos_nombres} (${data?.cedula})`, details: { id, cedula: data?.cedula, nombre: data?.apellidos_nombres, cargo: data?.cargo, local: data?.local } })
   },
 
   async search(query: string): Promise<CensoRecord[]> {

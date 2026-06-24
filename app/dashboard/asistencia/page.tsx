@@ -32,6 +32,7 @@ import { attendanceService, type AttendanceDetail, type AttendanceColumn } from 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { useMonth } from "@/contexts/month-context"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useAuth } from "@/contexts/auth-context"
 
 interface AttendanceDataMap {
   [detalleId: number]: { [columnaId: number]: number }
@@ -42,6 +43,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { currentMonth, updateConfigurations } = useMonth()
   const { checkAndExecute } = useSecurityCheck()
+  const { user } = useAuth()
   const [details, setDetails] = useState<AttendanceDetail[]>([])
   const [columns, setColumns] = useState<AttendanceColumn[]>([])
   const [attendanceData, setAttendanceData] = useState<AttendanceDataMap>({})
@@ -95,7 +97,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
     if (!newColumnName.trim() || !currentMonth?.id) return
     setSaving(true)
     try {
-      const newColumn = await attendanceService.createColumn(currentMonth.id, newColumnName.trim())
+      const newColumn = await attendanceService.createColumn(currentMonth.id, newColumnName.trim(), { user_id: user!.id, user_name: user!.username })
       setColumns((prev) => [...prev, newColumn])
       setNewColumnName("")
       setShowAddColumn(false)
@@ -114,7 +116,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
     if (!newDetail.trim() || !currentMonth?.id) return
     setSaving(true)
     try {
-      const newDetailRecord = await attendanceService.createDetail(currentMonth.id, newDetail.trim())
+      const newDetailRecord = await attendanceService.createDetail(currentMonth.id, newDetail.trim(), { user_id: user!.id, user_name: user!.username })
       setDetails((prev) => [...prev, newDetailRecord])
       setNewDetail("")
       setShowAddDetail(false)
@@ -131,7 +133,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
     if (!editingDetail?.nombre.trim()) return
     setSaving(true)
     try {
-      await attendanceService.updateDetail(editingDetail.id, editingDetail.nombre.trim())
+      await attendanceService.updateDetail(editingDetail.id, editingDetail.nombre.trim(), { user_id: user!.id, user_name: user!.username })
       setDetails((prev) => prev.map((d) => d.id === editingDetail.id ? { ...d, nombre: editingDetail.nombre.trim() } : d))
       setShowEditDetail(false)
       setEditingDetail(null)
@@ -141,7 +143,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
 
   const handleDeleteDetail = async (detailId: number) => {
     try {
-      await attendanceService.deleteDetail(detailId)
+      await attendanceService.deleteDetail(detailId, { user_id: user!.id, user_name: user!.username })
       setDetails((prev) => prev.filter((d) => d.id !== detailId))
       const newData = { ...attendanceData }
       delete newData[detailId]
@@ -153,7 +155,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
     if (!editingColumn?.nombre.trim()) return
     setSaving(true)
     try {
-      await attendanceService.updateColumn(editingColumn.id, editingColumn.nombre.trim())
+      await attendanceService.updateColumn(editingColumn.id, editingColumn.nombre.trim(), { user_id: user!.id, user_name: user!.username })
       setColumns((prev) => prev.map((c) => c.id === editingColumn.id ? { ...c, nombre: editingColumn.nombre.trim() } : c))
       setShowEditColumn(false)
       setEditingColumn(null)
@@ -163,7 +165,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
 
   const handleDeleteColumn = async (columnId: number) => {
     try {
-      await attendanceService.deleteColumn(columnId)
+      await attendanceService.deleteColumn(columnId, { user_id: user!.id, user_name: user!.username })
       setColumns((prev) => prev.filter((c) => c.id !== columnId))
       const newData = { ...attendanceData }
       Object.keys(newData).forEach((detailId) => {

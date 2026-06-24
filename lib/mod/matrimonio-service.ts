@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 
 export interface Matrimonio {
   id: number
@@ -61,32 +62,31 @@ export const matrimonioService = {
     return data || []
   },
 
-  // Crear un nuevo matrimonio
-  async create(matrimonio: MatrimonioInput): Promise<Matrimonio> {
+  async create(matrimonio: MatrimonioInput, audit?: AuditInfo): Promise<Matrimonio> {
     const { data, error } = await supabase.from("matrimonios").insert(matrimonio).select().single()
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "matrimonio", action: "crear", description: `Matrimonio #${data.numero} - ${data.nombre_esposo} & ${data.nombre_esposa}`, details: { numero: data.numero, fecha: data.fecha, nombre_esposo: data.nombre_esposo, nombre_esposa: data.nombre_esposa, testigos: data.testigos, observacion: data.observacion } })
     return data
   },
 
-  // Actualizar un matrimonio
-  async update(id: number, updates: Partial<MatrimonioInput>): Promise<Matrimonio> {
+  async update(id: number, updates: Partial<MatrimonioInput>, audit?: AuditInfo): Promise<Matrimonio> {
+    const { data: antes } = audit ? await supabase.from("matrimonios").select("numero,fecha,nombre_esposo,nombre_esposa,testigos").eq("id", id).single() : { data: null }
     const { data, error } = await supabase
       .from("matrimonios")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single()
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "matrimonio", action: "editar", description: `Matrimonio #${data.numero} - ${data.nombre_esposo} & ${data.nombre_esposa}`, details: { antes, despues: { numero: data.numero, fecha: data.fecha, nombre_esposo: data.nombre_esposo, nombre_esposa: data.nombre_esposa, testigos: data.testigos } } })
     return data
   },
 
-  // Eliminar un matrimonio
-  async delete(id: number): Promise<void> {
+  async delete(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await supabase.from("matrimonios").select("numero,nombre_esposo,nombre_esposa,fecha").eq("id", id).single()
     const { error } = await supabase.from("matrimonios").delete().eq("id", id)
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "matrimonio", action: "eliminar", description: `Matrimonio #${data?.numero} - ${data?.nombre_esposo} & ${data?.nombre_esposa}`, details: { id, numero: data?.numero, nombre_esposo: data?.nombre_esposo, nombre_esposa: data?.nombre_esposa, fecha: data?.fecha } })
   },
 
   // Obtener el siguiente número disponible globalmente

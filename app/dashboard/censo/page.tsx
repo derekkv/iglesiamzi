@@ -167,7 +167,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
 
     try {
       setIsLoadingB(true)
-      await censoService.create(formData)
+      await censoService.create(formData, { user_id: user!.id, user_name: user!.username })
       toast({
         title: "Éxito",
         description: "Registro creado correctamente",
@@ -203,7 +203,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
 
     try {
       setIsLoadingB(true)
-      await censoService.update(currentRecord.id, formData)
+      await censoService.update(currentRecord.id, formData, { user_id: user!.id, user_name: user!.username })
       toast({
         title: "Éxito",
         description: "Registro actualizado correctamente",
@@ -231,7 +231,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
 
     try {
       setIsLoadingB(true)
-      await censoService.delete(currentRecord.id)
+      await censoService.delete(currentRecord.id, { user_id: user!.id, user_name: user!.username })
       toast({
         title: "Éxito",
         description: "Registro eliminado correctamente",

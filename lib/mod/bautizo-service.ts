@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 
 export interface Bautizo {
   id: number
@@ -60,32 +61,31 @@ export const bautizoService = {
     return data || []
   },
 
-  // Crear un nuevo bautizo
-  async create(bautizo: BautizoInput): Promise<Bautizo> {
+  async create(bautizo: BautizoInput, audit?: AuditInfo): Promise<Bautizo> {
     const { data, error } = await supabase.from("bautizos").insert(bautizo).select().single()
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "bautizo", action: "crear", description: `Bautizo #${data.numero} - ${data.nombre_bautizado}`, details: { numero: data.numero, fecha: data.fecha, nombre_bautizado: data.nombre_bautizado, nombre_padre: data.nombre_padre, nombre_madre: data.nombre_madre, padrinos: data.padrinos, observacion: data.observacion } })
     return data
   },
 
-  // Actualizar un bautizo
-  async update(id: number, updates: Partial<BautizoInput>): Promise<Bautizo> {
+  async update(id: number, updates: Partial<BautizoInput>, audit?: AuditInfo): Promise<Bautizo> {
+    const { data: antes } = audit ? await supabase.from("bautizos").select("numero,fecha,nombre_bautizado,nombre_padre,nombre_madre,padrinos").eq("id", id).single() : { data: null }
     const { data, error } = await supabase
       .from("bautizos")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single()
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "bautizo", action: "editar", description: `Bautizo #${data.numero} - ${data.nombre_bautizado}`, details: { antes, despues: { numero: data.numero, fecha: data.fecha, nombre_bautizado: data.nombre_bautizado, nombre_padre: data.nombre_padre, nombre_madre: data.nombre_madre, padrinos: data.padrinos } } })
     return data
   },
 
-  // Eliminar un bautizo
-  async delete(id: number): Promise<void> {
+  async delete(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await supabase.from("bautizos").select("numero,nombre_bautizado,nombre_padre,nombre_madre,fecha").eq("id", id).single()
     const { error } = await supabase.from("bautizos").delete().eq("id", id)
-
     if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "bautizo", action: "eliminar", description: `Bautizo #${data?.numero} - ${data?.nombre_bautizado}`, details: { id, numero: data?.numero, nombre_bautizado: data?.nombre_bautizado, nombre_padre: data?.nombre_padre, nombre_madre: data?.nombre_madre, fecha: data?.fecha } })
   },
 
   async getNextNumber(): Promise<number> {

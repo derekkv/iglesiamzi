@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Lock, ArrowLeft } from "lucide-react"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,6 +51,7 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
   const [filterEstado, setFilterEstado] = useState("all")
 
   const { checkAndExecute } = useSecurityCheck()
+  const { user } = useAuth()
 
   const [isSaving, setIsSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -129,7 +131,7 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
         ministerio: formData.ministerio,
         estado: formData.estado,
         fechaRegistro: new Date().toISOString().split("T")[0],
-      })
+      }, { user_id: user!.id, user_name: user!.username })
 
       setItems((prev) => [newItem, ...prev])
       resetForm()
@@ -167,7 +169,7 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
         ministerio: formData.ministerio,
         estado: formData.estado,
         fechaRegistro: editingItem.fechaRegistro,
-      })
+      }, { user_id: user!.id, user_name: user!.username })
 
       setItems((prev) => prev.map((item) => (item.id === editingItem.id ? updatedItem : item)))
       resetForm()
@@ -183,7 +185,7 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
 
   const handleDeleteItem = async (id: string) => {
     try {
-      await storage.deleteInventoryItem(id)
+      await storage.deleteInventoryItem(id, { user_id: user!.id, user_name: user!.username })
       setItems((prev) => prev.filter((item) => item.id !== id))
     } catch (error) {
       console.error("Error deleting item:", error)

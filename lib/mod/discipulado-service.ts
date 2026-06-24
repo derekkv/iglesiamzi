@@ -1,4 +1,5 @@
 import { supabase } from "../supabase"
+import { auditService, type AuditInfo } from "./audit-service"
 
 export interface Participant {
   id: number
@@ -52,47 +53,25 @@ class DiscipuladoService {
     return data || []
   }
 
-  async addParticipant(mesId: string, name: string): Promise<Participant> {
-
-    const { data, error } = await this.supabase
-      .from("discipulado_participantes")
-      .insert({
-        mes_id: mesId,
-        name: name.trim(),
-      })
-      .select()
-      .single()
-
-    if (error) {
-      throw error
-    }
-
+  async addParticipant(mesId: string, name: string, audit?: AuditInfo): Promise<Participant> {
+    const { data, error } = await this.supabase.from("discipulado_participantes").insert({ mes_id: mesId, name: name.trim() }).select().single()
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "discipulado", action: "crear", description: `Participante: ${name}`, details: { id: data.id, nombre: name, mes_id: mesId } })
     return data
   }
 
-  async updateParticipant(id: number, name: string): Promise<Participant> {
-
-    const { data, error } = await this.supabase
-      .from("discipulado_participantes")
-      .update({ name: name.trim() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) {
-      throw error
-    }
-
+  async updateParticipant(id: number, name: string, audit?: AuditInfo): Promise<Participant> {
+    const { data, error } = await this.supabase.from("discipulado_participantes").update({ name: name.trim() }).eq("id", id).select().single()
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "discipulado", action: "editar", description: `Participante renombrado a: ${name}`, details: { id, nuevo_nombre: name } })
     return data
   }
 
-  async deleteParticipant(id: number): Promise<void> {
-
+  async deleteParticipant(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await this.supabase.from("discipulado_participantes").select("name").eq("id", id).single()
     const { error } = await this.supabase.from("discipulado_participantes").delete().eq("id", id)
-
-    if (error) {
-      throw error
-    }
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "discipulado", action: "eliminar", description: `Participante: ${data?.name}`, details: { id, nombre: data?.name } })
   }
 
   // Dates CRUD
@@ -111,31 +90,18 @@ class DiscipuladoService {
     return data || []
   }
 
-  async addDate(mesId: string, fecha: string): Promise<DiscipuladoDate> {
-
-    const { data, error } = await this.supabase
-      .from("discipulado_fechas")
-      .insert({
-        mes_id: mesId,
-        fecha: fecha,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      throw error
-    }
-
+  async addDate(mesId: string, fecha: string, audit?: AuditInfo): Promise<DiscipuladoDate> {
+    const { data, error } = await this.supabase.from("discipulado_fechas").insert({ mes_id: mesId, fecha }).select().single()
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "discipulado", action: "crear", description: `Fecha: ${fecha}`, details: { id: data.id, fecha, mes_id: mesId } })
     return data
   }
 
-  async deleteDate(id: number): Promise<void> {
-
+  async deleteDate(id: number, audit?: AuditInfo): Promise<void> {
+    const { data } = await this.supabase.from("discipulado_fechas").select("fecha").eq("id", id).single()
     const { error } = await this.supabase.from("discipulado_fechas").delete().eq("id", id)
-
-    if (error) {
-      throw error
-    }
+    if (error) throw error
+    if (audit) auditService.log({ ...audit, module: "discipulado", action: "eliminar", description: `Fecha: ${data?.fecha}`, details: { id, fecha: data?.fecha } })
   }
 
   // Attendance CRUD

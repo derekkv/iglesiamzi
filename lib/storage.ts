@@ -1,6 +1,6 @@
 import { GlobalConfig } from "./globalConfig";
 import { supabase } from "./supabase";
-
+import { auditService, type AuditInfo } from "./mod/audit-service";
 
 interface StorageAdapter {
   getMonth(id: string): Promise<any | null>;
@@ -116,7 +116,7 @@ async saveMonth(month: any) {
 }
 
 
-async addIngreso(mesId: string, ingreso: any) {
+async addIngreso(mesId: string, ingreso: any, audit?: AuditInfo) {
   const { error } = await supabase.from("ingresos").insert({
     mes_id: mesId,
     concepto: "bb",
@@ -128,18 +128,18 @@ async addIngreso(mesId: string, ingreso: any) {
     observacion: ingreso.observacion,
     estado: ingreso.estado,
   });
-
   if (error) throw new Error(`Supabase addIngreso error: ${error.message}`);
+  if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "crear", description: `Ingreso: ${ingreso.detalle} - $${ingreso.monto}`, details: { tipo: "Ingreso", monto: ingreso.monto, fecha: ingreso.fecha, ministerio: ingreso.ministerio, categoria: ingreso.categoria_principal, detalle: ingreso.detalle, observacion: ingreso.observacion, estado: ingreso.estado } })
 }
 
-async updateIngreso(id: number, ingreso: any) {
+async updateIngreso(id: number, ingreso: any, audit?: AuditInfo) {
+  const { data: antes } = audit ? await supabase.from("ingresos").select("monto,fecha,ministerio,categoria_principal,detalle,observacion,estado").eq("id", id).single() : { data: null };
   const { error } = await supabase
     .from("ingresos")
     .update({
       concepto: "edit we",
       monto: ingreso.monto,
       fecha: ingreso.fecha || new Date().toISOString(),
-      // Si agregaste columnas extra, inclúyelas aquí
       ministerio: ingreso.ministerio,
       categoria_principal: ingreso.categoria_principal,
       detalle: ingreso.detalle,
@@ -147,19 +147,18 @@ async updateIngreso(id: number, ingreso: any) {
       estado: ingreso.estado,
     })
     .eq("id", id);
-
   if (error) throw new Error(`Supabase updateIngreso error: ${error.message}`);
+  if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "editar", description: `Ingreso #${id}: ${ingreso.detalle} - $${ingreso.monto}`, details: { tipo: "Ingreso", antes: { monto: antes?.monto, fecha: antes?.fecha, ministerio: antes?.ministerio, categoria: antes?.categoria_principal, detalle: antes?.detalle, estado: antes?.estado }, despues: { monto: ingreso.monto, fecha: ingreso.fecha, ministerio: ingreso.ministerio, categoria: ingreso.categoria_principal, detalle: ingreso.detalle, estado: ingreso.estado } } })
 }
 
-// Editar egreso
-async updateEgreso(id: number, egreso: any) {
+async updateEgreso(id: number, egreso: any, audit?: AuditInfo) {
+  const { data: antes } = audit ? await supabase.from("egresos").select("monto,fecha,ministerio,categoria_principal,detalle,observacion,estado").eq("id", id).single() : { data: null };
   const { error } = await supabase
     .from("egresos")
     .update({
       concepto: "edit we",
       monto: egreso.monto,
       fecha: egreso.fecha || new Date().toISOString(),
-      // Columnas extra
       ministerio: egreso.ministerio,
       categoria_principal: egreso.categoria_principal,
       detalle: egreso.detalle,
@@ -167,31 +166,25 @@ async updateEgreso(id: number, egreso: any) {
       estado: egreso.estado,
     })
     .eq("id", id);
-
   if (error) throw new Error(`Supabase updateEgreso error: ${error.message}`);
+  if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "editar", description: `Egreso #${id}: ${egreso.detalle} - $${egreso.monto}`, details: { tipo: "Egreso", antes: { monto: antes?.monto, fecha: antes?.fecha, ministerio: antes?.ministerio, categoria: antes?.categoria_principal, detalle: antes?.detalle, estado: antes?.estado }, despues: { monto: egreso.monto, fecha: egreso.fecha, ministerio: egreso.ministerio, categoria: egreso.categoria_principal, detalle: egreso.detalle, estado: egreso.estado } } })
 }
 
-// Eliminar ingreso
-async deleteIngreso(id: number) {
-  const { error } = await supabase
-    .from("ingresos")
-    .delete()
-    .eq("id", id);
-
+async deleteIngreso(id: number, audit?: AuditInfo) {
+  const { data: rec } = await supabase.from("ingresos").select("monto,detalle,ministerio,fecha").eq("id", id).single();
+  const { error } = await supabase.from("ingresos").delete().eq("id", id);
   if (error) throw new Error(`Supabase deleteIngreso error: ${error.message}`);
+  if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "eliminar", description: `Ingreso #${id}: ${rec?.detalle} - $${rec?.monto}`, details: { tipo: "Ingreso", id, monto: rec?.monto, detalle: rec?.detalle, ministerio: rec?.ministerio, fecha: rec?.fecha } })
 }
 
-// Eliminar egreso
-async deleteEgreso(id: number) {
-  const { error } = await supabase
-    .from("egresos")
-    .delete()
-    .eq("id", id);
-
+async deleteEgreso(id: number, audit?: AuditInfo) {
+  const { data: rec } = await supabase.from("egresos").select("monto,detalle,ministerio,fecha").eq("id", id).single();
+  const { error } = await supabase.from("egresos").delete().eq("id", id);
   if (error) throw new Error(`Supabase deleteEgreso error: ${error.message}`);
+  if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "eliminar", description: `Egreso #${id}: ${rec?.detalle} - $${rec?.monto}`, details: { tipo: "Egreso", id, monto: rec?.monto, detalle: rec?.detalle, ministerio: rec?.ministerio, fecha: rec?.fecha } })
 }
 
-async addEgreso(mesId: string, ingreso: any) {
+async addEgreso(mesId: string, ingreso: any, audit?: AuditInfo) {
   const { error } = await supabase.from("egresos").insert({
     mes_id: mesId,
     concepto: "bb",
@@ -205,6 +198,7 @@ async addEgreso(mesId: string, ingreso: any) {
   });
 
   if (error) throw new Error(`Supabase addEgreso error: ${error.message}`);
+  if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "crear", description: `Egreso: ${ingreso.detalle} - $${ingreso.monto}`, details: { tipo: "Egreso", monto: ingreso.monto, fecha: ingreso.fecha, ministerio: ingreso.ministerio, categoria: ingreso.categoria_principal, detalle: ingreso.detalle, observacion: ingreso.observacion, estado: ingreso.estado } })
 }
 
 
@@ -504,7 +498,7 @@ async updateGlobalConfig(config: GlobalConfig) {
     }
   }
 
-  async addInventoryItem(item: Omit<InventoryItem, "id">): Promise<InventoryItem> {
+  async addInventoryItem(item: Omit<InventoryItem, "id">, audit?: AuditInfo): Promise<InventoryItem> {
     try {
       const { data, error } = await supabase
         .from("inventory_items")
@@ -522,6 +516,7 @@ async updateGlobalConfig(config: GlobalConfig) {
         .single()
 
       if (error) throw error
+      if (audit) auditService.log({ ...audit, module: "inventario", action: "crear", description: `Inventario: ${item.detalle} (${item.codigo})`, details: { codigo: item.codigo, detalle: item.detalle, cantidad: item.cantidad, ubicacion: item.ubicacion, ministerio: item.ministerio, estado: item.estado, numero_serie: item.numeroSerie } })
 
       return {
         id: data.id,
@@ -540,8 +535,9 @@ async updateGlobalConfig(config: GlobalConfig) {
     }
   }
 
-  async updateInventoryItem(id: string, item: Omit<InventoryItem, "id">): Promise<InventoryItem> {
+  async updateInventoryItem(id: string, item: Omit<InventoryItem, "id">, audit?: AuditInfo): Promise<InventoryItem> {
     try {
+      const { data: antesInv } = audit ? await supabase.from("inventory_items").select("cantidad,codigo,detalle,ubicacion,ministerio,estado").eq("id", id).single() : { data: null }
       const { data, error } = await supabase
         .from("inventory_items")
         .update({
@@ -560,6 +556,8 @@ async updateGlobalConfig(config: GlobalConfig) {
 
       if (error) throw error
 
+      if (audit) auditService.log({ ...audit, module: "inventario", action: "editar", description: `Inventario: ${item.detalle} (${item.codigo})`, details: { antes: { codigo: antesInv?.codigo, detalle: antesInv?.detalle, cantidad: antesInv?.cantidad, ubicacion: antesInv?.ubicacion, ministerio: antesInv?.ministerio, estado: antesInv?.estado }, despues: { codigo: item.codigo, detalle: item.detalle, cantidad: item.cantidad, ubicacion: item.ubicacion, ministerio: item.ministerio, estado: item.estado } } })
+
       return {
         id: data.id,
         cantidad: data.cantidad,
@@ -577,11 +575,12 @@ async updateGlobalConfig(config: GlobalConfig) {
     }
   }
 
-  async deleteInventoryItem(id: string): Promise<void> {
+  async deleteInventoryItem(id: string, audit?: AuditInfo): Promise<void> {
     try {
+      const { data } = await supabase.from("inventory_items").select("detalle,codigo,cantidad,ubicacion,ministerio,estado").eq("id", id).single()
       const { error } = await supabase.from("inventory_items").delete().eq("id", id)
-
       if (error) throw error
+      if (audit) auditService.log({ ...audit, module: "inventario", action: "eliminar", description: `Inventario: ${data?.detalle} (${data?.codigo})`, details: { id, codigo: data?.codigo, detalle: data?.detalle, cantidad: data?.cantidad, ubicacion: data?.ubicacion, ministerio: data?.ministerio, estado: data?.estado } })
     } catch (error) {
       console.error("Error deleting inventory item:", error)
       throw error

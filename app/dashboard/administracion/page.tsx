@@ -35,6 +35,8 @@ import { useSecurityCheck } from "@/contexts/security-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { Pencil, Trash2, RefreshCw, Copy, Check, ArrowLeft } from "lucide-react"
 import { getSecurityKeys, regenerateAllKeys} from "@/lib/security-keys"
+import { AuditLogTab } from "./AuditLogTab"
+import { auditService } from "@/lib/mod/audit-service"
 
 interface User {
   id: string
@@ -160,6 +162,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
 
     if (result.success) {
       toast.success("Usuario creado exitosamente")
+      auditService.log({ user_id: currentUser!.id, user_name: currentUser!.username, module: "administracion", action: "crear", description: `Usuario creado: ${newUserForm.username}`, details: { username: newUserForm.username, displayName: newUserForm.displayName, accountType: newUserForm.accountType, email: newUserForm.email, ministerioName: newUserForm.ministerioName } })
       setIsCreateDialogOpen(false)
       setNewUserForm({
         accountType: "personal",
@@ -211,6 +214,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
 
     if (result.success) {
       toast.success("Usuario actualizado exitosamente")
+      auditService.log({ user_id: currentUser!.id, user_name: currentUser!.username, module: "administracion", action: "editar", description: `Usuario editado: ${selectedUser!.username}`, details: { usuario: selectedUser!.username, cambios: editUserForm } })
       setIsEditDialogOpen(false)
       setSelectedUser(null)
       loadData()
@@ -233,6 +237,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
 
     if (result.success) {
       toast.success("Usuario eliminado exitosamente")
+      auditService.log({ user_id: currentUser!.id, user_name: currentUser!.username, module: "administracion", action: "eliminar", description: `Usuario eliminado: ${username}`, details: { userId, username } })
       loadData()
     } else {
       toast.error(result.error || "Error al eliminar usuario")
@@ -386,6 +391,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
             <TabsList>
               <TabsTrigger value="users">Usuarios y Ministerios</TabsTrigger>
               <TabsTrigger value="keys">Clave</TabsTrigger>
+              <TabsTrigger value="audit">Logs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="users" className="space-y-4">
@@ -668,6 +674,10 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="audit">
+              <AuditLogTab />
             </TabsContent>
           </Tabs>
 

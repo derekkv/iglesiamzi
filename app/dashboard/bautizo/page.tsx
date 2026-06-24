@@ -141,7 +141,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
         observacion: formData.observacion,
       }
 
-      await bautizoService.create(bautizoData)
+      await bautizoService.create(bautizoData, { user_id: user!.id, user_name: user!.username })
       await loadBautizos()
 
       toast({
@@ -224,7 +224,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
         observacion: formData.observacion,
       }
 
-      await bautizoService.update(editingBautizo.id, updates)
+      await bautizoService.update(editingBautizo.id, updates, { user_id: user!.id, user_name: user!.username })
       await loadBautizos()
 
       toast({
@@ -257,7 +257,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     if (!deleteBautizoId) return
 
     try {
-      await bautizoService.delete(deleteBautizoId)
+      await bautizoService.delete(deleteBautizoId, { user_id: user!.id, user_name: user!.username })
       await loadBautizos()
 
       toast({

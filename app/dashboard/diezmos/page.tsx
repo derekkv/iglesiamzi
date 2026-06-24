@@ -32,11 +32,13 @@ import { ArrowLeft, Plus, Trash2, Edit2, Search, Lock } from "lucide-react"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
 import { useMonth } from "@/contexts/month-context"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 
 function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { checkAndExecute } = useSecurityCheck()
+  const { user } = useAuth()
   const [activeMonth, setActiveMonth] = useState<{ id: string; name: string } | null>(null)
   const [records, setRecords] = useState<DiezmoRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -124,7 +126,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
         fecha: formData.fecha,
         donador: formData.donador.trim(),
         valor: Number.parseFloat(formData.valor),
-      })
+      }, { user_id: user!.id, user_name: user!.username })
 
       setRecords((prev) => [...prev, newRecord])
       setFormData({ fecha: "", donador: "", valor: "" })
@@ -149,7 +151,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
         fecha: formData.fecha,
         donador: formData.donador.trim(),
         valor: Number.parseFloat(formData.valor),
-      })
+      }, { user_id: user!.id, user_name: user!.username })
 
       setRecords((prev) => prev.map((record) => (record.id === editingRecord.id ? updatedRecord : record)))
       setShowEditModal(false)
@@ -172,7 +174,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const confirmDelete = async () => {
     if (!deleteTarget) return
     try {
-      await diezmosService.deleteDiezmo(deleteTarget.id)
+      await diezmosService.deleteDiezmo(deleteTarget.id, { user_id: user!.id, user_name: user!.username })
       setRecords((prev) => prev.filter((r) => r.id !== deleteTarget.id))
       toast.success("Diezmo eliminado")
     } catch (error) {
