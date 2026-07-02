@@ -370,13 +370,14 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
                           <TableHead>Edad</TableHead>
                           <TableHead>Cargo</TableHead>
                           <TableHead>Lugar de Trabajo</TableHead>
+                          <TableHead>Fecha Registro</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredRecords.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8">
+                            <TableCell colSpan={7} className="text-center py-8">
                               No hay registros
                             </TableCell>
                           </TableRow>
@@ -388,6 +389,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
                               <TableCell>{record.edad || "-"}</TableCell>
                               <TableCell>{record.cargo || "-"}</TableCell>
                               <TableCell>{record.lugar_trabajo || "-"}</TableCell>
+                              <TableCell>{record.created_at ? new Date(record.created_at).toLocaleDateString("es-EC") : "-"}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="icon" onClick={() => handleView(record)}>

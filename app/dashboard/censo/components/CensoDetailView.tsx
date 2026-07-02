@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { CensoRecord, HijoData } from "@/lib/mod/censo-service"
+import { supabase } from "@/lib/supabase"
+
+interface AuditEntry {
+  timestamp: string
+  user_name: string
+  action: string
+}
 
 interface CensoDetailViewProps {
   isOpen: boolean
@@ -19,6 +27,39 @@ interface CensoDetailViewProps {
 }
 
 export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailViewProps) {
+  const [auditInfo, setAuditInfo] = useState<AuditEntry | null>(null)
+  const [lastEditInfo, setLastEditInfo] = useState<AuditEntry | null>(null)
+
+  useEffect(() => {
+    if (isOpen && record?.id) {
+      // Log de creación
+      supabase
+        .from("audit_logs")
+        .select("timestamp, user_name, action")
+        .eq("module", "censo")
+        .eq("action", "crear")
+        .ilike("description", `%${record.apellidos_nombres}%`)
+        .order("timestamp", { ascending: true })
+        .limit(1)
+        .then(({ data }) => {
+          setAuditInfo(data && data.length > 0 ? data[0] : null)
+        })
+
+      // Último log de edición
+      supabase
+        .from("audit_logs")
+        .select("timestamp, user_name, action")
+        .eq("module", "censo")
+        .eq("action", "editar")
+        .ilike("description", `%${record.apellidos_nombres}%`)
+        .order("timestamp", { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+          setLastEditInfo(data && data.length > 0 ? data[0] : null)
+        })
+    }
+  }, [isOpen, record])
+
   if (!record) return null
 
   const hijos: HijoData[] = (record.hijos as HijoData[]) || []
@@ -26,7 +67,7 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalles del Registro de Censo</DialogTitle>
           <DialogDescription>Información completa registrada para la persona</DialogDescription>
@@ -165,7 +206,31 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
         </div>
 
         <DialogFooter className="mt-6">
-          <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <div className="w-full">
+            {/* Info de registro */}
+            {(record.created_at || auditInfo) && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-600">
+                {auditInfo && (
+                  <>
+                    <p><strong>Creado por:</strong> {auditInfo.user_name}</p>
+                    <p><strong>Fecha de creación:</strong> {new Date(auditInfo.timestamp).toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                  </>
+                )}
+                {!auditInfo && record.created_at && (
+                  <p><strong>Registrado:</strong> {new Date(record.created_at).toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                )}
+                {lastEditInfo && (
+                  <>
+                    <p><strong>Última edición por:</strong> {lastEditInfo.user_name}</p>
+                    <p><strong>Fecha de edición:</strong> {new Date(lastEditInfo.timestamp).toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
+            </div>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
