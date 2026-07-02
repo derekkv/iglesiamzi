@@ -31,6 +31,7 @@ import { Pencil, Trash2, Eye, Search, Plus, ArrowLeft } from "lucide-react"
 import { CensoForm } from "./components/CensoForm"
 import { CensoDetailView } from "./components/CensoDetailView"
 import { CatalogManager } from "./components/CatalogManager"
+import { CensoSavedModal } from "./components/CensoSavedModal"
 
 function CensoContent({ canEdit }: { canEdit: boolean }) {
   const [records, setRecords] = useState<CensoRecord[]>([])
@@ -46,6 +47,8 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isCatalogDialogOpen, setIsCatalogDialogOpen] = useState(false)
+  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false)
+  const [savedRecord, setSavedRecord] = useState<CensoRecord | null>(null)
 
   // Current record y datos del formulario
   const [currentRecord, setCurrentRecord] = useState<CensoRecord | null>(null)
@@ -173,7 +176,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
       setIsLoadingB(true)
       await censoService.create(formData, { user_id: user!.id, user_name: user!.username })
       toast({
-        title: "Éxito",
+        title: "Guardado",
         description: "Registro creado correctamente",
       })
       setFormData({ cedula: "", apellidos_nombres: "" })
@@ -209,7 +212,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
       setIsLoadingB(true)
       await censoService.update(currentRecord.id, formData, { user_id: user!.id, user_name: user!.username })
       toast({
-        title: "Éxito",
+        title: "Guardado",
         description: "Registro actualizado correctamente",
       })
       setIsEditDialogOpen(false)

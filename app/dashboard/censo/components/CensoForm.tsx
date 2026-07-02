@@ -41,6 +41,18 @@ export function CensoForm({
   const setFormField = (field: keyof CensoRecord, value: any) => {
     const updated = { ...formData, [field]: value }
 
+    // Auto-calcular edad desde fecha de nacimiento
+    if (field === "fecha_nacimiento" && value) {
+      const birth = new Date(value + "T12:00:00")
+      const today = new Date()
+      let age = today.getFullYear() - birth.getFullYear()
+      const monthDiff = today.getMonth() - birth.getMonth()
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--
+      }
+      updated.edad = age >= 0 ? age : null
+    }
+
     // Auto-marcar/desmarcar miembro_activo según discipulados
     if (field === "primeros_pasos" || field === "seguimos_avanzando" || field === "siendo_iglesia") {
       const pp = field === "primeros_pasos" ? value : updated.primeros_pasos
@@ -153,7 +165,7 @@ export function CensoForm({
           onChange={(e) =>
             setFormField(
               field,
-              type === "number" ? Number.parseFloat(e.target.value) || 0 : e.target.value
+              type === "number" ? (e.target.value === "" ? null : Number.parseFloat(e.target.value)) : e.target.value
             )
           }
           placeholder={label}
@@ -192,6 +204,7 @@ export function CensoForm({
             </div>
 
             {renderFormField("Si a Cristo", "si_a_cristo", "select", "si_a_cristo")}
+            {renderFormField("Bautizo", "bautizo", "select", "bautizo")}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {renderFormField("Tipo de Sangre", "tipo_sangre", "select", "tipo_sangre")}
@@ -218,6 +231,7 @@ export function CensoForm({
                 {renderFormField("Convencional", "convencional")}
                 {renderFormField("Contacto Familiar", "familiar")}
               </div>
+              {renderFormField("Nombre del Familiar", "familiar_nombre")}
               {renderFormField("Correo Electrónico", "correo")}
             </div>
           </div>

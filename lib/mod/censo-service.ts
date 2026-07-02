@@ -24,6 +24,7 @@ export interface CensoRecord {
   celular?: string
   convencional?: string
   familiar?: string
+  familiar_nombre?: string
   conyuge?: string
   cedula_conyugue?: string
   correo?: string
@@ -87,6 +88,33 @@ export interface ConfiguracionesGlobales {
   detalles: string[]
 }
 
+/**
+ * Limpia el objeto de datos antes de enviarlo a Supabase:
+ * - Elimina campos internos (id, created_at)
+ * - Convierte strings vacíos a null
+ * - Elimina campos con valor undefined
+ * - Convierte 0 a null en campos numéricos opcionales
+ */
+function cleanRecordForInsert(record: Partial<CensoRecord>): Record<string, any> {
+  const { id, created_at, updated_at, ...rest } = record as any
+  const cleaned: Record<string, any> = {}
+
+  for (const [key, value] of Object.entries(rest)) {
+    if (value === undefined) continue
+    if (value === "") {
+      cleaned[key] = null
+    } else {
+      cleaned[key] = value
+    }
+  }
+
+  // Campos numéricos opcionales: si son 0 y no fueron llenados, dejar null
+  if (cleaned.edad === 0) cleaned.edad = null
+  if (cleaned.porcentaje === 0) cleaned.porcentaje = null
+
+  return cleaned
+}
+
 export const censoService = {
   // CRUD para registros de censo
   async getAll(): Promise<CensoRecord[]> {
@@ -104,9 +132,10 @@ export const censoService = {
   },
 
   async create(record: CensoRecord, audit?: AuditInfo): Promise<CensoRecord> {
+    const cleaned = cleanRecordForInsert(record)
     const { data, error } = await supabase
       .from("censo")
-      .insert([{ ...record, updated_at: new Date().toISOString() }])
+      .insert([{ ...cleaned, updated_at: new Date().toISOString() }])
       .select()
       .single()
     if (error) throw error
@@ -115,10 +144,11 @@ export const censoService = {
   },
 
   async update(id: number, record: Partial<CensoRecord>, audit?: AuditInfo): Promise<CensoRecord> {
+    const cleaned = cleanRecordForInsert(record)
     const { data: antes } = audit ? await supabase.from("censo").select("apellidos_nombres,cedula,cargo,celular,estado_civil").eq("id", id).single() : { data: null }
     const { data, error } = await supabase
       .from("censo")
-      .update({ ...record, updated_at: new Date().toISOString() })
+      .update({ ...cleaned, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single()
