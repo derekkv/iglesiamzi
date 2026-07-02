@@ -5,6 +5,7 @@ const withPWA = withPWAInit({
   dest: "public",
   register: true,
   skipWaiting: true,
+  customWorkerDir: "worker",
 });
 
 const nextConfig: NextConfig = {

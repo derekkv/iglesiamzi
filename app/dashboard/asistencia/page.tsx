@@ -66,6 +66,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
   const [pendingDeleteColumn, setPendingDeleteColumn] = useState<AttendanceColumn | null>(null)
   const [pendingDeleteDetail, setPendingDeleteDetail] = useState<AttendanceDetail | null>(null)
   const [activeTab, setActiveTab] = useState("tabla")
+  const [showAddMenu, setShowAddMenu] = useState(false)
 
   useEffect(() => { loadAttendanceData() }, [currentMonth])
 
@@ -92,6 +93,26 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
         dataMap[item.detalle_id][item.columna_id] = item.cantidad
       })
       setAttendanceData(dataMap)
+
+      // Auto-registrar la fecha de hoy si no existe
+      if (!silent && canEdit) {
+        const today = new Date().toISOString().split("T")[0]
+        const todayExists = columnsData.some((col) => col.fecha === today)
+        if (!todayExists) {
+          const date = new Date(today + "T12:00:00")
+          const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+          const dayName = days[date.getDay()]
+          const day = String(date.getDate()).padStart(2, "0")
+          const month = String(date.getMonth() + 1).padStart(2, "0")
+          const displayName = `${dayName} ${day}/${month}`
+          try {
+            const newCol = await attendanceService.createColumn(currentMonth.id, displayName, { user_id: user!.id, user_name: user!.username }, today)
+            setColumns((prev) => [...prev, newCol])
+          } catch (e) {
+            // Silenciar si ya existe
+          }
+        }
+      }
     } catch (error) {
       console.error("Error loading attendance data:", error)
     } finally {
@@ -259,54 +280,21 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
                 </span>
               )}
               {canEdit && (
-                <Dialog open={showAddColumn} onOpenChange={setShowAddColumn}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="flex items-center space-x-2">
-                      <Plus className="w-4 h-4" /><span>Agregar Fecha</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Agregar Nueva Fecha</DialogTitle>
-                      <DialogDescription>Seleccione la fecha del servicio</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="columnDate">Fecha</Label>
-                        <Input id="columnDate" type="date" value={newColumnDate} onChange={(e) => setNewColumnDate(e.target.value)} />
-                      </div>
+                <div className="relative">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => setShowAddMenu(!showAddMenu)}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                  {showAddMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[150px]">
+                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => { setShowAddColumn(true); setShowAddMenu(false) }}>
+                        Agregar Fecha
+                      </button>
+                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => { setShowAddDetail(true); setShowAddMenu(false) }}>
+                        Agregar Detalle
+                      </button>
                     </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowAddColumn(false)}>Cancelar</Button>
-                      <Button onClick={handleAddColumn} disabled={saving || !newColumnDate}>{saving ? "Guardando..." : "Agregar"}</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-              {canEdit && (
-                <Dialog open={showAddDetail} onOpenChange={setShowAddDetail}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
-                      <Plus className="w-4 h-4" /><span>Agregar Detalle</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Agregar Nuevo Detalle</DialogTitle>
-                      <DialogDescription>Ingrese el nombre del nuevo detalle de asistencia</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="detailName">Nombre del detalle</Label>
-                        <Input id="detailName" value={newDetail} onChange={(e) => setNewDetail(e.target.value)} placeholder="Ej: ADULTOS MAYORES" />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowAddDetail(false)}>Cancelar</Button>
-                      <Button onClick={handleAddDetail} disabled={saving}>{saving ? "Guardando..." : "Agregar"}</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -486,6 +474,47 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
             </Tabs>
           </CardContent>
         </Card>
+
+
+        {/* Modal agregar fecha */}
+        <Dialog open={showAddColumn} onOpenChange={setShowAddColumn}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agregar Nueva Fecha</DialogTitle>
+              <DialogDescription>Seleccione la fecha del servicio</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="columnDate">Fecha</Label>
+                <Input id="columnDate" type="date" value={newColumnDate} onChange={(e) => setNewColumnDate(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddColumn(false)}>Cancelar</Button>
+              <Button onClick={handleAddColumn} disabled={saving || !newColumnDate}>{saving ? "Guardando..." : "Agregar"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal agregar detalle */}
+        <Dialog open={showAddDetail} onOpenChange={setShowAddDetail}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agregar Nuevo Detalle</DialogTitle>
+              <DialogDescription>Ingrese el nombre del nuevo detalle de asistencia</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="detailName">Nombre del detalle</Label>
+                <Input id="detailName" value={newDetail} onChange={(e) => setNewDetail(e.target.value)} placeholder="Ej: ADULTOS MAYORES" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddDetail(false)}>Cancelar</Button>
+              <Button onClick={handleAddDetail} disabled={saving}>{saving ? "Guardando..." : "Agregar"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Modal editar detalle */}
         <Dialog open={showEditDetail} onOpenChange={setShowEditDetail}>

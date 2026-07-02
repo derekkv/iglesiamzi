@@ -1,0 +1,121 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { pushService, VAPID_PUBLIC_KEY } from "@/lib/mod/push-service"
+import { Button } from "@/components/ui/button"
+import { Bell, X } from "lucide-react"
+
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray.buffer as ArrayBuffer
+}
+
+export function PushNotificationPrompt() {
+  const { user } = useAuth()
+  const [showPrompt, setShowPrompt] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
+
+    // Solo mostrar si no ha decidido aún
+    const dismissed = localStorage.getItem("push_prompt_dismissed")
+    if (dismissed) return
+
+    // Chequear si ya tiene permiso
+    if (Notification.permission === "granted") {
+      // Ya tiene permiso, registrar suscripción silenciosamente
+      subscribeUser()
+      return
+    }
+
+    if (Notification.permission === "denied") return
+
+    // Mostrar prompt después de un delay
+    const timeout = setTimeout(() => setShowPrompt(true), 3000)
+    return () => clearTimeout(timeout)
+  }, [user])
+
+  const subscribeUser = async () => {
+    if (!user) return
+    setSubscribing(true)
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      })
+
+      const sub = subscription.toJSON()
+      await pushService.saveSubscription({
+        user_id: user.id,
+        endpoint: sub.endpoint!,
+        p256dh: sub.keys!.p256dh!,
+        auth: sub.keys!.auth!,
+      })
+
+      setShowPrompt(false)
+      localStorage.setItem("push_prompt_dismissed", "subscribed")
+    } catch (error) {
+      console.error("Error subscribing to push:", error)
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  const handleAccept = async () => {
+    const permission = await Notification.requestPermission()
+    if (permission === "granted") {
+      await subscribeUser()
+    } else {
+      setShowPrompt(false)
+      localStorage.setItem("push_prompt_dismissed", "denied")
+    }
+  }
+
+  const handleDismiss = () => {
+    setShowPrompt(false)
+    localStorage.setItem("push_prompt_dismissed", "later")
+    // Volver a preguntar en 7 días
+    setTimeout(() => localStorage.removeItem("push_prompt_dismissed"), 7 * 24 * 60 * 60 * 1000)
+  }
+
+  if (!showPrompt) return null
+
+  return (
+    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 animate-in slide-in-from-bottom-4">
+      <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+            <Bell className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-gray-900 text-sm">Activar notificaciones</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Recibe alertas cuando te asignen un servicio y recordatorios antes de tu turno.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <Button size="sm" onClick={handleAccept} disabled={subscribing} className="text-xs">
+                {subscribing ? "Activando..." : "Activar"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleDismiss} className="text-xs text-gray-500">
+                Ahora no
+              </Button>
+            </div>
+          </div>
+          <button onClick={handleDismiss} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
