@@ -219,18 +219,18 @@ export function CensoForm({
               <div className="flex items-center space-x-2 py-1">
                 <Checkbox
                   id="tiene_discapacidad"
-                  checked={!!formData.capacidad_esp && formData.capacidad_esp !== "No" && formData.capacidad_esp !== ""}
+                  checked={formData.tiene_discapacidad || false}
                   onCheckedChange={(checked) => {
                     if (!checked) {
-                      onChangeFormData({ ...formData, capacidad_esp: null as any, porcentaje: undefined, tipo_discapacidad: undefined })
+                      onChangeFormData({ ...formData, tiene_discapacidad: false, capacidad_esp: undefined, porcentaje: undefined, tipo_discapacidad: undefined })
                     } else {
-                      setFormField("capacidad_esp", "")
+                      setFormField("tiene_discapacidad", true)
                     }
                   }}
                 />
                 <Label htmlFor="tiene_discapacidad" className="cursor-pointer text-sm font-normal text-gray-700">¿Tiene discapacidad?</Label>
               </div>
-              {formData.capacidad_esp && formData.capacidad_esp !== "No" && (
+              {formData.tiene_discapacidad && (
                 <div className="ml-6 space-y-4 border-l-2 border-green-300 pl-4 py-2">
                   {renderFormField("Tipo de Discapacidad", "capacidad_esp", "select", "capacidad_esp")}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

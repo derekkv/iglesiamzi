@@ -19,6 +19,7 @@ export interface CensoRecord {
   estado_civil?: string
   sexo?: string
   capacidad_esp?: string
+  tiene_discapacidad?: boolean
   porcentaje?: number
   tipo_discapacidad?: string
   celular?: string
