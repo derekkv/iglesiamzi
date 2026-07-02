@@ -62,22 +62,30 @@ export function PushNotificationPrompt() {
         auth: sub.keys!.auth!,
       })
 
-      setShowPrompt(false)
       localStorage.setItem("push_prompt_dismissed", "subscribed")
     } catch (error) {
       console.error("Error subscribing to push:", error)
+      localStorage.setItem("push_prompt_dismissed", "error")
     } finally {
       setSubscribing(false)
+      setShowPrompt(false)
     }
   }
 
   const handleAccept = async () => {
-    const permission = await Notification.requestPermission()
-    if (permission === "granted") {
-      await subscribeUser()
-    } else {
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === "granted") {
+        await subscribeUser()
+      } else {
+        setShowPrompt(false)
+        localStorage.setItem("push_prompt_dismissed", "denied")
+      }
+    } catch (error) {
+      console.error("Error requesting permission:", error)
+      setSubscribing(false)
       setShowPrompt(false)
-      localStorage.setItem("push_prompt_dismissed", "denied")
+      localStorage.setItem("push_prompt_dismissed", "error")
     }
   }
 
