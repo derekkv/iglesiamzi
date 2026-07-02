@@ -368,7 +368,7 @@ export default function DashboardPage() {
             {sortedGroups.map((group) => (
               <Card
                 key={group.id}
-                className="overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-[1.02] cursor-pointer border-0 rounded-xl group"
+                className="p-0 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-[1.02] cursor-pointer border-0 rounded-xl group"
                 onClick={() => setSelectedGroup(group)}
               >
                 <div className="relative h-52 overflow-hidden">
@@ -404,30 +404,60 @@ export default function DashboardPage() {
             {ungroupedModules.map((module) => {
               const isAccessible = module.hasAccess && (!module.requiresActiveMonth || currentMonth)
               const isBlocked = module.requiresActiveMonth && !currentMonth
+              // Imagen por módulo
+              const moduleImage = module.name === "pastoral" ? "/Pastoral.jpg" : null
               return (
                 <Card
                   key={module.name}
-                  className={`overflow-hidden transition-all duration-200 rounded-xl ${
+                  className={`p-0 overflow-hidden transition-all duration-200 rounded-xl ${
                     isAccessible
-                      ? "hover:shadow-xl hover:scale-[1.02] cursor-pointer border-blue-200"
+                      ? "hover:shadow-xl hover:scale-[1.02] cursor-pointer border-0 group"
                       : isBlocked
                         ? "opacity-40 cursor-not-allowed border-amber-200"
                         : "opacity-60 cursor-not-allowed"
                   }`}
                   onClick={() => isAccessible && handleModuleClick(module)}
                 >
-                  <CardHeader className="text-center pt-8 pb-4">
-                    <div className="text-5xl mb-3">{module.icon}</div>
-                    <CardTitle className="text-lg">{module.title}</CardTitle>
-                    <CardDescription>{module.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-center pb-6">
-                    {isBlocked ? (
-                      <span className="text-xs text-amber-600">Requiere mes activo</span>
-                    ) : (
-                      <Button size="sm" variant="outline">Abrir</Button>
-                    )}
-                  </CardContent>
+                  {moduleImage ? (
+                    <>
+                      <div className="relative h-52 overflow-hidden">
+                        <img
+                          src={moduleImage}
+                          alt={module.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                        <div className="absolute bottom-4 left-4 text-white">
+                          <h3 className="text-xl font-bold">{module.title}</h3>
+                          <p className="text-sm text-white/80">{module.description}</p>
+                        </div>
+                      </div>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-end">
+                          {isBlocked ? (
+                            <span className="text-xs text-amber-600">Requiere mes activo</span>
+                          ) : (
+                            <Button size="sm" variant="outline">Abrir</Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </>
+                  ) : (
+                    <>
+                      <CardHeader className="text-center pt-8 pb-4">
+                        <div className="text-5xl mb-3">{module.icon}</div>
+                        <CardTitle className="text-lg">{module.title}</CardTitle>
+                        <CardDescription>{module.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-center pb-6">
+                        {isBlocked ? (
+                          <span className="text-xs text-amber-600">Requiere mes activo</span>
+                        ) : (
+                          <Button size="sm" variant="outline">Abrir</Button>
+                        )}
+                      </CardContent>
+                    </>
+                  )}
                 </Card>
               )
             })}

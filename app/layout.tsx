@@ -10,6 +10,7 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SecurityCheckProvider } from "@/contexts/security-context";
 import { SecurityKeyDialog } from "@/components/SecurityKeyDialog";
+import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
 
 export const metadata: Metadata = {
   title: "Regalo de Dios",
@@ -35,6 +36,7 @@ export default function RootLayout({
         </SecurityCheckProvider>
           </AuthProvider>
           <Toaster />
+          <ServiceWorkerUpdater />
         </Suspense>
       </body>
     </html>
