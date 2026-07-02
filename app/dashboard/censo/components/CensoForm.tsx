@@ -50,7 +50,7 @@ export function CensoForm({
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
         age--
       }
-      updated.edad = age >= 0 ? age : null
+      updated.edad = age >= 0 ? age : undefined
     }
 
     // Auto-marcar/desmarcar miembro_activo según discipulados

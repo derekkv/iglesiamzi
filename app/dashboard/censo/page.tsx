@@ -175,10 +175,8 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
     try {
       setIsLoadingB(true)
       await censoService.create(formData, { user_id: user!.id, user_name: user!.username })
-      toast({
-        title: "Guardado",
-        description: "Registro creado correctamente",
-      })
+      setSavedRecord(formData)
+      setIsSavedModalOpen(true)
       setFormData({ cedula: "", apellidos_nombres: "" })
       setIsAddDialogOpen(false)
       loadRecords()
@@ -211,10 +209,8 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
     try {
       setIsLoadingB(true)
       await censoService.update(currentRecord.id, formData, { user_id: user!.id, user_name: user!.username })
-      toast({
-        title: "Guardado",
-        description: "Registro actualizado correctamente",
-      })
+      setSavedRecord(formData)
+      setIsSavedModalOpen(true)
       setIsEditDialogOpen(false)
       loadRecords()
     } catch (error: any) {
@@ -501,6 +497,13 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
           options={catalogOptions}
           onAddOption={handleAddCatalogOption}
           onDeleteOption={handleDeleteCatalogOption}
+        />
+
+        {/* Modal de Guardado Exitoso */}
+        <CensoSavedModal
+          isOpen={isSavedModalOpen}
+          onOpenChange={setIsSavedModalOpen}
+          record={savedRecord}
         />
         </main>
       </div>
