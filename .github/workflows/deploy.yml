@@ -1,0 +1,30 @@
+name: Deploy VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy por SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd /var/www/iglesiamzi
+
+            git fetch origin
+            git reset --hard origin/main
+
+            npm ci
+
+            npm run build
+
+            pm2 reload iglesia
