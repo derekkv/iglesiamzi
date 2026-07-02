@@ -1,44 +1,105 @@
-# dependencies
+# ===================
+# Dependencies & package managers
+# ===================
 /node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+package-lock.json
 
-# testing
-/coverage
-
-# next.js
+# ===================
+# Build output
+# ===================
 /.next/
 /out/
-
-# production
 /build
+/.open-next
+.wrangler
 
-# misc
-.DS_Store
+# ===================
+# Testing
+# ===================
+/coverage
+
+# ===================
+# Environment & secrets
+# ===================
+.env*
+!.env.example
+.dev.vars*
+!.dev.vars.example
 *.pem
 
-# debug
+# ===================
+# IDE / editor / tooling configs
+# ===================
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+
+# ===================
+# Logs & debug
+# ===================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
-
-# vercel
+# ===================
+# Vercel / Cloudflare generated
+# ===================
 .vercel
+cloudflare-env.d.ts
 
-# typescript
+# ===================
+# TypeScript build artifacts
+# ===================
 *.tsbuildinfo
 next-env.d.ts
 
-# OpenNext
-/.open-next
+# ===================
+# Graphify output (don't index itself)
+# ===================
+/graphify-out
 
-# wrangler files
-.wrangler
-.dev.vars*
-!.dev.vars.example
-.env*
-!.env.example
+# ===================
+# Static assets & public (no code logic)
+# ===================
+/public
+
+# ===================
+# Agent/skill metadata (not app code)
+# ===================
+/.agents
+/.kiro
+skills-lock.json
+
+# ===================
+# Config files (low value for graph)
+# ===================
+postcss.config.mjs
+tailwind.config.*
+components.json
+tsconfig.json
+next.config.ts
+open-next.config.ts
+wrangler.jsonc
+
+# ===================
+# Docs (not code architecture)
+# ===================
+README.md
+CLAUDE.md
+*.md
+!app/**/*.md
+!components/**/*.md
+!lib/**/*.md
+!hooks/**/*.md
+!contexts/**/*.md
+!types/**/*.md
+
+# ===================
+# Git
+# ===================
+/.git

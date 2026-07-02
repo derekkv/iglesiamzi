@@ -66,7 +66,7 @@ export async function login(
   }
 }
 
-// Función para obtener permisos del usuario con información del módulo
+// Función para obtener permisos del usuario con información del módulo y grupo
 export async function getUserPermissions(userId: string) {
   try {
     const { data, error } = await supabase
@@ -79,7 +79,19 @@ export async function getUserPermissions(userId: string) {
           name,
           display_name,
           description,
-          icon
+          icon,
+          route,
+          requires_active_month,
+          is_active,
+          group_id,
+          group:module_groups(
+            id,
+            name,
+            display_name,
+            icon,
+            image,
+            sort_order
+          )
         )
       `)
       .eq("user_id", userId)
@@ -150,7 +162,7 @@ export async function checkUserPermission(
 export async function checkUserEditPermission(
   userId: string,
   moduleName: string,
-): Promise<{ success: boolean; canView: boolean; canEdit: boolean; error?: string }> {
+): Promise<{ success: boolean; canView: boolean; canEdit: boolean; canAdmin: boolean; error?: string }> {
   try {
     const { data, error } = await supabase
       .from("user_permissions")
@@ -158,6 +170,7 @@ export async function checkUserEditPermission(
         `
         can_view,
         can_edit,
+        can_admin,
         module:system_modules!inner(name)
       `,
       )
@@ -167,16 +180,17 @@ export async function checkUserEditPermission(
 
     if (error) {
       console.log("No se encontró permiso para", moduleName, "error:", error.message)
-      return { success: true, canView: false, canEdit: false }
+      return { success: true, canView: false, canEdit: false, canAdmin: false }
     }
 
     return {
       success: true,
       canView: data?.can_view || false,
       canEdit: data?.can_edit || false,
+      canAdmin: data?.can_admin || false,
     }
   } catch (error) {
     console.error("Error verificando permiso de edición:", error)
-    return { success: false, canView: false, canEdit: false, error: "Error al verificar permisos" }
+    return { success: false, canView: false, canEdit: false, canAdmin: false, error: "Error al verificar permisos" }
   }
 }

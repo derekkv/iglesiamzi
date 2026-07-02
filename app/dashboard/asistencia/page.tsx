@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,6 +57,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
 
   const [newDetail, setNewDetail] = useState("")
   const [newColumnName, setNewColumnName] = useState("")
+  const [newColumnDate, setNewColumnDate] = useState("")
   const [editingDetail, setEditingDetail] = useState<{ id: number; nombre: string } | null>(null)
   const [editingColumn, setEditingColumn] = useState<{ id: number; nombre: string } | null>(null)
 
@@ -67,10 +69,15 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
 
   useEffect(() => { loadAttendanceData() }, [currentMonth])
 
-  const loadAttendanceData = async () => {
+  // Realtime: refrescar cuando cambian datos de asistencia
+  useRealtimeMultiple(["asistencia_columnas", "asistencia_detalles", "asistencia_datos"], () => {
+    loadAttendanceData(true)
+  })
+
+  const loadAttendanceData = async (silent = false) => {
     if (!currentMonth?.id) return
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       await attendanceService.initializeDefaultDetails(currentMonth.id)
       const [detailsData, columnsData, attendanceDataRaw] = await Promise.all([
         attendanceService.getDetails(currentMonth.id),
@@ -88,17 +95,26 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
     } catch (error) {
       console.error("Error loading attendance data:", error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
 
   const handleAddColumn = async () => {
-    if (!newColumnName.trim() || !currentMonth?.id) return
+    if (!newColumnDate || !currentMonth?.id) return
     setSaving(true)
     try {
-      const newColumn = await attendanceService.createColumn(currentMonth.id, newColumnName.trim(), { user_id: user!.id, user_name: user!.username })
+      // Generar nombre legible desde la fecha (ej: "Dom 07/06")
+      const date = new Date(newColumnDate + "T12:00:00")
+      const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+      const dayName = days[date.getDay()]
+      const day = String(date.getDate()).padStart(2, "0")
+      const month = String(date.getMonth() + 1).padStart(2, "0")
+      const displayName = `${dayName} ${day}/${month}`
+
+      const newColumn = await attendanceService.createColumn(currentMonth.id, displayName, { user_id: user!.id, user_name: user!.username }, newColumnDate)
       setColumns((prev) => [...prev, newColumn])
+      setNewColumnDate("")
       setNewColumnName("")
       setShowAddColumn(false)
       const newData = { ...attendanceData }
@@ -251,18 +267,18 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Agregar Nueva Fecha/Columna</DialogTitle>
-                      <DialogDescription>Ingrese el nombre para la nueva columna (ej: "Dom 15/12", "Miércoles", etc.)</DialogDescription>
+                      <DialogTitle>Agregar Nueva Fecha</DialogTitle>
+                      <DialogDescription>Seleccione la fecha del servicio</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="columnName">Nombre de la columna</Label>
-                        <Input id="columnName" value={newColumnName} onChange={(e) => setNewColumnName(e.target.value)} placeholder="Ej: Dom 15/12" />
+                        <Label htmlFor="columnDate">Fecha</Label>
+                        <Input id="columnDate" type="date" value={newColumnDate} onChange={(e) => setNewColumnDate(e.target.value)} />
                       </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowAddColumn(false)}>Cancelar</Button>
-                      <Button onClick={handleAddColumn} disabled={saving}>{saving ? "Guardando..." : "Agregar"}</Button>
+                      <Button onClick={handleAddColumn} disabled={saving || !newColumnDate}>{saving ? "Guardando..." : "Agregar"}</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

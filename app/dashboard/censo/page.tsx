@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useRealtime } from "@/hooks/use-realtime"
 import { useToast } from "@/hooks/use-toast"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -81,9 +82,9 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
     }
   }, [searchQuery, records])
 
-  const loadRecords = async () => {
+  const loadRecords = async (silent = false) => {
     try {
-      setIsLoading(true)
+      if (!silent) setIsLoading(true)
       const data = await censoService.getAll()
       setRecords(data)
       setFilteredRecords(data)
@@ -95,9 +96,12 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
+
+  // Realtime: refrescar cuando cambia la tabla censo
+  useRealtime({ table: "censo", onChange: () => loadRecords(true) })
 
   const loadAllCatalogs = async () => {
     try {
@@ -303,14 +307,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
       sexo: "Sexo",
       capacidad_esp: "Capacidad Especial",
       nivel_estudio: "Nivel de Estudio",
-      acumula_decimos: "Acumula Décimos",
-      hoja_vida: "Hoja de Vida",
-      estado: "Estado",
       jornada_trabajo: "Jornada de Trabajo",
-      cargo: "Cargo",
-      local: "Local",
-      pagos: "Pagos",
-      banco: "Banco",
     }
     return labels[tipo] || tipo
   }
@@ -373,7 +370,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
                           <TableHead>Apellidos y Nombres</TableHead>
                           <TableHead>Edad</TableHead>
                           <TableHead>Cargo</TableHead>
-                          <TableHead>Local</TableHead>
+                          <TableHead>Lugar de Trabajo</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -391,7 +388,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
                               <TableCell>{record.apellidos_nombres}</TableCell>
                               <TableCell>{record.edad || "-"}</TableCell>
                               <TableCell>{record.cargo || "-"}</TableCell>
-                              <TableCell>{record.local || "-"}</TableCell>
+                              <TableCell>{record.lugar_trabajo || "-"}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="icon" onClick={() => handleView(record)}>
@@ -432,7 +429,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
                     e.preventDefault()
                     handleSave()
                   }}
-                  onCancel={() => setFormData({ cedula: "", apellidos_nombres: "", sueldo: 0 })}
+                  onCancel={() => setFormData({ cedula: "", apellidos_nombres: "" })}
                   isSaving={isLoadingB}
                   submitLabel="Guardar Registro"
                 />

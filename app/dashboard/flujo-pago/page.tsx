@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,6 +32,7 @@ import {
 import { paymentFlowService, type PaymentTable, type PaymentRow } from "@/lib/mod/payment-flow-service"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
+import { NominaSection } from "./NominaSection"
 
 function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
@@ -62,18 +64,21 @@ function FlujoPagoContent({ canEdit }: { canEdit: boolean }) {
     loadTables()
   }, [])
 
-  const loadTables = async () => {
+  const loadTables = async (silent = false) => {
     try {
-      setIsLoading(true)
+      if (!silent) setIsLoading(true)
       const tablesData = await paymentFlowService.getAllTables()
       setTables(tablesData)
     } catch (error) {
       console.error("Error loading tables:", error)
       alert("Error al cargar las tablas. Por favor, intente de nuevo.")
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
+
+  // Realtime: refrescar cuando cambian tablas de flujo de pago
+  useRealtimeMultiple(["payment_tables", "payment_rows"], () => loadTables(true))
 
   const resetRowForm = () => {
     setRowFormData({
@@ -782,6 +787,9 @@ setSaving(true)
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Nómina - Solo visible para usuarios autorizados */}
+        <NominaSection />
       </main>
     </div>
   )

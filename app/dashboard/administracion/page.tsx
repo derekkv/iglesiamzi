@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,9 +24,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import {
   getAllUsers,
   getAllModules,
+  getModulesGrouped,
   createUser,
   getUserPermissions,
   setUserPermission,
+  setGroupPermissions,
   updateUser,
   deleteUser,
 } from "@/lib/admin"
@@ -54,8 +57,20 @@ interface Module {
   id: string
   name: string
   displayName: string
+  display_name?: string
   description: string
   icon: string
+  group_id?: string
+}
+
+interface ModuleGroup {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  icon: string
+  sort_order: number
+  modules: Module[]
 }
 
 interface SecurityKey {
@@ -66,9 +81,11 @@ interface SecurityKey {
   created_at: string
 }
 
-function AdministracionContent({ canEdit }: { canEdit: boolean }) {
+function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdmin?: boolean }) {
   const [users, setUsers] = useState<User[]>([])
   const [modules, setModules] = useState<Module[]>([])
+  const [moduleGroups, setModuleGroups] = useState<ModuleGroup[]>([])
+  const [ungroupedModules, setUngroupedModules] = useState<Module[]>([])
   const [securityKeys, setSecurityKeys] = useState<SecurityKey[]>([])
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userPermissions, setUserPermissions] = useState<any[]>([])
@@ -115,6 +132,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
   const loadData = async () => {
     const usersResult = await getAllUsers()
     const modulesResult = await getAllModules()
+    const groupedResult = await getModulesGrouped()
     const keysResult = await getSecurityKeys()
 
     if (usersResult.success) {
@@ -125,10 +143,18 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
       setModules(modulesResult.modules || [])
     }
 
+    if (groupedResult.success) {
+      setModuleGroups(groupedResult.grouped || [])
+      setUngroupedModules(groupedResult.ungrouped || [])
+    }
+
     if (keysResult.success) {
       setSecurityKeys(keysResult.keys || [])
     }
   }
+
+  // Realtime: refrescar cuando cambian usuarios o permisos
+  useRealtimeMultiple(["users", "user_permissions"], loadData)
 
   const handleCreateUser = async () => {
     if (!canEdit) {
@@ -390,8 +416,8 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
           <Tabs defaultValue="users" className="space-y-6">
             <TabsList>
               <TabsTrigger value="users">Usuarios y Ministerios</TabsTrigger>
-              <TabsTrigger value="keys">Clave</TabsTrigger>
-              <TabsTrigger value="audit">Logs</TabsTrigger>
+              {canAdmin && <TabsTrigger value="keys">Clave</TabsTrigger>}
+              {canAdmin && <TabsTrigger value="audit">Logs</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="users" className="space-y-4">
@@ -547,9 +573,11 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleOpenPermissions(user)}>
-                                Permisos
-                              </Button>
+                              {canAdmin && (
+                                <Button variant="outline" size="sm" onClick={() => handleOpenPermissions(user)}>
+                                  Permisos
+                                </Button>
+                              )}
                               <Button variant="outline" size="sm" onClick={() => handleOpenEdit(user)} disabled={!canEdit}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -741,53 +769,190 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
             <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Permisos de {selectedUser?.displayName}</DialogTitle>
-                <DialogDescription>Configure los permisos de Vista y Edición por módulo para este usuario</DialogDescription>
+                <DialogDescription>Configure los permisos de Vista y Edición por módulo para este usuario. Use los checkboxes de grupo para activar/desactivar todos los sub-módulos.</DialogDescription>
               </DialogHeader>
-              <div className="py-4 overflow-y-auto flex-1">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Módulo</TableHead>
-                      <TableHead className="text-center">Ver</TableHead>
-                      <TableHead className="text-center">Editar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {modules.map((module) => {
-                      const permission = userPermissions.find((p) => p.module_id === module.id)
-                      return (
-                        <TableRow key={module.id}>
-                          <TableCell>
-                            <div className="flex items-center space-x-3">
-                              <span className="text-2xl">{module.icon}</span>
-                              <div>
-                                <div className="font-medium">{module.displayName}</div>
-                                <div className="text-sm text-gray-500">{module.description}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={permission?.can_view || false}
-                              disabled={!canEdit}
-                              onCheckedChange={() => handleTogglePermission(module.id, permission?.can_view || false)}
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={permission?.can_edit || false}
-                              disabled={!canEdit || !permission?.can_view}
-                              onCheckedChange={() => {
-                                if (!permission?.can_view) return
-                                handleToggleEditPermission(module.id, permission?.can_view || false, permission?.can_edit || false)
-                              }}
-                            />
-                          </TableCell>
+              <div className="py-4 overflow-y-auto flex-1 space-y-6">
+                {/* Módulos sin grupo (ej. Administración panel) */}
+                {ungroupedModules.length > 0 && (
+                  <div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Módulo</TableHead>
+                          <TableHead className="text-center">Ver</TableHead>
+                          <TableHead className="text-center">Editar</TableHead>
+                          <TableHead className="text-center">Admin</TableHead>
                         </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {ungroupedModules.map((module) => {
+                          const permission = userPermissions.find((p: any) => p.module_id === module.id)
+                          return (
+                            <TableRow key={module.id}>
+                              <TableCell>
+                                <div className="flex items-center space-x-3">
+                                  <span className="text-2xl">{module.icon}</span>
+                                  <div>
+                                    <div className="font-medium">{module.displayName || module.display_name}</div>
+                                    <div className="text-sm text-gray-500">{module.description}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Checkbox
+                                  checked={permission?.can_view || false}
+                                  disabled={!canEdit}
+                                  onCheckedChange={() => handleTogglePermission(module.id, permission?.can_view || false)}
+                                />
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Checkbox
+                                  checked={permission?.can_edit || false}
+                                  disabled={!canEdit || !permission?.can_view}
+                                  onCheckedChange={() => {
+                                    if (!permission?.can_view) return
+                                    handleToggleEditPermission(module.id, permission?.can_view || false, permission?.can_edit || false)
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Checkbox
+                                  checked={permission?.can_admin || false}
+                                  disabled={!canEdit || !permission?.can_view}
+                                  onCheckedChange={async () => {
+                                    if (!permission?.can_view || !selectedUser || !currentUser?.id) return
+                                    const result = await setUserPermission({
+                                      userId: selectedUser.id,
+                                      moduleId: module.id,
+                                      canView: true,
+                                      canEdit: permission?.can_edit || false,
+                                      canAdmin: !(permission?.can_admin || false),
+                                      grantedBy: currentUser.id,
+                                    })
+                                    if (result.success) {
+                                      toast.success("Permiso de administrador actualizado")
+                                      const updatedResult = await getUserPermissions(selectedUser.id)
+                                      if (updatedResult.success) {
+                                        setUserPermissions(updatedResult.permissions || [])
+                                      }
+                                    }
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Módulos agrupados */}
+                {moduleGroups.map((group) => {
+                  // Calcular estado del checkbox padre
+                  const groupModuleIds = group.modules.map((m: any) => m.id)
+                  const groupPermissions = groupModuleIds.map((id: string) =>
+                    userPermissions.find((p: any) => p.module_id === id)
+                  )
+                  const viewCount = groupPermissions.filter((p: any) => p?.can_view).length
+                  const allChecked = viewCount === groupModuleIds.length
+                  const noneChecked = viewCount === 0
+                  const isIndeterminate = !allChecked && !noneChecked
+
+                  return (
+                    <div key={group.id} className="border rounded-lg overflow-hidden">
+                      {/* Header del grupo con checkbox padre */}
+                      <div className="bg-gray-100 px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            checked={isIndeterminate ? "indeterminate" : allChecked}
+                            disabled={!canEdit}
+                            onCheckedChange={async () => {
+                              if (!selectedUser || !currentUser?.id) return
+                              // Si todos están marcados o algunos (indeterminado), desmarcar todos
+                              // Si ninguno está marcado, marcar todos
+                              const newValue = noneChecked
+                              const result = await setGroupPermissions(
+                                selectedUser.id,
+                                group.id,
+                                newValue,
+                                false,
+                                currentUser.id
+                              )
+                              if (result.success) {
+                                toast.success(
+                                  newValue
+                                    ? `Permisos activados para ${group.display_name}`
+                                    : `Permisos desactivados para ${group.display_name}`
+                                )
+                                const updatedResult = await getUserPermissions(selectedUser.id)
+                                if (updatedResult.success) {
+                                  setUserPermissions(updatedResult.permissions || [])
+                                }
+                              } else {
+                                toast.error("Error al actualizar permisos del grupo")
+                              }
+                            }}
+                          />
+                          <span className="text-xl">{group.icon}</span>
+                          <div>
+                            <div className="font-semibold text-gray-900">{group.display_name}</div>
+                            <div className="text-xs text-gray-500">{group.description}</div>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {viewCount}/{groupModuleIds.length} activos
+                        </Badge>
+                      </div>
+
+                      {/* Sub-módulos */}
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="pl-12">Sub-módulo</TableHead>
+                            <TableHead className="text-center">Ver</TableHead>
+                            <TableHead className="text-center">Editar</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.modules.map((module: any) => {
+                            const permission = userPermissions.find((p: any) => p.module_id === module.id)
+                            return (
+                              <TableRow key={module.id}>
+                                <TableCell className="pl-12">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="text-lg">{module.icon}</span>
+                                    <div>
+                                      <div className="font-medium">{module.display_name}</div>
+                                      <div className="text-sm text-gray-500">{module.description}</div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox
+                                    checked={permission?.can_view || false}
+                                    disabled={!canEdit}
+                                    onCheckedChange={() => handleTogglePermission(module.id, permission?.can_view || false)}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox
+                                    checked={permission?.can_edit || false}
+                                    disabled={!canEdit || !permission?.can_view}
+                                    onCheckedChange={() => {
+                                      if (!permission?.can_view) return
+                                      handleToggleEditPermission(module.id, permission?.can_view || false, permission?.can_edit || false)
+                                    }}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )
+                })}
               </div>
               <DialogFooter>
                 <Button onClick={() => setIsPermissionsDialogOpen(false)}>Cerrar</Button>
@@ -802,7 +967,7 @@ function AdministracionContent({ canEdit }: { canEdit: boolean }) {
 export default function AdministracionPage() {
   return (
     <PermissionsGuard moduleName="administracion">
-      {(canEdit) => <AdministracionContent canEdit={canEdit} />}
+      {(canEdit, canAdmin) => <AdministracionContent canEdit={canEdit} canAdmin={canAdmin} />}
     </PermissionsGuard>
   )
 }

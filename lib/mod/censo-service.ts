@@ -1,6 +1,11 @@
 import { supabase } from "@/lib/supabase"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 
+export interface HijoData {
+  nombre: string
+  edad: string
+}
+
 export interface CensoRecord {
   id?: number
   // Datos Personales
@@ -20,36 +25,45 @@ export interface CensoRecord {
   convencional?: string
   familiar?: string
   conyuge?: string
+  cedula_conyugue?: string
   correo?: string
   nivel_estudio?: string
   curso?: string
-  acumula_decimos?: string
-  hoja_vida?: string
-  estado?: string
-  fecha_registro_saite?: string
-  fecha_registro_iess?: string
   direccion?: string
   ciudad?: string
   parroquia?: string
   barrio?: string
-  // Datos Iglesia
+  // Hijos
+  tiene_hijos?: boolean
+  hijos?: HijoData[]
+  // Datos Iglesia / Trabajo
   jornada_trabajo?: string
   cargo?: string
-  local?: string
-  fecha_ingreso?: string
-  fecha_reingreso?: string
-  fecha_salida?: string
-  dias_por_mes?: number
-  horas_diarias?: number
-  horas_semanal?: number
-  sueldo?: number
-  pagos?: string
-  banco?: string
-  numero_cuenta?: string
-  interseccion?: string
-  redil?: string
-  ninos?: string
-  otros?: string
+  lugar_trabajo?: string
+  // Discipulado
+  discipulado_irdd?: boolean
+  primeros_pasos?: boolean
+  seguimos_avanzando?: boolean
+  siendo_iglesia?: boolean
+  // Bautizo IRDD
+  bautizo_irdd?: boolean
+  fecha_bautizo?: string
+  // Matrimonio IRDD
+  matrimonio_irdd?: boolean
+  fecha_matrimonio?: string
+  // Membresía
+  miembro?: boolean
+  miembro_activo?: boolean
+  // Servicio
+  sirve_iglesia?: boolean
+  ministerio?: string
+  cargo_ministerio?: string
+  // Seminarios
+  seminarios?: string[]
+  // Proyecto Mario
+  proyecto_mario?: boolean
+  proyecto_mario_detalle?: string
+  // Timestamps
   created_at?: string
   updated_at?: string
 }
@@ -61,6 +75,16 @@ export interface CatalogOption {
   activo?: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface ConfiguracionesGlobales {
+  id: number
+  ministerios: string[]
+  cargos_ministerio: string[]
+  ubicaciones: string[]
+  estados: string[]
+  categorias_principales: string[]
+  detalles: string[]
 }
 
 export const censoService = {
@@ -86,12 +110,12 @@ export const censoService = {
       .select()
       .single()
     if (error) throw error
-    if (audit) auditService.log({ ...audit, module: "censo", action: "crear", description: `Censo - ${data.apellidos_nombres}`, details: { cedula: record.cedula, nombre: record.apellidos_nombres, cargo: record.cargo, local: record.local, celular: record.celular, estado_civil: record.estado_civil } })
+    if (audit) auditService.log({ ...audit, module: "censo", action: "crear", description: `Censo - ${data.apellidos_nombres}`, details: { cedula: record.cedula, nombre: record.apellidos_nombres, cargo: record.cargo, celular: record.celular, estado_civil: record.estado_civil } })
     return data
   },
 
   async update(id: number, record: Partial<CensoRecord>, audit?: AuditInfo): Promise<CensoRecord> {
-    const { data: antes } = audit ? await supabase.from("censo").select("apellidos_nombres,cedula,cargo,local,celular,estado_civil").eq("id", id).single() : { data: null }
+    const { data: antes } = audit ? await supabase.from("censo").select("apellidos_nombres,cedula,cargo,celular,estado_civil").eq("id", id).single() : { data: null }
     const { data, error } = await supabase
       .from("censo")
       .update({ ...record, updated_at: new Date().toISOString() })
@@ -99,15 +123,15 @@ export const censoService = {
       .select()
       .single()
     if (error) throw error
-    if (audit) auditService.log({ ...audit, module: "censo", action: "editar", description: `Censo - ${data.apellidos_nombres}`, details: { antes, despues: { apellidos_nombres: data.apellidos_nombres, cedula: data.cedula, cargo: data.cargo, local: data.local, celular: data.celular, estado_civil: data.estado_civil } } })
+    if (audit) auditService.log({ ...audit, module: "censo", action: "editar", description: `Censo - ${data.apellidos_nombres}`, details: { antes, despues: { apellidos_nombres: data.apellidos_nombres, cedula: data.cedula, cargo: data.cargo, celular: data.celular, estado_civil: data.estado_civil } } })
     return data
   },
 
   async delete(id: number, audit?: AuditInfo): Promise<void> {
-    const { data } = await supabase.from("censo").select("apellidos_nombres,cedula,cargo,local").eq("id", id).single()
+    const { data } = await supabase.from("censo").select("apellidos_nombres,cedula,cargo").eq("id", id).single()
     const { error } = await supabase.from("censo").delete().eq("id", id)
     if (error) throw error
-    if (audit) auditService.log({ ...audit, module: "censo", action: "eliminar", description: `Censo - ${data?.apellidos_nombres} (${data?.cedula})`, details: { id, cedula: data?.cedula, nombre: data?.apellidos_nombres, cargo: data?.cargo, local: data?.local } })
+    if (audit) auditService.log({ ...audit, module: "censo", action: "eliminar", description: `Censo - ${data?.apellidos_nombres} (${data?.cedula})`, details: { id, cedula: data?.cedula, nombre: data?.apellidos_nombres, cargo: data?.cargo } })
   },
 
   async search(query: string): Promise<CensoRecord[]> {
@@ -121,6 +145,18 @@ export const censoService = {
 
     if (error) throw error
     return data || []
+  },
+
+  // Configuraciones globales (ministerios, cargos, etc.)
+  async getConfiguraciones(): Promise<ConfiguracionesGlobales | null> {
+    const { data, error } = await supabase
+      .from("configuraciones_globales")
+      .select("*")
+      .limit(1)
+      .single()
+
+    if (error) throw error
+    return data
   },
 
   // CRUD para catálogos (opciones de selects)

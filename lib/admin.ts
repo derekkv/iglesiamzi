@@ -27,6 +27,7 @@ export interface UserPermissionData {
   moduleId: string
   canView: boolean
   canEdit: boolean
+  canAdmin?: boolean
   grantedBy: string
 }
 
@@ -111,10 +112,16 @@ export async function deleteUser(userId: string) {
   }
 }
 
-// Obtener todos los módulos
+// Obtener todos los módulos (incluye grupo)
 export async function getAllModules() {
   try {
-    const { data, error } = await supabase.from("system_modules").select("*").order("sort_order", { ascending: true })
+    const { data, error } = await supabase
+      .from("system_modules")
+      .select(`
+        *,
+        group:module_groups(*)
+      `)
+      .order("sort_order", { ascending: true })
 
     if (error) throw error
 
@@ -122,6 +129,105 @@ export async function getAllModules() {
   } catch (error) {
     console.error("Error obteniendo módulos:", error)
     return { success: false, error: "Error al obtener módulos", modules: [] }
+  }
+}
+
+// Obtener todos los grupos de módulos
+export async function getAllModuleGroups() {
+  try {
+    const { data, error } = await supabase
+      .from("module_groups")
+      .select("*")
+      .order("sort_order", { ascending: true })
+
+    if (error) throw error
+
+    return { success: true, groups: data }
+  } catch (error) {
+    console.error("Error obteniendo grupos:", error)
+    return { success: false, error: "Error al obtener grupos", groups: [] }
+  }
+}
+
+// Obtener módulos agrupados (para el panel de permisos y dashboard)
+export async function getModulesGrouped() {
+  try {
+    const { data: groups, error: groupsError } = await supabase
+      .from("module_groups")
+      .select("*")
+      .order("sort_order", { ascending: true })
+
+    if (groupsError) throw groupsError
+
+    const { data: modules, error: modulesError } = await supabase
+      .from("system_modules")
+      .select(`
+        *,
+        group:module_groups(*)
+      `)
+      .order("sort_order", { ascending: true })
+
+    if (modulesError) throw modulesError
+
+    // Organizar: módulos sin grupo primero, luego agrupados
+    const ungrouped = modules.filter((m: any) => !m.group_id)
+    const grouped = groups.map((group: any) => ({
+      ...group,
+      modules: modules.filter((m: any) => m.group_id === group.id),
+    }))
+
+    return { success: true, ungrouped, grouped }
+  } catch (error) {
+    console.error("Error obteniendo módulos agrupados:", error)
+    return { success: false, error: "Error al obtener módulos agrupados", ungrouped: [], grouped: [] }
+  }
+}
+
+// Asignar permisos en lote para todos los módulos de un grupo
+export async function setGroupPermissions(
+  userId: string,
+  groupId: string,
+  canView: boolean,
+  canEdit: boolean,
+  grantedBy: string
+) {
+  try {
+    // Obtener todos los módulos del grupo
+    const { data: modules, error: modulesError } = await supabase
+      .from("system_modules")
+      .select("id")
+      .eq("group_id", groupId)
+
+    if (modulesError) throw modulesError
+
+    // Aplicar permiso a cada módulo del grupo
+    for (const module of modules) {
+      if (!canView) {
+        await supabase
+          .from("user_permissions")
+          .delete()
+          .eq("user_id", userId)
+          .eq("module_id", module.id)
+      } else {
+        await supabase
+          .from("user_permissions")
+          .upsert(
+            {
+              user_id: userId,
+              module_id: module.id,
+              can_view: true,
+              can_edit: canEdit,
+              granted_by: grantedBy,
+            },
+            { onConflict: "user_id,module_id" }
+          )
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error asignando permisos de grupo:", error)
+    return { success: false, error: "Error al asignar permisos de grupo" }
   }
 }
 
@@ -169,6 +275,7 @@ export async function setUserPermission(permissionData: UserPermissionData) {
           module_id: permissionData.moduleId,
           can_view: true,
           can_edit: permissionData.canEdit,
+          can_admin: permissionData.canAdmin || false,
           granted_by: permissionData.grantedBy,
         },
         {

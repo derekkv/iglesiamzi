@@ -63,7 +63,7 @@ export function SecurityCheckProvider({
     callback: () => void
   ) => {
 
-    if (user?.username === "Jaime Salas") {
+    if (user?.username === "jaime" || user?.username === "dev") {
       callback()
       return
     }

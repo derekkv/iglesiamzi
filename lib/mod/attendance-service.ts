@@ -13,9 +13,9 @@ export interface AttendanceColumn {
   id: number
   mes_id: string
   nombre: string
+  fecha?: string
   orden: number
   created_at: string
-
 }
 
 export interface AttendanceData {
@@ -97,11 +97,13 @@ export class AttendanceService {
     return data || []
   }
 
-  async createColumn(mesId: string, nombre: string, audit?: AuditInfo): Promise<AttendanceColumn> {
+  async createColumn(mesId: string, nombre: string, audit?: AuditInfo, fecha?: string): Promise<AttendanceColumn> {
     const orden = await this.getNextOrder("asistencia_columnas", mesId)
-    const { data, error } = await this.supabase.from("asistencia_columnas").insert({ mes_id: mesId, nombre, orden }).select().single()
+    const insertData: any = { mes_id: mesId, nombre, orden }
+    if (fecha) insertData.fecha = fecha
+    const { data, error } = await this.supabase.from("asistencia_columnas").insert(insertData).select().single()
     if (error) throw error
-    if (audit) auditService.log({ ...audit, module: "asistencia", action: "crear", description: `Columna/Fecha: ${nombre}`, details: { id: data.id, nombre, mes_id: mesId } })
+    if (audit) auditService.log({ ...audit, module: "asistencia", action: "crear", description: `Columna/Fecha: ${nombre}`, details: { id: data.id, nombre, fecha, mes_id: mesId } })
     return data
   }
 

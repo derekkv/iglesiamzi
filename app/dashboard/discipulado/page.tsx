@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -106,6 +107,11 @@ function DiscipuladoContent({ canEdit }: { canEdit: boolean }) {
       console.error("Error refreshing data:", error)
     }
   }
+
+  // Realtime: refrescar cuando cambian datos de discipulado
+  useRealtimeMultiple(["discipulado_participantes", "discipulado_fechas", "discipulado_asistencia"], () => {
+    refreshData()
+  })
 
   const handleAddParticipant = async () => {
     if (!newParticipantName.trim() || !currentMonth) return

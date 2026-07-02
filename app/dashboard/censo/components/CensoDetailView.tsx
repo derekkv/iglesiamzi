@@ -9,7 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { CensoRecord } from "@/lib/mod/censo-service"
+import { Badge } from "@/components/ui/badge"
+import type { CensoRecord, HijoData } from "@/lib/mod/censo-service"
 
 interface CensoDetailViewProps {
   isOpen: boolean
@@ -19,6 +20,9 @@ interface CensoDetailViewProps {
 
 export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailViewProps) {
   if (!record) return null
+
+  const hijos: HijoData[] = (record.hijos as HijoData[]) || []
+  const seminarios: string[] = (record.seminarios as string[]) || []
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -54,45 +58,108 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
               <p><strong>Celular:</strong> {record.celular || "-"}</p>
               <p><strong>Convencional:</strong> {record.convencional || "-"}</p>
               <p><strong>Contacto Familiar:</strong> {record.familiar || "-"}</p>
-              <p><strong>Cónyuge:</strong> {record.conyuge || "-"}</p>
               <p><strong>Correo:</strong> {record.correo || "-"}</p>
               <p><strong>Nivel de Estudio:</strong> {record.nivel_estudio || "-"}</p>
-              <p><strong>Curso:</strong> {record.curso || "-"}</p>
-              <p><strong>Acumula Décimos:</strong> {record.acumula_decimos || "-"}</p>
-              <p><strong>Hoja de Vida:</strong> {record.hoja_vida || "-"}</p>
-              <p><strong>Estado:</strong> {record.estado || "-"}</p>
-              <p><strong>Fecha Registro SAITE:</strong> {record.fecha_registro_saite || "-"}</p>
-              <p><strong>Fecha Registro IESS:</strong> {record.fecha_registro_iess || "-"}</p>
+              <p><strong>Curso/Profesión:</strong> {record.curso || "-"}</p>
               <p><strong>Dirección:</strong> {record.direccion || "-"}</p>
               <p><strong>Ciudad:</strong> {record.ciudad || "-"}</p>
               <p><strong>Parroquia:</strong> {record.parroquia || "-"}</p>
               <p><strong>Barrio:</strong> {record.barrio || "-"}</p>
+
+              {/* Cónyuge */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>Cónyuge:</strong> {record.conyuge || "-"}</p>
+                <p><strong>Cédula Cónyuge:</strong> {record.cedula_conyugue || "-"}</p>
+              </div>
+
+              {/* Hijos */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>¿Tiene hijos?:</strong> {record.tiene_hijos ? "Sí" : "No"}</p>
+                {hijos.length > 0 && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    {hijos.map((hijo, i) => (
+                      <p key={i} className="text-gray-700">• {hijo.nombre} - {hijo.edad} años</p>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* DATOS IGLESIA */}
           <div className="space-y-3 bg-orange-50/50 dark:bg-orange-950/10 p-4 rounded-lg border border-orange-100 dark:border-orange-900/50">
             <h3 className="text-md font-bold text-orange-800 dark:text-orange-300 border-b border-orange-200 dark:border-orange-800 pb-2">
-              DATOS IGLESIA
+              DATOS DE LA IGLESIA
             </h3>
             <div className="space-y-2 text-sm">
               <p><strong>Jornada de Trabajo:</strong> {record.jornada_trabajo || "-"}</p>
               <p><strong>Cargo:</strong> {record.cargo || "-"}</p>
-              <p><strong>Local asignado:</strong> {record.local || "-"}</p>
-              <p><strong>Fecha Ingreso:</strong> {record.fecha_ingreso || "-"}</p>
-              <p><strong>Fecha Reingreso:</strong> {record.fecha_reingreso || "-"}</p>
-              <p><strong>Fecha Salida:</strong> {record.fecha_salida || "-"}</p>
-              <p><strong>Días por Mes:</strong> {record.dias_por_mes || "-"}</p>
-              <p><strong>Horas Diarias:</strong> {record.horas_diarias || "-"}</p>
-              <p><strong>Horas Semanales:</strong> {record.horas_semanal || "-"}</p>
-              <p><strong>Sueldo:</strong> {record.sueldo ? `$${record.sueldo.toFixed(2)}` : "-"}</p>
-              <p><strong>Pagos:</strong> {record.pagos || "-"}</p>
-              <p><strong>Banco:</strong> {record.banco || "-"}</p>
-              <p><strong>Número de Cuenta:</strong> {record.numero_cuenta || "-"}</p>
-              <p><strong>Intersección Vial:</strong> {record.interseccion || "-"}</p>
-              <p><strong>Redil:</strong> {record.redil || "-"}</p>
-              <p><strong>Niños a Cargo:</strong> {record.ninos || "-"}</p>
-              <p><strong>Observaciones / Otros:</strong> {record.otros || "-"}</p>
+              <p><strong>Lugar de Trabajo:</strong> {record.lugar_trabajo || "-"}</p>
+
+              {/* Discipulado */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>¿Discipulado en IRDD?:</strong> {record.discipulado_irdd ? "Sí" : "No"}</p>
+                {record.discipulado_irdd && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    <p>• Primeros pasos: {record.primeros_pasos ? <Badge className="bg-green-100 text-green-800">Sí</Badge> : <Badge variant="secondary">No</Badge>}</p>
+                    <p>• Seguimos avanzando: {record.seguimos_avanzando ? <Badge className="bg-green-100 text-green-800">Sí</Badge> : <Badge variant="secondary">No</Badge>}</p>
+                    <p>• Siendo Iglesia: {record.siendo_iglesia ? <Badge className="bg-green-100 text-green-800">Sí</Badge> : <Badge variant="secondary">No</Badge>}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Bautizo */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>¿Bautizo en IRDD?:</strong> {record.bautizo_irdd ? "Sí" : "No"}</p>
+                {record.bautizo_irdd && (
+                  <p className="ml-4"><strong>Fecha:</strong> {record.fecha_bautizo || "-"}</p>
+                )}
+              </div>
+
+              {/* Matrimonio */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>¿Matrimonio en IRDD?:</strong> {record.matrimonio_irdd ? "Sí" : "No"}</p>
+                {record.matrimonio_irdd && (
+                  <p className="ml-4"><strong>Fecha:</strong> {record.fecha_matrimonio || "-"}</p>
+                )}
+              </div>
+
+              {/* Membresía */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>Miembro:</strong> {record.miembro ? <Badge className="bg-blue-100 text-blue-800">Sí</Badge> : <Badge variant="secondary">No</Badge>}</p>
+                <p><strong>Miembro Activo:</strong> {record.miembro_activo ? <Badge className="bg-green-100 text-green-800">Sí</Badge> : <Badge variant="secondary">No</Badge>}</p>
+              </div>
+
+              {/* Servicio */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>¿Sirve a la iglesia?:</strong> {record.sirve_iglesia ? "Sí" : "No"}</p>
+                {record.sirve_iglesia && (
+                  <div className="ml-4 mt-1">
+                    <p><strong>Ministerio:</strong> {record.ministerio || "-"}</p>
+                    <p><strong>Cargo:</strong> {record.cargo_ministerio || "-"}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Seminarios */}
+              {seminarios.length > 0 && (
+                <div className="border-t pt-2 mt-2">
+                  <p><strong>Seminarios realizados:</strong></p>
+                  <div className="ml-4 mt-1 space-y-1">
+                    {seminarios.map((s, i) => (
+                      <p key={i} className="text-gray-700">• {s}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Proyecto Mario */}
+              <div className="border-t pt-2 mt-2">
+                <p><strong>¿Proyecto Mario?:</strong> {record.proyecto_mario ? "Sí" : "No"}</p>
+                {record.proyecto_mario && record.proyecto_mario_detalle && (
+                  <p className="ml-4"><strong>Detalle:</strong> {record.proyecto_mario_detalle}</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

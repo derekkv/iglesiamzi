@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 
 interface PermissionsGuardProps {
-  children: (canEdit: boolean) => React.ReactNode
+  children: (canEdit: boolean, canAdmin?: boolean) => React.ReactNode
   moduleName: string
   fallbackPath?: string
 }
@@ -17,7 +17,7 @@ interface PermissionsGuardProps {
 export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashboard" }: PermissionsGuardProps) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
-  const [permState, setPermState] = useState<{ canView: boolean; canEdit: boolean } | null>(null)
+  const [permState, setPermState] = useState<{ canView: boolean; canEdit: boolean; canAdmin: boolean } | null>(null)
 
   useEffect(() => {
     const checkPermission = async () => {
@@ -37,7 +37,7 @@ export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashbo
         return
       }
 
-      setPermState({ canView: result.canView, canEdit: result.canEdit })
+      setPermState({ canView: result.canView, canEdit: result.canEdit, canAdmin: result.canAdmin })
     }
 
     checkPermission()
@@ -58,14 +58,14 @@ export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashbo
     return null
   }
 
-  return <>{children(permState.canEdit)}</>
+  return <>{children(permState.canEdit, permState.canAdmin)}</>
 }
 
-export function withPermissions(Component: React.ComponentType<{ canEdit: boolean }>, moduleName: string) {
+export function withPermissions(Component: React.ComponentType<{ canEdit: boolean; canAdmin?: boolean }>, moduleName: string) {
   return function PermissionsWrappedComponent(props: any) {
     return (
       <PermissionsGuard moduleName={moduleName}>
-        {(canEdit) => <Component {...props} canEdit={canEdit} />}
+        {(canEdit, canAdmin) => <Component {...props} canEdit={canEdit} canAdmin={canAdmin} />}
       </PermissionsGuard>
     )
   }

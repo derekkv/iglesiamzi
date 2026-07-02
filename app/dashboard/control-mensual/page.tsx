@@ -13,8 +13,11 @@ import { toast } from "sonner"
 import { EditMonthModal } from "@/components/EditMonthModal"
 import { CreateMonthModal } from "@/components/CreateMonthModal"
 import { CloseMonthModal } from "@/components/CloseMonthModal"
+import { supabase } from "@/lib/supabase"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
+import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 
-import { Lock, ArrowLeft } from "lucide-react"
+import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign } from "lucide-react"
 
 function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
 
@@ -27,12 +30,75 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
 const [openCreateModal, setOpenCreateModal] = useState(false)
 const [openCloseModal, setOpenCloseModal] = useState(false)
 
+  // Resumen financiero y asistencia
+  const [ingresos, setIngresos] = useState<any[]>([])
+  const [egresos, setEgresos] = useState<any[]>([])
+  const [asistenciaColumns, setAsistenciaColumns] = useState<any[]>([])
+  const [asistenciaDetails, setAsistenciaDetails] = useState<any[]>([])
+  const [asistenciaData, setAsistenciaData] = useState<any[]>([])
+  const [nominaRecords, setNominaRecords] = useState<any[]>([])
+  const { hasAccess: hasNominaAccess } = useRestrictedAccess("nomina")
+
  const { user, isLoading } = useAuth()
   useEffect(() => {
     const now = new Date()
     setSelectedDate(now.toISOString().split("T")[0])
     setMonthName(`${now.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`)
   }, [router])
+
+  // Cargar resumen del mes
+  useEffect(() => {
+    if (currentMonth?.id) loadSummary()
+  }, [currentMonth])
+
+  const loadSummary = async (silent = false) => {
+    if (!currentMonth?.id) return
+    try {
+      const [ingRes, egRes, colRes, detRes, datRes, nomRes] = await Promise.all([
+        supabase.from("ingresos").select("*").eq("mes_id", currentMonth.id),
+        supabase.from("egresos").select("*").eq("mes_id", currentMonth.id),
+        supabase.from("asistencia_columnas").select("*").eq("mes_id", currentMonth.id).order("orden"),
+        supabase.from("asistencia_detalles").select("*").eq("mes_id", currentMonth.id).order("orden"),
+        supabase.from("asistencia_datos").select("*").eq("mes_id", currentMonth.id),
+        supabase.from("nomina").select("*").eq("mes_id", currentMonth.id),
+      ])
+      setIngresos(ingRes.data || [])
+      setEgresos(egRes.data || [])
+      setAsistenciaColumns(colRes.data || [])
+      setAsistenciaDetails(detRes.data || [])
+      setAsistenciaData(datRes.data || [])
+      setNominaRecords(nomRes.data || [])
+    } catch (error) {
+      console.error("Error cargando resumen:", error)
+    }
+  }
+
+  // Realtime
+  useRealtimeMultiple(["ingresos", "egresos", "asistencia_columnas", "asistencia_datos", "nomina"], () => loadSummary(true))
+
+  // Cálculos del resumen
+  const totalIngresos = ingresos.reduce((sum, r) => sum + Number(r.monto || 0), 0)
+  const totalEgresos = egresos.reduce((sum, r) => sum + Number(r.monto || 0), 0)
+  const balance = totalIngresos - totalEgresos
+
+  // Ingresos por categoría
+  const ingresosPorCategoria = ingresos.reduce((acc, r) => {
+    const cat = r.categoria_principal || "Sin categoría"
+    acc[cat] = (acc[cat] || 0) + Number(r.monto || 0)
+    return acc
+  }, {} as Record<string, number>)
+
+  // Egresos por categoría
+  const egresosPorCategoria = egresos.reduce((acc, r) => {
+    const cat = r.categoria_principal || "Sin categoría"
+    acc[cat] = (acc[cat] || 0) + Number(r.monto || 0)
+    return acc
+  }, {} as Record<string, number>)
+
+  // Asistencia totales por columna
+  const getColumnTotal = (colId: number) => {
+    return asistenciaData.filter((d: any) => d.columna_id === colId).reduce((sum: number, d: any) => sum + (d.cantidad || 0), 0)
+  }
 
   const handleStartNewMonth = () => {
     if (selectedDate && monthName.trim()) {
@@ -256,6 +322,242 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
             </CardContent>
           </Card>
         </div>
+
+        {/* ===== RESUMEN DEL MES ===== */}
+        {currentMonth && (
+          <div className="mt-8 space-y-6">
+            <h2 className="text-xl font-bold text-gray-900">Resumen del Mes: {currentMonth.name}</h2>
+
+            {/* Cards de resumen financiero */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="border-green-200 bg-green-50/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-700">Total Ingresos</p>
+                      <p className="text-2xl font-bold text-green-700">${totalIngresos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-green-400" />
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">{ingresos.length} registros</p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-200 bg-red-50/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-red-700">Total Egresos</p>
+                      <p className="text-2xl font-bold text-red-700">${totalEgresos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <TrendingDown className="w-8 h-8 text-red-400" />
+                  </div>
+                  <p className="text-xs text-red-600 mt-1">{egresos.length} registros</p>
+                </CardContent>
+              </Card>
+
+              <Card className={`border-${balance >= 0 ? "blue" : "amber"}-200 bg-${balance >= 0 ? "blue" : "amber"}-50/50`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700">Balance</p>
+                      <p className={`text-2xl font-bold ${balance >= 0 ? "text-blue-700" : "text-amber-700"}`}>
+                        ${balance.toLocaleString("es-CO", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <DollarSign className={`w-8 h-8 ${balance >= 0 ? "text-blue-400" : "text-amber-400"}`} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{balance >= 0 ? "Superávit" : "Déficit"}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-purple-200 bg-purple-50/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-purple-700">Días de Asistencia</p>
+                      <p className="text-2xl font-bold text-purple-700">{asistenciaColumns.length}</p>
+                    </div>
+                    <Users className="w-8 h-8 text-purple-400" />
+                  </div>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Promedio: {asistenciaColumns.length > 0
+                      ? Math.round(asistenciaData.reduce((s: number, d: any) => s + (d.cantidad || 0), 0) / asistenciaColumns.length)
+                      : 0} personas/día
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Desglose por categoría */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Ingresos por categoría */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-green-600" />
+                    Ingresos por Categoría
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {Object.keys(ingresosPorCategoria).length > 0 ? (
+                    <div className="space-y-2">
+                      {(Object.entries(ingresosPorCategoria) as [string, number][])
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([cat, monto]) => (
+                          <div key={cat} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                            <span className="text-sm text-gray-700">{cat}</span>
+                            <div className="text-right">
+                              <span className="text-sm font-semibold text-green-700">
+                                ${monto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-xs text-gray-400 ml-2">
+                                ({totalIngresos > 0 ? Math.round((monto / totalIngresos) * 100) : 0}%)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-4">Sin ingresos registrados</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Egresos por categoría */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingDown className="w-4 h-4 text-red-600" />
+                    Egresos por Categoría
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {Object.keys(egresosPorCategoria).length > 0 ? (
+                    <div className="space-y-2">
+                      {(Object.entries(egresosPorCategoria) as [string, number][])
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([cat, monto]) => (
+                          <div key={cat} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                            <span className="text-sm text-gray-700">{cat}</span>
+                            <div className="text-right">
+                              <span className="text-sm font-semibold text-red-700">
+                                ${monto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-xs text-gray-400 ml-2">
+                                ({totalEgresos > 0 ? Math.round((monto / totalEgresos) * 100) : 0}%)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-4">Sin egresos registrados</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Resumen de Asistencia */}
+            {asistenciaColumns.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-600" />
+                    Asistencia del Mes
+                  </CardTitle>
+                  <CardDescription>Total de asistencia por cada día registrado</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {asistenciaColumns.map((col: any) => {
+                      const total = getColumnTotal(col.id)
+                      return (
+                        <div key={col.id} className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+                          <p className="text-xs text-purple-600 font-medium">{col.nombre}</p>
+                          <p className="text-xl font-bold text-purple-800 mt-1">{total}</p>
+                          <p className="text-xs text-gray-500">personas</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Resumen por categoría de asistencia */}
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Totales por categoría:</p>
+                    <div className="space-y-1">
+                      {asistenciaDetails.map((detail: any) => {
+                        const detailTotal = asistenciaData
+                          .filter((d: any) => d.detalle_id === detail.id)
+                          .reduce((sum: number, d: any) => sum + (d.cantidad || 0), 0)
+                        if (detailTotal === 0) return null
+                        return (
+                          <div key={detail.id} className="flex items-center justify-between py-1">
+                            <span className="text-xs text-gray-600">{detail.nombre}</span>
+                            <span className="text-xs font-semibold text-purple-700">{detailTotal}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resumen de Nómina (solo para usuarios con acceso) */}
+            {hasNominaAccess && nominaRecords.length > 0 && (
+              <Card className="border-amber-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span>💰</span> Resumen de Nómina
+                  </CardTitle>
+                  <CardDescription>Estado de pagos de quincena del mes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                    <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                      <p className="text-xs text-amber-600">Total Nómina</p>
+                      <p className="text-lg font-bold text-amber-800">
+                        ${nominaRecords.reduce((s: number, r: any) => s + Number(r.valor), 0).toLocaleString("es-CO", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <p className="text-xs text-blue-600">Pagados 1ra Q.</p>
+                      <p className="text-lg font-bold text-blue-800">
+                        {nominaRecords.filter((r: any) => r.primera_quincena_pagada).length}/{nominaRecords.length}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                      <p className="text-xs text-green-600">Pagados 2da Q.</p>
+                      <p className="text-lg font-bold text-green-800">
+                        {nominaRecords.filter((r: any) => r.segunda_quincena_pagada).length}/{nominaRecords.length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Pendientes */}
+                  {(nominaRecords.some((r: any) => !r.primera_quincena_pagada) || nominaRecords.some((r: any) => !r.segunda_quincena_pagada)) && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">Pagos pendientes:</p>
+                      {nominaRecords.filter((r: any) => !r.primera_quincena_pagada).map((r: any) => (
+                        <div key={`1q-${r.id}`} className="flex items-center justify-between py-1 px-3 bg-red-50 rounded text-sm">
+                          <span>{r.nombre}</span>
+                          <Badge variant="secondary" className="text-xs">1ra Quincena pendiente</Badge>
+                        </div>
+                      ))}
+                      {nominaRecords.filter((r: any) => !r.segunda_quincena_pagada).map((r: any) => (
+                        <div key={`2q-${r.id}`} className="flex items-center justify-between py-1 px-3 bg-orange-50 rounded text-sm">
+                          <span>{r.nombre}</span>
+                          <Badge variant="secondary" className="text-xs">2da Quincena pendiente</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </main>
     </div>
   )

@@ -4,6 +4,7 @@ import type React from "react";
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useRealtimeMultiple } from "@/hooks/use-realtime";
 import {
   Card,
   CardContent,
@@ -45,7 +46,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Edit, Settings, Plus, Lock, ArrowLeft } from "lucide-react";
+import { Trash2, Edit, Settings, Plus, Lock, ArrowLeft, ArrowDown, ArrowUp } from "lucide-react";
 import { useMonth } from "@/contexts/month-context";
 import {
   getGlobalConfig,
@@ -66,6 +67,7 @@ interface FinancialRecord {
   observacion: string;
   monto: string | number
   estado: "Procesado" | "Pendiente";
+  metodo_pago: string;
   mes_id: string;
   created_at: string;
 }
@@ -90,6 +92,20 @@ const { checkAndExecute } = useSecurityCheck()
   const [error, setError] = useState("");
   const [deleteRecordId, setDeleteRecordId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortDesc, setSortDesc] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ingresos_sort_desc") !== "false"
+    }
+    return true
+  });
+
+  // Filtros
+  const [filterTipo, setFilterTipo] = useState<string>("todos")
+  const [filterCategoria, setFilterCategoria] = useState<string>("todas")
+  const [filterDetalle, setFilterDetalle] = useState<string>("todos")
+  const [filterEstado, setFilterEstado] = useState<string>("todos")
+  const [filterMetodo, setFilterMetodo] = useState<string>("todos")
+  const [filterText, setFilterText] = useState("")
 
 const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   ministerios: [],
@@ -122,6 +138,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
     detalle: "",
     observacion: "",
     monto: "",
+    metodo_pago: "Efectivo" as string,
     estado: "Pendiente" as "Procesado" | "Pendiente",
   });
 
@@ -152,6 +169,11 @@ const handleDeleteClick = (record: FinancialRecord) => {
     initializePage();
   }, [router, currentMonth]);
 
+  // Realtime: refrescar al detectar cambios en ingresos o egresos
+  useRealtimeMultiple(["ingresos", "egresos"], () => {
+    loadFinancialRecords()
+  });
+
   const loadFinancialRecords = async () => {
     if (!currentMonth) return;
 
@@ -180,6 +202,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
           detalle: ingreso.detalle,
           observacion: ingreso.observacion,
           monto: ingreso.monto,
+          metodo_pago: ingreso.metodo_pago || "N/A",
           estado: ingreso.estado,
           mes_id: ingreso.mes_id,
           created_at: ingreso.created_at
@@ -195,6 +218,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
           detalle: egreso.detalle,
           observacion: egreso.observacion,
           monto: egreso.monto,
+          metodo_pago: egreso.metodo_pago || "N/A",
           estado: egreso.estado,
           mes_id: egreso.mes_id,
           created_at: egreso.created_at,
@@ -205,9 +229,10 @@ const handleDeleteClick = (record: FinancialRecord) => {
           ...expenseRecords
             ];
 
-          // Ordenar por fecha ascendente
+          // Ordenar por fecha según preferencia (se re-ordena en render)
           allRecords.sort((a, b) => {
-            return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+            const diff = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+            return -diff;
           });
 
       setRecords(allRecords);
@@ -261,6 +286,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
         observacion: formData.observacion,
         monto: formData.monto,
         fecha: formData.fecha,
+        metodo_pago: formData.metodo_pago,
         estado: formData.estado,
       };
 
@@ -283,6 +309,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
         observacion: "",
         // @ts-ignore
         monto: "",
+        metodo_pago: "Efectivo",
         estado: "Pendiente",
       });
       setIsAddModalOpen(false);
@@ -320,6 +347,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
       observacion: record.observacion,
       // @ts-ignore
       monto: record.monto,
+      metodo_pago: record.metodo_pago || "N/A",
       estado: record.estado,
     });
     setIsEditModalOpen(true);
@@ -362,6 +390,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
         observacion: formData.observacion,
         monto: formData.monto,
         fecha: formData.fecha,
+        metodo_pago: formData.metodo_pago,
         estado: formData.estado,
       };
 
@@ -859,6 +888,25 @@ function formatDateForTable(dateString: string) {
                     </div>
 
                     <div>
+                      <Label htmlFor="metodo_pago">Método de Pago</Label>
+                      <Select
+                        value={formData.metodo_pago}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, metodo_pago: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Efectivo">Efectivo</SelectItem>
+                          <SelectItem value="Transferencia">Transferencia</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
                       <Label htmlFor="estado">Estado</Label>
                       <Select
                         value={formData.estado}
@@ -961,10 +1009,100 @@ function formatDateForTable(dateString: string) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Registros Financieros</CardTitle>
-            <CardDescription>
-              Lista completa de ingresos y egresos del mes actual
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Registros Financieros</CardTitle>
+                <CardDescription>
+                  Lista completa de ingresos y egresos del mes actual
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newVal = !sortDesc
+                  setSortDesc(newVal)
+                  localStorage.setItem("ingresos_sort_desc", String(newVal))
+                }}
+                title={sortDesc ? "Más recientes primero" : "Más antiguos primero"}
+                className="flex items-center gap-1"
+              >
+                {sortDesc ? (
+                  <><ArrowDown className="w-4 h-4" /> Recientes</>
+                ) : (
+                  <><ArrowUp className="w-4 h-4" /> Antiguos</>
+                )}
+              </Button>
+            </div>
+            {/* Filtros */}
+            <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t">
+              <div className="flex-1 min-w-[180px]">
+                <Input
+                  placeholder="Buscar por observación, ministerio..."
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+              <select
+                value={filterTipo}
+                onChange={(e) => setFilterTipo(e.target.value)}
+                className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="todos">Todos</option>
+                <option value="Ingreso">Ingresos</option>
+                <option value="Egreso">Egresos</option>
+              </select>
+              <select
+                value={filterCategoria}
+                onChange={(e) => setFilterCategoria(e.target.value)}
+                className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="todas">Todas las categorías</option>
+                {[...new Set(records.map((r) => r.categoria_principal).filter(Boolean))].sort().map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <select
+                value={filterDetalle}
+                onChange={(e) => setFilterDetalle(e.target.value)}
+                className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="todos">Todos los detalles</option>
+                {[...new Set(records.map((r) => r.detalle).filter(Boolean))].sort().map((det) => (
+                  <option key={det} value={det}>{det}</option>
+                ))}
+              </select>
+              <select
+                value={filterEstado}
+                onChange={(e) => setFilterEstado(e.target.value)}
+                className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="Procesado">Procesado</option>
+                <option value="Pendiente">Pendiente</option>
+              </select>
+              <select
+                value={filterMetodo}
+                onChange={(e) => setFilterMetodo(e.target.value)}
+                className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="todos">Todos los métodos</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="N/A">N/A</option>
+              </select>
+              {(filterTipo !== "todos" || filterCategoria !== "todas" || filterDetalle !== "todos" || filterEstado !== "todos" || filterMetodo !== "todos" || filterText) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => { setFilterTipo("todos"); setFilterCategoria("todas"); setFilterDetalle("todos"); setFilterEstado("todos"); setFilterMetodo("todos"); setFilterText("") }}
+                >
+                  Limpiar
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {records.length > 0 ? (
@@ -978,6 +1116,7 @@ function formatDateForTable(dateString: string) {
                       <th className="text-left p-3 font-medium">Categoría</th>
                       <th className="text-left p-3 font-medium">Detalle</th>
                       <th className="text-left p-3 font-medium">Valor</th>
+                      <th className="text-left p-3 font-medium">Método de Pago</th>
                       <th className="text-left p-3 font-medium">Estado</th>
                       <th className="text-left p-3 font-medium">Observación</th>
                       <th className="text-left p-3 font-medium">Acciones</th>
@@ -985,7 +1124,27 @@ function formatDateForTable(dateString: string) {
                   </thead>
                   <tbody>
                     
-                    {records.map((record) => (
+                    {[...records]
+                    .filter((record) => {
+                      if (filterTipo !== "todos" && record.tipo !== filterTipo) return false
+                      if (filterCategoria !== "todas" && record.categoria_principal !== filterCategoria) return false
+                      if (filterDetalle !== "todos" && record.detalle !== filterDetalle) return false
+                      if (filterEstado !== "todos" && record.estado !== filterEstado) return false
+                      if (filterMetodo !== "todos" && (record.metodo_pago || "N/A") !== filterMetodo) return false
+                      if (filterText) {
+                        const search = filterText.toLowerCase()
+                        const matchesText =
+                          (record.observacion || "").toLowerCase().includes(search) ||
+                          (record.ministerio || "").toLowerCase().includes(search) ||
+                          (record.categoria_principal || "").toLowerCase().includes(search)
+                        if (!matchesText) return false
+                      }
+                      return true
+                    })
+                    .sort((a, b) => {
+                      const diff = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+                      return sortDesc ? -diff : diff;
+                    }).map((record) => (
                       <tr key={record.id + "-" + record.tipo} className="border-b hover:bg-gray-50">
                         <td className="p-3">
                         {formatDateForTable(record.fecha)}
@@ -1007,6 +1166,11 @@ function formatDateForTable(dateString: string) {
                         <td className="p-3">{record.detalle}</td>
                         <td className="p-3 font-medium">
                           ${record.monto.toLocaleString()}
+                        </td>
+                        <td className="p-3">
+                          <Badge variant="outline" className="text-xs">
+                            {record.metodo_pago || "N/A"}
+                          </Badge>
                         </td>
                         <td className="p-3">
                           <Badge
@@ -1240,6 +1404,25 @@ function formatDateForTable(dateString: string) {
                 }
                 placeholder="Observaciones adicionales (opcional)"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-metodo_pago">Método de Pago</Label>
+              <Select
+                value={formData.metodo_pago}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, metodo_pago: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Efectivo">Efectivo</SelectItem>
+                  <SelectItem value="Transferencia">Transferencia</SelectItem>
+                  <SelectItem value="N/A">N/A</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

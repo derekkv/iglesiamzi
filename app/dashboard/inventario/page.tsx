@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Lock, ArrowLeft } from "lucide-react"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -85,6 +86,9 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
       console.error("Error loading items:", error)
     }
   }
+
+  // Realtime: refrescar cuando cambian items o movimientos de inventario
+  useRealtimeMultiple(["inventory_items", "inventory_movements"], loadItems)
 
   const loadConfig = async () => {
     try {
