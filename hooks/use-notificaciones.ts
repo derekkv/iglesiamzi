@@ -149,7 +149,7 @@ export function useNotificaciones() {
     return true
   }, [])
 
-  // Enviar notificación a todos los admins
+  // Enviar notificación a todos los admins (usuarios con acceso al grupo administración)
   const notificarAdmins = useCallback(async (params: {
     titulo: string
     mensaje: string
@@ -159,25 +159,43 @@ export function useNotificaciones() {
   }) => {
     const { titulo, mensaje, tipo = "requerimiento", referenciaTipo, referenciaId } = params
 
-    // Obtener usuarios con permiso can_admin en módulo administracion
+    // Obtener usuarios con permisos en módulos del grupo administración
     const { data: adminPerms, error: permError } = await supabase
       .from("user_permissions")
       .select(`
         user_id,
-        module:system_modules!inner(name)
+        module:system_modules!inner(
+          name,
+          group:module_groups!inner(name)
+        )
       `)
-      .eq("can_admin", true)
-      .eq("system_modules.name", "administracion")
+      .eq("can_view", true)
+      .eq("system_modules.module_groups.name", "administracion")
 
     if (permError || !adminPerms) {
-      console.error("Error obteniendo admins:", permError)
+      // Fallback: buscar por can_admin en módulo administracion directamente
+      const { data: fallbackPerms } = await supabase
+        .from("user_permissions")
+        .select(`user_id, module:system_modules!inner(name)`)
+        .eq("can_admin", true)
+        .eq("system_modules.name", "administracion")
+
+      if (fallbackPerms) {
+        const uniqueIds = [...new Set(fallbackPerms.map((p) => p.user_id))]
+        for (const uid of uniqueIds) {
+          await enviarNotificacion({ userId: uid, titulo, mensaje, tipo, referenciaTipo, referenciaId })
+        }
+      }
       return
     }
 
+    // Deduplicar user_ids (un usuario puede tener permisos en varios módulos del grupo)
+    const uniqueUserIds = [...new Set(adminPerms.map((p) => p.user_id))]
+
     // Enviar a cada admin
-    for (const perm of adminPerms) {
+    for (const uid of uniqueUserIds) {
       await enviarNotificacion({
-        userId: perm.user_id,
+        userId: uid,
         titulo,
         mensaje,
         tipo,
