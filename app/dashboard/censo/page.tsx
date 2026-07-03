@@ -315,7 +315,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
     <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
+            <div className="flex items-center justify-between py-3 sm:h-16">
               <div className="flex items-center space-x-4">
                 <Button
                   variant="ghost"
@@ -361,8 +361,8 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
                 {isLoading ? (
                   <div className="text-center py-8">Cargando registros...</div>
                 ) : (
-                  <div className="rounded-md border">
-                    <Table>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table className="min-w-[600px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Cédula</TableHead>
@@ -448,7 +448,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
 
         {/* Modal de Edición */}
         <AlertDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <AlertDialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <AlertDialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <AlertDialogHeader>
               <AlertDialogTitle>Editar Registro</AlertDialogTitle>
               <AlertDialogDescription>Modifique los datos de la persona</AlertDialogDescription>

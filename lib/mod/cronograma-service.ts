@@ -5,17 +5,17 @@ export interface CronogramaEntry {
   id?: number
   user_id: string
   user_name: string
-  lugar: string
+  asignacion: string
   fecha: string
-  modulo: string // "protocolo", "administracion", "discipulado", etc.
+  modulo: string
+  ministerio?: string
+  evento?: string
+  hora_entrada?: string
+  hora_llegada?: string
+  atraso?: boolean | null
   created_at?: string
   updated_at?: string
 }
-
-export const LUGARES = [
-  "Salón / Auditorio / Acomodación",
-  "Puerta / Recibidor / Promesas",
-]
 
 export const cronogramaService = {
   async getAll(modulo: string): Promise<CronogramaEntry[]> {
@@ -76,8 +76,8 @@ export const cronogramaService = {
         ...audit,
         module: "cronograma-protocolo",
         action: "crear",
-        description: `Cronograma - ${entry.user_name} | ${entry.lugar} | ${entry.fecha}`,
-        details: { user_name: entry.user_name, lugar: entry.lugar, fecha: entry.fecha, modulo: entry.modulo },
+        description: `Cronograma - ${entry.user_name} | ${entry.asignacion} | ${entry.fecha}`,
+        details: { user_name: entry.user_name, asignacion: entry.asignacion, fecha: entry.fecha, modulo: entry.modulo },
       })
     }
 
@@ -95,7 +95,7 @@ export const cronogramaService = {
         body: JSON.stringify({
           user_id: entry.user_id,
           title: "Nuevo servicio asignado",
-          body: `Te asignaron servicio en ${entry.lugar} el ${fechaDisplay}`,
+          body: `Te asignaron: ${entry.asignacion} - ${fechaDisplay}`,
           url: "/dashboard/cronograma-protocolo",
         }),
       }).catch(() => {})
@@ -106,8 +106,16 @@ export const cronogramaService = {
     return data
   },
 
+  async updateField(id: number, fields: Partial<Pick<CronogramaEntry, "hora_entrada" | "hora_llegada" | "atraso">>): Promise<void> {
+    const { error } = await supabase
+      .from("cronograma_servicio")
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq("id", id)
+    if (error) throw error
+  },
+
   async delete(id: number, audit?: AuditInfo): Promise<void> {
-    const { data } = await supabase.from("cronograma_servicio").select("user_name, lugar, fecha").eq("id", id).single()
+    const { data } = await supabase.from("cronograma_servicio").select("user_name, asignacion, fecha").eq("id", id).single()
     const { error } = await supabase.from("cronograma_servicio").delete().eq("id", id)
     if (error) throw error
     if (audit) {
@@ -115,7 +123,7 @@ export const cronogramaService = {
         ...audit,
         module: "cronograma-protocolo",
         action: "eliminar",
-        description: `Cronograma - ${data?.user_name} | ${data?.lugar} | ${data?.fecha}`,
+        description: `Cronograma - ${data?.user_name} | ${data?.asignacion} | ${data?.fecha}`,
         details: { id, ...data },
       })
     }

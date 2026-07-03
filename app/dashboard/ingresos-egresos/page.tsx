@@ -603,7 +603,7 @@ function formatDateForTable(dateString: string) {
                     Configurar
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Configurar Opciones</DialogTitle>
                     <DialogDescription>

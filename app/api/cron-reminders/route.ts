@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
       const payload = JSON.stringify({
         title: "Recordatorio de servicio",
-        body: `Mañana tienes servicio en ${service.lugar} (${fechaDisplay})`,
+        body: `Mañana tienes servicio: ${service.asignacion} (${fechaDisplay})`,
         url: "/dashboard/cronograma-protocolo",
       })
 

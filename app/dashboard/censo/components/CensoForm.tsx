@@ -20,6 +20,7 @@ interface CensoFormProps {
   onCancel: () => void
   isSaving: boolean
   submitLabel: string
+  showNuevoCreyente?: boolean
 }
 
 export function CensoForm({
@@ -31,6 +32,7 @@ export function CensoForm({
   onCancel,
   isSaving,
   submitLabel,
+  showNuevoCreyente = false,
 }: CensoFormProps) {
   const [configuraciones, setConfiguraciones] = useState<ConfiguracionesGlobales | null>(null)
 
@@ -187,9 +189,26 @@ export function CensoForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Nuevo Creyente - solo para censo MDG */}
+      {showNuevoCreyente && (
+        <div className="bg-purple-50 dark:bg-purple-950/20 p-3 sm:p-5 rounded-xl border border-purple-200">
+          <h3 className="text-base font-semibold text-purple-800 bg-purple-100 dark:bg-purple-900 px-3 py-2 rounded-lg mb-4">
+            Estado del Creyente
+          </h3>
+          <div className="flex items-center space-x-2 py-1">
+            <Checkbox
+              id="nuevo_creyente"
+              checked={formData.nuevo_creyente || false}
+              onCheckedChange={(checked) => setFormField("nuevo_creyente", checked as boolean)}
+            />
+            <Label htmlFor="nuevo_creyente" className="cursor-pointer text-sm font-normal text-gray-700">¿Es nuevo creyente?</Label>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
         {/* DATOS PERSONALES */}
-        <div className="space-y-5 bg-green-50 dark:bg-green-950/20 p-5 rounded-xl border border-green-200">
+        <div className="space-y-4 sm:space-y-5 bg-green-50 dark:bg-green-950/20 p-3 sm:p-5 rounded-xl border border-green-200">
           <h3 className="text-base font-semibold text-green-800 bg-green-100 dark:bg-green-900 px-3 py-2 rounded-lg">
             Datos Personales
           </h3>
@@ -337,7 +356,7 @@ export function CensoForm({
         </div>
 
         {/* DATOS DE LA IGLESIA */}
-        <div className="space-y-5 bg-orange-50 dark:bg-orange-950/20 p-5 rounded-xl border border-orange-200">
+        <div className="space-y-4 sm:space-y-5 bg-orange-50 dark:bg-orange-950/20 p-3 sm:p-5 rounded-xl border border-orange-200">
           <h3 className="text-base font-semibold text-orange-800 bg-orange-100 dark:bg-orange-900 px-3 py-2 rounded-lg">
             Datos de la Iglesia
           </h3>
@@ -404,20 +423,29 @@ export function CensoForm({
             {formData.sirve_iglesia && (
               <div className="ml-6 mt-3 space-y-4 border-l-2 border-orange-300 pl-4 py-2">
                 <div className="space-y-1.5">
-                  <Label className="text-sm text-gray-700">Ministerio</Label>
-                  <Select
-                    value={formData.ministerio || ""}
-                    onValueChange={(value) => setFormField("ministerio", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar ministerio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {configuraciones?.ministerios?.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm text-gray-700">Ministerios</Label>
+                  <div className="space-y-2 mt-1">
+                    {configuraciones?.ministerios?.map((m) => {
+                      const selected = formData.ministerios_list || (formData.ministerio ? [formData.ministerio] : [])
+                      const isChecked = selected.includes(m)
+                      return (
+                        <div key={m} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`min-${m}`}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => {
+                              const current = formData.ministerios_list || (formData.ministerio ? [formData.ministerio] : [])
+                              const updated = checked
+                                ? [...current, m]
+                                : current.filter((x: string) => x !== m)
+                              onChangeFormData({ ...formData, ministerios_list: updated, ministerio: updated.join(", ") })
+                            }}
+                          />
+                          <Label htmlFor={`min-${m}`} className="cursor-pointer text-sm font-normal text-gray-700">{m}</Label>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm text-gray-700">Cargo en el ministerio</Label>
@@ -432,6 +460,8 @@ export function CensoForm({
                       {configuraciones?.cargos_ministerio?.map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
+                      <SelectItem value="Anciano">Anciano</SelectItem>
+                      <SelectItem value="Pastor/a Vitalicio">Pastor/a Vitalicio</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

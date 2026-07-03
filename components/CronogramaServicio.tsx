@@ -1,0 +1,426 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useRealtime } from "@/hooks/use-realtime"
+import { useAuth } from "@/contexts/auth-context"
+import { useSecurityCheck } from "@/contexts/security-context"
+import { cronogramaService, type CronogramaEntry } from "@/lib/mod/cronograma-service"
+import { censoService } from "@/lib/mod/censo-service"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
+import { ArrowLeft, Plus, Trash2, Search, X } from "lucide-react"
+
+interface CronogramaServicioProps {
+  canEdit: boolean
+  moduloKey: string
+  moduleName: string
+  title: string
+}
+
+export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: CronogramaServicioProps) {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { checkAndExecute } = useSecurityCheck()
+
+  const [entries, setEntries] = useState<CronogramaEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  // Form
+  const [showForm, setShowForm] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<{ id: string; username: string; displayName: string } | null>(null)
+  const [asignacion, setAsignacion] = useState("")
+  const [evento, setEvento] = useState("")
+  const [fecha, setFecha] = useState("")
+  const [horaEntrada, setHoraEntrada] = useState("")
+  const [ministerio, setMinisterio] = useState("")
+  const [ministerios, setMinisterios] = useState<string[]>([])
+
+  // User search
+  const [userQuery, setUserQuery] = useState("")
+  const [userResults, setUserResults] = useState<{ id: string; username: string; displayName: string }[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showResults, setShowResults] = useState(false)
+
+  // Delete
+  const [pendingDelete, setPendingDelete] = useState<CronogramaEntry | null>(null)
+
+  useEffect(() => {
+    loadEntries()
+    loadMinisterios()
+  }, [])
+
+  useRealtime({ table: "cronograma_servicio", onChange: () => loadEntries(true) })
+
+  const loadEntries = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      const data = await cronogramaService.getAll(moduloKey)
+      setEntries(data)
+    } catch (error) {
+      console.error("Error loading cronograma:", error)
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
+  const loadMinisterios = async () => {
+    try {
+      const config = await censoService.getConfiguraciones()
+      if (config?.ministerios) setMinisterios(config.ministerios)
+    } catch (error) {
+      console.error("Error loading ministerios:", error)
+    }
+  }
+
+  const handleSearchUsers = async (query: string) => {
+    setUserQuery(query)
+    if (query.trim().length < 2) {
+      setUserResults([])
+      setShowResults(false)
+      return
+    }
+    setSearching(true)
+    try {
+      const results = await cronogramaService.searchUsersWithModuleAccess(query, moduleName)
+      setUserResults(results)
+      setShowResults(true)
+    } catch (error) {
+      console.error("Error searching users:", error)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleSelectUser = (u: { id: string; username: string; displayName: string }) => {
+    setSelectedUser(u)
+    setUserQuery(u.displayName)
+    setShowResults(false)
+  }
+
+  const handleSave = async () => {
+    if (!selectedUser || !asignacion || !fecha || !ministerio) return
+    setSaving(true)
+    try {
+      await cronogramaService.create(
+        {
+          user_id: selectedUser.id,
+          user_name: selectedUser.displayName,
+          asignacion,
+          fecha,
+          modulo: moduloKey,
+          ministerio,
+          evento: evento || undefined,
+          hora_entrada: horaEntrada || undefined,
+        },
+        { user_id: user!.id, user_name: user!.username }
+      )
+      setSelectedUser(null)
+      setUserQuery("")
+      setAsignacion("")
+      setEvento("")
+      setFecha("")
+      setHoraEntrada("")
+      setMinisterio("")
+      setShowForm(false)
+      loadEntries()
+    } catch (error) {
+      console.error("Error saving:", error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = (entry: CronogramaEntry) => {
+    checkAndExecute(entry.created_at || new Date().toISOString(), () => {
+      setPendingDelete(entry)
+    })
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete?.id) return
+    try {
+      await cronogramaService.delete(pendingDelete.id, { user_id: user!.id, user_name: user!.username })
+      setPendingDelete(null)
+      loadEntries()
+    } catch (error) {
+      console.error("Error deleting:", error)
+    }
+  }
+
+  const handleInlineUpdate = async (entryId: number, field: "hora_llegada" | "atraso", value: any) => {
+    try {
+      await cronogramaService.updateField(entryId, { [field]: value })
+      setEntries((prev) =>
+        prev.map((e) => (e.id === entryId ? { ...e, [field]: value } : e))
+      )
+    } catch (error) {
+      console.error("Error updating field:", error)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr + "T12:00:00")
+    const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+    const day = String(date.getDate()).padStart(2, "0")
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    return `${days[date.getDay()]} ${day}/${month}`
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando cronograma...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-3 sm:h-16">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="flex items-center space-x-2">
+                <ArrowLeft className="w-4 h-4" /><span>Volver</span>
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Cronograma de Servicio</h1>
+                <p className="text-sm text-gray-600">{title}</p>
+              </div>
+            </div>
+            {canEdit && (
+              <Button size="sm" onClick={() => setShowForm(!showForm)} className="flex items-center space-x-2">
+                <Plus className="w-4 h-4" /><span>Asignar</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {showForm && canEdit && (
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardHeader>
+              <CardTitle className="text-lg">Asignar Nuevo Servicio</CardTitle>
+              <CardDescription>Seleccione la persona, asignación y fecha</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Ministerio</Label>
+                  <Select value={ministerio} onValueChange={setMinisterio}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar ministerio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ministerios.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5 relative">
+                  <Label>Persona</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      value={userQuery}
+                      onChange={(e) => handleSearchUsers(e.target.value)}
+                      placeholder="Buscar por nombre..."
+                      className="pl-9"
+                    />
+                    {selectedUser && (
+                      <button
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                        onClick={() => { setSelectedUser(null); setUserQuery(""); setUserResults([]) }}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {showResults && userResults.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {userResults.map((u) => (
+                        <button
+                          key={u.id}
+                          className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm border-b last:border-0"
+                          onClick={() => handleSelectUser(u)}
+                        >
+                          <span className="font-medium">{u.displayName}</span>
+                          <span className="text-gray-400 ml-2">@{u.username}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {showResults && userResults.length === 0 && userQuery.length >= 2 && !searching && (
+                    <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
+                      No se encontraron usuarios
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Asignación</Label>
+                  <Input
+                    value={asignacion}
+                    onChange={(e) => setAsignacion(e.target.value)}
+                    placeholder="Ej: Salón / Auditorio / Puerta..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Hora de Entrada</Label>
+                    <Input type="time" value={horaEntrada} onChange={(e) => setHoraEntrada(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Fecha</Label>
+                    <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Evento <span className="text-gray-400 font-normal">(opcional)</span></Label>
+                  <Input
+                    value={evento}
+                    onChange={(e) => setEvento(e.target.value)}
+                    placeholder="Ej: Culto dominical, Conferencia..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+                <Button onClick={handleSave} disabled={saving || !selectedUser || !asignacion || !fecha || !ministerio}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Servicios Asignados</CardTitle>
+            <CardDescription>{entries.length} servicio{entries.length !== 1 ? "s" : ""} registrado{entries.length !== 1 ? "s" : ""}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {entries.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p>No hay servicios asignados aún.</p>
+                {canEdit && <p className="text-sm mt-1">Usa el botón "Asignar" para agregar.</p>}
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table className="min-w-[800px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ministerio</TableHead>
+                      <TableHead>Persona</TableHead>
+                      <TableHead>Asignación</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>H. Entrada</TableHead>
+                      <TableHead>H. Llegada</TableHead>
+                      <TableHead>Atraso</TableHead>
+                      <TableHead>Evento</TableHead>
+                      {canEdit && <TableHead className="text-right">Acciones</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.map((entry) => {
+                      const isPast = new Date(entry.fecha + "T23:59:59") < new Date()
+                      return (
+                        <TableRow key={entry.id} className={isPast ? "opacity-50" : ""}>
+                          <TableCell className="text-xs text-gray-500">{entry.ministerio || "-"}</TableCell>
+                          <TableCell className="font-medium">{entry.user_name}</TableCell>
+                          <TableCell>{entry.asignacion}</TableCell>
+                          <TableCell className="text-xs">{formatDate(entry.fecha)}</TableCell>
+                          <TableCell className="text-xs">{entry.hora_entrada || "-"}</TableCell>
+                          <TableCell>
+                            {canEdit ? (
+                              <Input
+                                type="time"
+                                className="h-7 w-24 text-xs"
+                                value={entry.hora_llegada || ""}
+                                onChange={(e) => handleInlineUpdate(entry.id!, "hora_llegada", e.target.value || null)}
+                              />
+                            ) : (
+                              <span className="text-xs">{entry.hora_llegada || "-"}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {canEdit ? (
+                              <select
+                                className="h-7 text-xs border rounded px-1 bg-white"
+                                value={entry.atraso === true ? "si" : entry.atraso === false ? "no" : ""}
+                                onChange={(e) => {
+                                  const val = e.target.value === "si" ? true : e.target.value === "no" ? false : null
+                                  handleInlineUpdate(entry.id!, "atraso", val)
+                                }}
+                              >
+                                <option value="">-</option>
+                                <option value="si">Sí</option>
+                                <option value="no">No</option>
+                              </select>
+                            ) : (
+                              <span className="text-xs">{entry.atraso === true ? "Sí" : entry.atraso === false ? "No" : "-"}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-gray-500">{entry.evento || "-"}</TableCell>
+                          {canEdit && (
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(entry)}>
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la asignación de {pendingDelete?.user_name} ({pendingDelete?.asignacion}) del {pendingDelete?.fecha ? formatDate(pendingDelete.fecha) : ""}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={confirmDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

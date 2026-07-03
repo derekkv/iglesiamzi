@@ -59,12 +59,15 @@ export interface CensoRecord {
   // Servicio
   sirve_iglesia?: boolean
   ministerio?: string
+  ministerios_list?: string[]
   cargo_ministerio?: string
   // Seminarios
   seminarios?: string[]
   // Proyecto Mario
   proyecto_mario?: boolean
   proyecto_mario_detalle?: string
+  // Nuevo creyente (usado en censo MDG)
+  nuevo_creyente?: boolean
   // Timestamps
   created_at?: string
   updated_at?: string

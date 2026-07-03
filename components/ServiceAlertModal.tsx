@@ -107,7 +107,7 @@ export function ServiceAlertModal() {
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-700">{service.lugar}</span>
+                      <span className="text-sm text-gray-700">{service.asignacion}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-gray-500" />

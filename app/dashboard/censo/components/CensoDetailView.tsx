@@ -67,13 +67,20 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-1rem)] sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalles del Registro de Censo</DialogTitle>
           <DialogDescription>Información completa registrada para la persona</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          {/* NUEVO CREYENTE - mostrar si el campo existe */}
+          {record.nuevo_creyente !== undefined && (
+            <div className="col-span-1 md:col-span-2 bg-purple-50/50 dark:bg-purple-950/10 p-4 rounded-lg border border-purple-100 dark:border-purple-900/50">
+              <p className="text-sm"><strong>Nuevo Creyente:</strong> {record.nuevo_creyente ? <span className="text-green-600 font-semibold">Sí</span> : <span className="text-gray-500">No</span>}</p>
+            </div>
+          )}
+
           {/* DATOS PERSONALES */}
           <div className="space-y-3 bg-green-50/50 dark:bg-green-950/10 p-4 rounded-lg border border-green-100 dark:border-green-900/50">
             <h3 className="text-md font-bold text-green-800 dark:text-green-300 border-b border-green-200 dark:border-green-800 pb-2">
@@ -176,7 +183,7 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
                 <p><strong>¿Sirve a la iglesia?:</strong> {record.sirve_iglesia ? "Sí" : "No"}</p>
                 {record.sirve_iglesia && (
                   <div className="ml-4 mt-1">
-                    <p><strong>Ministerio:</strong> {record.ministerio || "-"}</p>
+                    <p><strong>Ministerio(s):</strong> {record.ministerios_list && record.ministerios_list.length > 0 ? record.ministerios_list.join(", ") : record.ministerio || "-"}</p>
                     <p><strong>Cargo:</strong> {record.cargo_ministerio || "-"}</p>
                   </div>
                 )}

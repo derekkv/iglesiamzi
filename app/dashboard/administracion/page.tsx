@@ -40,6 +40,7 @@ import { Pencil, Trash2, RefreshCw, Copy, Check, ArrowLeft } from "lucide-react"
 import { getSecurityKeys, regenerateAllKeys} from "@/lib/security-keys"
 import { AuditLogTab } from "./AuditLogTab"
 import { auditService } from "@/lib/mod/audit-service"
+import { AdminRequerimientos } from "@/components/AdminRequerimientos"
 
 interface User {
   id: string
@@ -416,6 +417,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
           <Tabs defaultValue="users" className="space-y-6">
             <TabsList>
               <TabsTrigger value="users">Usuarios y Ministerios</TabsTrigger>
+              {canAdmin && <TabsTrigger value="requerimientos">Requerimientos</TabsTrigger>}
               {canAdmin && <TabsTrigger value="keys">Clave</TabsTrigger>}
               {canAdmin && <TabsTrigger value="audit">Logs</TabsTrigger>}
             </TabsList>
@@ -702,6 +704,10 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="requerimientos">
+              <AdminRequerimientos />
             </TabsContent>
 
             <TabsContent value="audit">

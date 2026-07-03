@@ -365,7 +365,7 @@ function InventarioContent({ canEdit }: { canEdit: boolean }) {
               <DialogTrigger asChild>
                 <Button variant="outline">⚙️ Configuración</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Configuración de Inventario</DialogTitle>
                   <DialogDescription>Gestione los ministerios, ubicaciones y estados disponibles</DialogDescription>

@@ -3,15 +3,15 @@
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { CronogramaServicio } from "@/components/CronogramaServicio"
 
-export default function CronogramaProtocoloPage() {
+export default function CronogramaMDGPage() {
   return (
-    <PermissionsGuard moduleName="cronograma-protocolo">
+    <PermissionsGuard moduleName="cronograma-mdg">
       {(canEdit) => (
         <CronogramaServicio
           canEdit={canEdit}
-          moduloKey="protocolo"
-          moduleName="cronograma-protocolo"
-          title="Protocolo"
+          moduloKey="mdg"
+          moduleName="cronograma-mdg"
+          title="Mujeres de Gracia"
         />
       )}
     </PermissionsGuard>

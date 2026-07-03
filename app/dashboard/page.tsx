@@ -13,6 +13,7 @@ import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateMonthModal } from "@/components/CreateMonthModal"
 import { ChangePasswordModal } from "@/components/ChangePasswordModal"
+import { BuzonNotificaciones } from "@/components/BuzonNotificaciones"
 
 
 interface ModulePermission {
@@ -227,22 +228,23 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="w-15 h-15 rounded-lg flex items-center justify-center">
-                <img src="/logo.png" alt="Logo" className="w-15 h-15" />
+          <div className="flex justify-between items-center py-3 sm:h-16">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shrink-0">
+                <img src="/logo.png" alt="Logo" className="w-10 h-10 sm:w-12 sm:h-12" />
               </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">Regalo de Dios - Panel de control</h1>
-                <p className="text-sm text-gray-600">Bienvenido, {user.displayName}</p>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-xl font-semibold text-gray-900 truncate">Regalo de Dios</h1>
+                <p className="text-xs sm:text-sm text-gray-600 truncate">Hola, {user.displayName}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="text-blue-600 border-blue-200">
+            <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
+              <BuzonNotificaciones />
+              <Badge variant="outline" className="text-blue-600 border-blue-200 text-xs hidden sm:inline-flex">
                 {currentMonth?.name || "Sin mes activo"}
               </Badge>
-              <Button variant="outline" onClick={handleLogout}>
-                Cerrar Sesión
+              <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs sm:text-sm">
+                Salir
               </Button>
               <ChangePasswordModal userId={user.id}>
               </ChangePasswordModal>
@@ -253,7 +255,7 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header con título y toggle de vista */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
           <div>
             {selectedGroup ? (
               <div className="flex items-center space-x-3">
@@ -273,8 +275,8 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Módulos del Sistema</h2>
-                <p className="text-gray-600">Seleccione el módulo con el que desea trabajar</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Módulos del Sistema</h2>
+                <p className="text-sm sm:text-base text-gray-600">Seleccione el módulo</p>
               </div>
             )}
           </div>
@@ -361,10 +363,26 @@ export default function DashboardPage() {
                 </Card>
               )
             })}
+            {/* Tarjeta de Requerimientos de Bienes y Servicios (excepto grupo administración) */}
+            {selectedGroup.name !== "administracion" && (
+              <Card
+                className="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-pointer border-purple-200 bg-purple-50/30"
+                onClick={() => router.push(`/dashboard/requerimientos/${selectedGroup.name}`)}
+              >
+                <CardHeader className="text-center">
+                  <div className="text-4xl mb-2">📋</div>
+                  <CardTitle className="text-lg">Requerimientos</CardTitle>
+                  <CardDescription>Bienes y Servicios</CardDescription>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <Badge className="bg-purple-100 text-purple-800 border-purple-200">Disponible</Badge>
+                </CardContent>
+              </Card>
+            )}
           </div>
         ) : viewMode === "cards" ? (
           /* ======= VISTA DE TARJETAS DE GRUPO (DEFAULT) ======= */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {sortedGroups.map((group) => (
               <Card
                 key={group.id}
