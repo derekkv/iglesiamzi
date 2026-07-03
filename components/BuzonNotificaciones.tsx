@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Bell, Check, CheckCheck, X, FileText, ThumbsUp, ThumbsDown, Pause, Info } from "lucide-react"
+import { Bell, CheckCheck, FileText, ThumbsUp, ThumbsDown, Pause, Info } from "lucide-react"
 import { useNotificaciones, type BuzonMensaje } from "@/hooks/use-notificaciones"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -56,7 +56,7 @@ function formatTimeAgo(dateStr: string): string {
 
 export function BuzonNotificaciones() {
   const { user } = useAuth()
-  const { mensajes, noLeidos, loading, showAlert, dismissAlert, marcarLeido, marcarTodosLeidos } = useNotificaciones()
+  const { mensajes, noLeidos, loading, marcarLeido, marcarTodosLeidos } = useNotificaciones()
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -73,31 +73,10 @@ export function BuzonNotificaciones() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [isOpen])
 
-  // Auto-dismiss alert después de 5s
-  useEffect(() => {
-    if (showAlert) {
-      const timer = setTimeout(dismissAlert, 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [showAlert, dismissAlert])
-
   if (!user) return null
 
   return (
     <div className="relative" ref={panelRef}>
-      {/* Alerta flotante de nuevo mensaje */}
-      {showAlert && (
-        <div className="absolute -top-12 right-0 z-[60] animate-in slide-in-from-top-2 fade-in duration-300">
-          <div className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
-            <Bell className="h-3 w-3" />
-            <span>Nuevo mensaje</span>
-            <button onClick={dismissAlert} className="ml-1 hover:opacity-70">
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Botón campana */}
       <button
         onClick={() => setIsOpen(!isOpen)}

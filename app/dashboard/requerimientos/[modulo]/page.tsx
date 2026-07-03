@@ -5,33 +5,12 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { RequerimientosBienesServicios } from "@/components/RequerimientosBienesServicios"
-import { useAuth } from "@/contexts/auth-context"
 
-// Mapa de módulo-slug a moduleName para permisos (módulos individuales)
-const MODULO_MAP: Record<string, { permiso: string; titulo: string }> = {
-  "asistencia": { permiso: "asistencia", titulo: "Asistencia" },
-  "bautizo": { permiso: "bautizo", titulo: "Bautizo" },
-  "censo": { permiso: "censo", titulo: "Censo" },
-  "censo-mdg": { permiso: "censo-mdg", titulo: "Censo MDG" },
-  "control-mensual": { permiso: "control_mensual", titulo: "Control Mensual" },
-  "cronograma-administracion": { permiso: "cronograma-administracion", titulo: "Cronograma Administración" },
-  "cronograma-discipulado": { permiso: "cronograma-discipulado", titulo: "Cronograma Discipulado" },
-  "cronograma-mdg": { permiso: "cronograma-mdg", titulo: "Cronograma MDG" },
-  "cronograma-protocolo": { permiso: "cronograma-protocolo", titulo: "Cronograma Protocolo" },
-  "diezmos": { permiso: "diezmos", titulo: "Diezmos" },
-  "discipulado": { permiso: "discipulado", titulo: "Discipulado" },
-  "flujo-pago": { permiso: "flujo_pago", titulo: "Flujo de Pago" },
-  "ingresos-egresos": { permiso: "ingresos_egresos", titulo: "Ingresos y Egresos" },
-  "inventario": { permiso: "inventario", titulo: "Inventario" },
-  "matrimonio": { permiso: "matrimonio", titulo: "Matrimonio" },
-  "pastoral": { permiso: "pastoral", titulo: "Pastoral" },
-}
-
-// Mapa de grupos - cada grupo usa un permiso de un módulo representativo del grupo
-const GRUPO_MAP: Record<string, { titulo: string; permiso: string }> = {
-  "protocolo": { titulo: "Protocolo", permiso: "cronograma-protocolo" },
-  "discipulado": { titulo: "Discipulado", permiso: "discipulado" },
-  "mdg": { titulo: "Mujeres de Gracia", permiso: "cronograma-mdg" },
+// Mapa de slug a nombre de módulo en system_modules para permisos
+const MODULO_CONFIG: Record<string, { permiso: string; titulo: string }> = {
+  "protocolo": { permiso: "requerimientos-protocolo", titulo: "Requerimientos de Bienes y Servicios - Protocolo" },
+  "discipulado": { permiso: "requerimientos-discipulado", titulo: "Requerimientos de Bienes y Servicios - Discipulado" },
+  "mdg": { permiso: "requerimientos-mdg", titulo: "Requerimientos de Bienes y Servicios - Mujeres de Gracia" },
 }
 
 function RequerimientosContent({ modulo, titulo, canEdit }: { modulo: string; titulo: string; canEdit: boolean }) {
@@ -45,7 +24,7 @@ function RequerimientosContent({ modulo, titulo, canEdit }: { modulo: string; ti
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.back()}
+              onClick={() => router.push("/dashboard")}
               className="flex items-center gap-1"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -74,13 +53,9 @@ export default function RequerimientosModuloPage() {
   const params = useParams()
   const modulo = params.modulo as string
 
-  // Verificar si es un grupo o un módulo individual
-  const grupoInfo = GRUPO_MAP[modulo]
-  const moduloInfo = MODULO_MAP[modulo]
+  const config = MODULO_CONFIG[modulo]
 
-  const info = grupoInfo || moduloInfo
-
-  if (!info) {
+  if (!config) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-500">Módulo no encontrado</p>
@@ -89,8 +64,8 @@ export default function RequerimientosModuloPage() {
   }
 
   return (
-    <PermissionsGuard moduleName={info.permiso}>
-      {(canEdit) => <RequerimientosContent modulo={modulo} titulo={info.titulo} canEdit={canEdit} />}
+    <PermissionsGuard moduleName={config.permiso}>
+      {(canEdit) => <RequerimientosContent modulo={modulo} titulo={config.titulo} canEdit={canEdit} />}
     </PermissionsGuard>
   )
 }

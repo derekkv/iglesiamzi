@@ -13,6 +13,7 @@ import { SecurityKeyDialog } from "@/components/SecurityKeyDialog";
 import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
 import { ServiceAlertModal } from "@/components/ServiceAlertModal";
 import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
+import { NotificacionModal } from "@/components/NotificacionModal";
 
 export const metadata: Metadata = {
   title: "Regalo de Dios",
@@ -37,6 +38,7 @@ export default function RootLayout({
               <SecurityKeyDialog />
               <ServiceAlertModal />
               <PushNotificationPrompt />
+              <NotificacionModal />
         </SecurityCheckProvider>
           </AuthProvider>
           <Toaster />

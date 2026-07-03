@@ -363,22 +363,7 @@ export default function DashboardPage() {
                 </Card>
               )
             })}
-            {/* Tarjeta de Requerimientos de Bienes y Servicios (excepto grupo administración) */}
-            {selectedGroup.name !== "administracion" && (
-              <Card
-                className="transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-pointer border-purple-200 bg-purple-50/30"
-                onClick={() => router.push(`/dashboard/requerimientos/${selectedGroup.name}`)}
-              >
-                <CardHeader className="text-center">
-                  <div className="text-4xl mb-2">📋</div>
-                  <CardTitle className="text-lg">Requerimientos</CardTitle>
-                  <CardDescription>Bienes y Servicios</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <Badge className="bg-purple-100 text-purple-800 border-purple-200">Disponible</Badge>
-                </CardContent>
-              </Card>
-            )}
+
           </div>
         ) : viewMode === "cards" ? (
           /* ======= VISTA DE TARJETAS DE GRUPO (DEFAULT) ======= */
