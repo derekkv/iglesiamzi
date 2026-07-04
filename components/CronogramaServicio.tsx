@@ -26,15 +26,17 @@ import {
 } from "@/components/ui/alert-dialog"
 
 import { ArrowLeft, Plus, Trash2, Search, X } from "lucide-react"
+import { toast } from "sonner"
 
 interface CronogramaServicioProps {
   canEdit: boolean
   moduloKey: string
   moduleName: string
   title: string
+  isAdmin?: boolean // Si es true, muestra controles de hora llegada y atraso
 }
 
-export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: CronogramaServicioProps) {
+export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAdmin = false }: CronogramaServicioProps) {
   const router = useRouter()
   const { user } = useAuth()
   const { checkAndExecute } = useSecurityCheck()
@@ -62,6 +64,9 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
   // Delete
   const [pendingDelete, setPendingDelete] = useState<CronogramaEntry | null>(null)
 
+  // Modal de conflicto
+  const [conflictMessage, setConflictMessage] = useState("")
+
   useEffect(() => {
     loadEntries()
     loadMinisterios()
@@ -73,7 +78,12 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
     try {
       if (!silent) setLoading(true)
       const data = await cronogramaService.getAll(moduloKey)
-      setEntries(data)
+      // Si no tiene canEdit, solo mostrar sus propios registros
+      if (!canEdit && user) {
+        setEntries(data.filter((e) => e.user_id === user.id))
+      } else {
+        setEntries(data)
+      }
     } catch (error) {
       console.error("Error loading cronograma:", error)
     } finally {
@@ -141,8 +151,8 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
       setMinisterio("")
       setShowForm(false)
       loadEntries()
-    } catch (error) {
-      console.error("Error saving:", error)
+    } catch (error: any) {
+      setConflictMessage(error.message || "Error al guardar")
     } finally {
       setSaving(false)
     }
@@ -342,8 +352,9 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
                       <TableHead>Asignación</TableHead>
                       <TableHead>Fecha</TableHead>
                       <TableHead>H. Entrada</TableHead>
-                      <TableHead>H. Llegada</TableHead>
-                      <TableHead>Atraso</TableHead>
+                      {isAdmin && <TableHead>H. Llegada</TableHead>}
+                      {isAdmin && <TableHead>Atraso</TableHead>}
+                      {!isAdmin && <TableHead className="text-center">Puntualidad</TableHead>}
                       <TableHead>Evento</TableHead>
                       {canEdit && <TableHead className="text-right">Acciones</TableHead>}
                     </TableRow>
@@ -358,20 +369,18 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
                           <TableCell>{entry.asignacion}</TableCell>
                           <TableCell className="text-xs">{formatDate(entry.fecha)}</TableCell>
                           <TableCell className="text-xs">{entry.hora_entrada || "-"}</TableCell>
-                          <TableCell>
-                            {canEdit ? (
+                          {isAdmin && (
+                            <TableCell>
                               <Input
                                 type="time"
                                 className="h-7 w-24 text-xs"
                                 value={entry.hora_llegada || ""}
                                 onChange={(e) => handleInlineUpdate(entry.id!, "hora_llegada", e.target.value || null)}
                               />
-                            ) : (
-                              <span className="text-xs">{entry.hora_llegada || "-"}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {canEdit ? (
+                            </TableCell>
+                          )}
+                          {isAdmin && (
+                            <TableCell>
                               <select
                                 className="h-7 text-xs border rounded px-1 bg-white"
                                 value={entry.atraso === true ? "si" : entry.atraso === false ? "no" : ""}
@@ -384,10 +393,19 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
                                 <option value="si">Sí</option>
                                 <option value="no">No</option>
                               </select>
-                            ) : (
-                              <span className="text-xs">{entry.atraso === true ? "Sí" : entry.atraso === false ? "No" : "-"}</span>
-                            )}
-                          </TableCell>
+                            </TableCell>
+                          )}
+                          {!isAdmin && (
+                            <TableCell className="text-center">
+                              {entry.atraso === false ? (
+                                <span className="inline-block w-4 h-4 rounded-full bg-green-500" title="Puntual" />
+                              ) : entry.atraso === true ? (
+                                <span className="inline-block w-4 h-4 rounded-full bg-red-500" title="Llegó tarde" />
+                              ) : (
+                                <span className="text-gray-300 text-xs">-</span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-xs text-gray-500">{entry.evento || "-"}</TableCell>
                           {canEdit && (
                             <TableCell className="text-right">
@@ -418,6 +436,28 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title }: Cr
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={confirmDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de conflicto de horario */}
+      <AlertDialog open={!!conflictMessage} onOpenChange={(open) => { if (!open) setConflictMessage("") }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                <X className="w-8 h-8 text-red-600" />
+              </div>
+              <AlertDialogTitle className="text-xl">No se puede asignar</AlertDialogTitle>
+              <AlertDialogDescription className="text-base text-gray-700">
+                {conflictMessage}
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="px-8" onClick={() => setConflictMessage("")}>
+              Entendido
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

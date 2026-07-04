@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
-import { login } from "@/lib/auth"
 import { useAuth } from "@/contexts/auth-context"
 
 
@@ -31,16 +30,33 @@ export default function LoginPage() {
       return
     }
 
-    const result = await login({ username, password })
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: username, password }),
+      })
 
-    if (result.success && result.user) {
-      setAuthUser(result.user)
-      router.push("/dashboard")
-    } else {
-      setError(result.error || "Error al iniciar sesión")
+      const data = await res.json()
+
+      if (res.ok && data.token && data.user) {
+        setAuthUser(data.user, data.token)
+        router.push("/dashboard")
+      } else if (res.status === 429) {
+        setError(data.error || "Demasiados intentos. Intente más tarde.")
+      } else {
+        const remaining = data.remainingAttempts
+        let msg = data.error || "Error al iniciar sesión"
+        if (remaining !== undefined && remaining <= 2) {
+          msg += ` (${remaining} intento${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""})`
+        }
+        setError(msg)
+      }
+    } catch (err) {
+      setError("Error de conexión. Intente de nuevo.")
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   return (

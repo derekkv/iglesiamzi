@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js"
 
 const VAPID_PUBLIC_KEY = "BKHW7uYkfEBfrPirumVyRqNj_eiWBLpEQuV1Q6NsGImX7wJYA4oB1q_w5iGCZ7xcoO3Jgs41VczB3a7Y2FeIoYY"
 const VAPID_PRIVATE_KEY = "kG6aW66CSKCC76Tgt-ACRBYSWVxHtgIHFK5Q3_QJO14"
-const SUPABASE_URL = "https://backiglesia.mzipet.com"
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgyOTU5NTM1LCJleHAiOjE5NDA2Mzk1MzV9.s_Np7AI-RtfyXZm279OO7mByV-CnNzWoNI8qcX8E0v8"
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://backiglesia.mzipet.com"
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgyOTU5NTM1LCJleHAiOjE5NDA2Mzk1MzV9.s_Np7AI-RtfyXZm279OO7mByV-CnNzWoNI8qcX8E0v8"
 
 // Clave secreta para proteger el endpoint (configura en tu VPS como env var)
 const CRON_SECRET = process.env.CRON_SECRET || "iglesia-cron-secret-2024"

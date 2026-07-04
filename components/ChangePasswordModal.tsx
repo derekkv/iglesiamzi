@@ -89,12 +89,13 @@ export function ChangePasswordModal({ userId }: { userId: string }) {
 
       // Actualizar el contexto de auth con el nuevo displayName
       if (user) {
+        const existingToken = localStorage.getItem("authToken") || ""
         setAuthUser({
           ...user,
           displayName: displayName.trim(),
           email: email.trim() || undefined,
           cedula: cedula.trim() || undefined,
-        })
+        }, existingToken)
       }
 
       toast.success("Datos actualizados correctamente")

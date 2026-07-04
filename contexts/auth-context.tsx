@@ -15,7 +15,7 @@ export interface AuthUser {
 
 interface AuthContextType {
   user: AuthUser | null
-  login: (user: AuthUser) => void
+  login: (user: AuthUser, token: string) => void
   logout: () => void
   isLoading: boolean
 }
@@ -28,27 +28,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Cargar usuario desde localStorage al iniciar
-    const storedUser = localStorage.getItem("authUser")
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch (error) {
-        console.error("Error parsing stored user:", error)
-        localStorage.removeItem("authUser")
-      }
-    }
-    setIsLoading(false)
+    validateSession()
   }, [])
 
-  const login = (userData: AuthUser) => {
+  async function validateSession() {
+    const token = localStorage.getItem("authToken")
+
+    if (!token) {
+      // Migración: si hay datos viejos sin token, limpiar
+      localStorage.removeItem("authUser")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const res = await fetch("/api/verify-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data.valid && data.user) {
+          setUser(data.user)
+        } else {
+          // Token inválido o expirado
+          clearSession()
+        }
+      } else {
+        clearSession()
+      }
+    } catch (error) {
+      console.error("Error validando sesión:", error)
+      // En caso de error de red, intentar usar datos locales como fallback temporal
+      const storedUser = localStorage.getItem("authUser")
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch {
+          clearSession()
+        }
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function clearSession() {
+    localStorage.removeItem("authToken")
+    localStorage.removeItem("authUser")
+    setUser(null)
+  }
+
+  const login = (userData: AuthUser, token: string) => {
     setUser(userData)
+    localStorage.setItem("authToken", token)
     localStorage.setItem("authUser", JSON.stringify(userData))
   }
 
   const logout = () => {
-    setUser(null)
-    localStorage.removeItem("authUser")
+    clearSession()
     router.push("/")
   }
 

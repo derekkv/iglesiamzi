@@ -64,6 +64,20 @@ export const cronogramaService = {
   },
 
   async create(entry: Omit<CronogramaEntry, "id" | "created_at" | "updated_at">, audit?: AuditInfo): Promise<CronogramaEntry> {
+    // Validar que la persona no esté asignada el mismo día en ningún módulo
+    const { data: existing, error: checkError } = await supabase
+      .from("cronograma_servicio")
+      .select("id, modulo")
+      .eq("user_id", entry.user_id)
+      .eq("fecha", entry.fecha)
+      .limit(1)
+
+    if (checkError) throw checkError
+
+    if (existing && existing.length > 0) {
+      throw new Error(`${entry.user_name} ya está asignado/a el ${entry.fecha} en el módulo "${existing[0].modulo}"`)
+    }
+
     const { data, error } = await supabase
       .from("cronograma_servicio")
       .insert([{ ...entry, updated_at: new Date().toISOString() }])

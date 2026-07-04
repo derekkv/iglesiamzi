@@ -190,13 +190,13 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
   })
 
   const resetForm = () => {
-    setFormData({ ministerio: "", requerimiento: "", valor: "", evento_lugar: "", fecha_entrega: "" })
+    setFormData({ ministerio: "Administración", requerimiento: "", valor: "", evento_lugar: "", fecha_entrega: "" })
   }
 
   const handleCreate = async () => {
     if (!user) return
-    if (!formData.ministerio || !formData.requerimiento || !formData.evento_lugar) {
-      toast.error("Complete los campos obligatorios: Ministerio, Requerimiento y Evento/Lugar")
+    if (!formData.requerimiento || !formData.evento_lugar) {
+      toast.error("Complete los campos obligatorios: Requerimiento y Evento/Lugar")
       return
     }
     if (formData.requerimiento.length > 250) {
@@ -208,9 +208,9 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
     try {
       const newReq = {
         modulo,
-        ministerio: formData.ministerio,
+        ministerio: "Administración",
         persona_id: user.id,
-        persona_nombre: user.displayName,
+        persona_nombre: `${user.displayName} - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`,
         requerimiento: formData.requerimiento,
         valor: formData.valor ? parseFloat(formData.valor) : null,
         evento_lugar: formData.evento_lugar,
@@ -278,7 +278,7 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
 
   const handleEdit = async () => {
     if (!user || !selectedReq) return
-    if (!editData.ministerio || !editData.requerimiento || !editData.evento_lugar) {
+    if (!editData.requerimiento || !editData.evento_lugar) {
       toast.error("Complete los campos obligatorios")
       return
     }
@@ -292,7 +292,7 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
       const { error } = await supabase
         .from("requerimientos_bienes_servicios")
         .update({
-          ministerio: editData.ministerio,
+          ministerio: "Administración",
           requerimiento: editData.requerimiento,
           valor: editData.valor ? parseFloat(editData.valor) : null,
           evento_lugar: editData.evento_lugar,
@@ -602,24 +602,12 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm">Ministerio *</Label>
-                <Select
-                  value={formData.ministerio}
-                  onValueChange={(v) => setFormData({ ...formData, ministerio: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {config?.ministerios.map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-sm">Ministerio</Label>
+                <Input value="Administración" disabled className="bg-gray-50" />
               </div>
               <div>
-                <Label className="text-sm">Persona</Label>
-                <Input value={user?.displayName || ""} disabled className="bg-gray-50" />
+                <Label className="text-sm">Solicitante</Label>
+                <Input value={`${user?.displayName || ""} - ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}`} disabled className="bg-gray-50" />
               </div>
             </div>
 
@@ -690,20 +678,8 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm">Ministerio *</Label>
-                <Select
-                  value={editData.ministerio}
-                  onValueChange={(v) => setEditData({ ...editData, ministerio: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {config?.ministerios.map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-sm">Ministerio</Label>
+                <Input value="Administración" disabled className="bg-gray-50" />
               </div>
               <div>
                 <Label className="text-sm">Fecha de Entrega</Label>
