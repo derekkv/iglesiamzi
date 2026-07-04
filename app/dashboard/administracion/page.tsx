@@ -29,6 +29,8 @@ import {
   getUserPermissions,
   setUserPermission,
   setGroupPermissions,
+  getUserGroupLeaders,
+  setGroupLeader,
   updateUser,
   deleteUser,
 } from "@/lib/admin"
@@ -90,6 +92,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
   const [securityKeys, setSecurityKeys] = useState<SecurityKey[]>([])
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userPermissions, setUserPermissions] = useState<any[]>([])
+  const [userLeaderGroups, setUserLeaderGroups] = useState<string[]>([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false)
@@ -276,6 +279,10 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
     const result = await getUserPermissions(user.id)
     if (result.success) {
       setUserPermissions(result.permissions || [])
+    }
+    const leadersResult = await getUserGroupLeaders(user.id)
+    if (leadersResult.success) {
+      setUserLeaderGroups(leadersResult.groupIds || [])
     }
     setIsPermissionsDialogOpen(true)
   }
@@ -906,9 +913,45 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                             <div className="text-xs text-gray-500">{group.description}</div>
                           </div>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {viewCount}/{groupModuleIds.length} activos
-                        </Badge>
+                        <div className="flex items-center space-x-3">
+                          <Badge variant="outline" className="text-xs">
+                            {viewCount}/{groupModuleIds.length} activos
+                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`leader-${group.id}`}
+                              checked={userLeaderGroups.includes(group.id)}
+                              disabled={!canEdit}
+                              onCheckedChange={async () => {
+                                if (!selectedUser || !currentUser?.id) return
+                                const isCurrentlyLeader = userLeaderGroups.includes(group.id)
+                                const result = await setGroupLeader(
+                                  selectedUser.id,
+                                  group.id,
+                                  !isCurrentlyLeader,
+                                  currentUser.id
+                                )
+                                if (result.success) {
+                                  toast.success(
+                                    !isCurrentlyLeader
+                                      ? `${selectedUser.displayName} es ahora Líder de ${group.display_name}`
+                                      : `Líder removido de ${group.display_name}`
+                                  )
+                                  setUserLeaderGroups(prev =>
+                                    !isCurrentlyLeader
+                                      ? [...prev, group.id]
+                                      : prev.filter(id => id !== group.id)
+                                  )
+                                } else {
+                                  toast.error("Error al actualizar líder de grupo")
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`leader-${group.id}`} className="text-xs font-medium text-gray-700 cursor-pointer">
+                              Líder
+                            </Label>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Sub-módulos */}

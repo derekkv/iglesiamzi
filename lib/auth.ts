@@ -164,8 +164,9 @@ export async function checkUserPermission(
 export async function checkUserEditPermission(
   userId: string,
   moduleName: string,
-): Promise<{ success: boolean; canView: boolean; canEdit: boolean; canAdmin: boolean; error?: string }> {
+): Promise<{ success: boolean; canView: boolean; canEdit: boolean; canAdmin: boolean; canLeader: boolean; error?: string }> {
   try {
+    // 1. Obtener permisos del módulo
     const { data, error } = await supabase
       .from("user_permissions")
       .select(
@@ -173,7 +174,7 @@ export async function checkUserEditPermission(
         can_view,
         can_edit,
         can_admin,
-        module:system_modules!inner(name)
+        module:system_modules!inner(name, group_id)
       `,
       )
       .eq("user_id", userId)
@@ -182,7 +183,20 @@ export async function checkUserEditPermission(
 
     if (error) {
       console.log("No se encontró permiso para", moduleName, "error:", error.message)
-      return { success: true, canView: false, canEdit: false, canAdmin: false }
+      return { success: true, canView: false, canEdit: false, canAdmin: false, canLeader: false }
+    }
+
+    // 2. Verificar si es líder del grupo al que pertenece este módulo
+    let canLeader = false
+    const groupId = (data?.module as any)?.group_id
+    if (groupId) {
+      const { data: leaderRow } = await supabase
+        .from("user_group_leaders")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("group_id", groupId)
+        .maybeSingle()
+      canLeader = !!leaderRow
     }
 
     return {
@@ -190,9 +204,10 @@ export async function checkUserEditPermission(
       canView: data?.can_view || false,
       canEdit: data?.can_edit || false,
       canAdmin: data?.can_admin || false,
+      canLeader,
     }
   } catch (error) {
     console.error("Error verificando permiso de edición:", error)
-    return { success: false, canView: false, canEdit: false, canAdmin: false, error: "Error al verificar permisos" }
+    return { success: false, canView: false, canEdit: false, canAdmin: false, canLeader: false, error: "Error al verificar permisos" }
   }
 }

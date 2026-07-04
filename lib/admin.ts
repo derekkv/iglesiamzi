@@ -322,3 +322,50 @@ export async function changePassword(userId: string, newPassword: string) {
     return { success: false, error: "Error al cambiar contraseña" }
   }
 }
+
+
+// ============ LÍDERES DE GRUPO ============
+
+// Obtener los grupos donde un usuario es líder
+export async function getUserGroupLeaders(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("user_group_leaders")
+      .select("group_id")
+      .eq("user_id", userId)
+
+    if (error) throw error
+
+    return { success: true, groupIds: (data || []).map((r: any) => r.group_id) }
+  } catch (error) {
+    console.error("Error obteniendo líderes de grupo:", error)
+    return { success: false, error: "Error al obtener líderes de grupo", groupIds: [] }
+  }
+}
+
+// Asignar o quitar líder de un grupo
+export async function setGroupLeader(userId: string, groupId: string, isLeader: boolean, grantedBy: string) {
+  try {
+    if (isLeader) {
+      const { error } = await supabase
+        .from("user_group_leaders")
+        .upsert(
+          { user_id: userId, group_id: groupId, granted_by: grantedBy },
+          { onConflict: "user_id,group_id" }
+        )
+      if (error) throw error
+    } else {
+      const { error } = await supabase
+        .from("user_group_leaders")
+        .delete()
+        .eq("user_id", userId)
+        .eq("group_id", groupId)
+      if (error) throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error asignando líder de grupo:", error)
+    return { success: false, error: "Error al asignar líder de grupo" }
+  }
+}
