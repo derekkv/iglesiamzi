@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as { valid?: boolean; user?: AuthUser }
         if (data.valid && data.user) {
           setUser(data.user)
         } else {

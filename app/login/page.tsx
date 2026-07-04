@@ -37,7 +37,7 @@ export default function LoginPage() {
         body: JSON.stringify({ identifier: username, password }),
       })
 
-      const data = await res.json()
+      const data = await res.json() as { token?: string; user?: any; error?: string; remainingAttempts?: number }
 
       if (res.ok && data.token && data.user) {
         setAuthUser(data.user, data.token)
