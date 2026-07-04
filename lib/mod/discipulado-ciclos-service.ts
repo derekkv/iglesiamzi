@@ -320,6 +320,55 @@ class DiscipuladoCiclosService {
     return data || []
   }
 
+  /** Cerrar (desactivar) el ciclo activo sin crear uno nuevo */
+  async cerrarCiclo(cicloId: number, audit?: AuditInfo): Promise<void> {
+    const { error } = await supabase
+      .from("discipulado_ciclos")
+      .update({ activo: false, updated_at: new Date().toISOString() })
+      .eq("id", cicloId)
+
+    if (error) throw error
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "discipulado",
+        action: "editar",
+        description: `Ciclo #${cicloId} cerrado`,
+        details: { ciclo_id: cicloId },
+      })
+    }
+  }
+
+  /** Eliminar todas las fechas (y asistencia asociada) de un ciclo */
+  async deleteAllFechas(cicloId: number, audit?: AuditInfo): Promise<void> {
+    // Eliminar asistencia asociada a las fechas del ciclo
+    const { error: asistError } = await supabase
+      .from("discipulado_ciclo_asistencia")
+      .delete()
+      .eq("ciclo_id", cicloId)
+
+    if (asistError) throw asistError
+
+    // Eliminar todas las fechas
+    const { error: fechasError } = await supabase
+      .from("discipulado_ciclo_fechas")
+      .delete()
+      .eq("ciclo_id", cicloId)
+
+    if (fechasError) throw fechasError
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "discipulado",
+        action: "eliminar",
+        description: `Todas las fechas eliminadas del ciclo #${cicloId}`,
+        details: { ciclo_id: cicloId },
+      })
+    }
+  }
+
   /**
    * Cambiar una fecha y recalcular las siguientes.
    * Solo las fechas posteriores al índice cambiado se recalculan como domingos consecutivos.

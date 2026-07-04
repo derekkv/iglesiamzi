@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -120,6 +120,19 @@ export default function DashboardPage() {
   })
   // Grupo seleccionado para ver sus sub-módulos (null = vista de grupos)
   const [selectedGroup, setSelectedGroup] = useState<GroupData | null>(null)
+  const restoredRef = useRef(false)
+
+  // Persistir grupo seleccionado en sessionStorage
+  useEffect(() => {
+    if (restoredRef.current) {
+      // Solo persistir después de la restauración inicial
+      if (selectedGroup) {
+        sessionStorage.setItem("dashboard_selected_group_id", selectedGroup.id)
+      } else {
+        sessionStorage.removeItem("dashboard_selected_group_id")
+      }
+    }
+  }, [selectedGroup])
 
   const handleViewModeChange = (mode: "cards" | "classic") => {
     setViewMode(mode)
@@ -205,6 +218,18 @@ export default function DashboardPage() {
   const sortedGroups = Object.values(groupedModulesMap).sort(
     (a, b) => (a.sort_order || 0) - (b.sort_order || 0)
   )
+
+  // Restaurar grupo seleccionado desde sessionStorage al cargar datos
+  useEffect(() => {
+    if (!loading && permissions.length > 0 && !restoredRef.current) {
+      restoredRef.current = true
+      const savedGroupId = sessionStorage.getItem("dashboard_selected_group_id")
+      if (savedGroupId) {
+        const found = sortedGroups.find((g) => g.id === savedGroupId)
+        if (found) setSelectedGroup(found)
+      }
+    }
+  }, [loading, permissions])
 
   // Módulos sin grupo (como pastoral)
   const ungroupedModules = availableModules.filter((m) => !m.groupId)

@@ -24,7 +24,8 @@ import {
   discipuladoCiclosService, CICLO_CONFIG,
   type CicloTipo, type CicloCompleto, type CicloParticipante, type CicloFecha,
 } from "@/lib/mod/discipulado-ciclos-service"
-import { Trash2, Plus, ArrowLeft, Edit, Lock, Play, CalendarDays } from "lucide-react"
+import { Trash2, Plus, ArrowLeft, Edit, Lock, Play, CalendarDays, FileDown } from "lucide-react"
+import { downloadCertificados } from "@/lib/generate-certificados"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
@@ -78,6 +79,7 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
   const [showEditFecha, setShowEditFecha] = useState(false)
   const [editingFecha, setEditingFecha] = useState<CicloFecha | null>(null)
   const [nuevaFechaEdit, setNuevaFechaEdit] = useState("")
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const audit = user ? { user_id: user.id, user_name: user.username } : undefined
 
@@ -320,28 +322,100 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
               </DialogContent>
             </Dialog>
           )}
-          {cicloTerminado && canEdit && (
-            <Dialog open={showIniciar} onOpenChange={setShowIniciar}>
-              <DialogTrigger asChild>
-                <Button className="bg-green-600 hover:bg-green-700" size="sm">
-                  <Play className="w-4 h-4 mr-2" /> Reiniciar ciclo
+          {canEdit && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50">
+                  <Lock className="w-4 h-4 mr-2" /> Cerrar ciclo
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Reiniciar {config.label}</DialogTitle>
-                  <DialogDescription>El ciclo actual se archivará. Los participantes NO se eliminan (quedan en historial). Se creará un nuevo ciclo con {config.totalClases} domingos.</DialogDescription>
-                </DialogHeader>
-                <div>
-                  <Label>Nueva fecha de inicio</Label>
-                  <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowIniciar(false)}>Cancelar</Button>
-                  <Button onClick={handleIniciarCiclo} disabled={saving || !fechaInicio}>{saving ? "Iniciando..." : "Reiniciar"}</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Cerrar este ciclo?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    El ciclo se marcará como cerrado. Podrás iniciar uno nuevo después. Los datos del ciclo actual se conservan en el historial.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-orange-600 hover:bg-orange-700"
+                    onClick={async () => {
+                      try {
+                        await discipuladoCiclosService.cerrarCiclo(data.ciclo.id, audit)
+                        toast.success("Ciclo cerrado correctamente")
+                        await loadData()
+                      } catch (error: any) {
+                        toast.error("Error: " + error.message)
+                      }
+                    }}
+                  >
+                    Cerrar ciclo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {/* Botón generar certificados para aprobados */}
+          {data.participantes.some((p) => p.estatus === "aprobado") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-green-300 text-green-700 hover:bg-green-50"
+              disabled={generatingPdf}
+              onClick={async () => {
+                const aprobados = data.participantes
+                  .filter((p) => p.estatus === "aprobado")
+                  .map((p) => p.nombre)
+                setGeneratingPdf(true)
+                try {
+                  await downloadCertificados(aprobados, tipo)
+                  toast.success(`Certificados generados para ${aprobados.length} participante(s)`)
+                } catch (error: any) {
+                  toast.error("Error generando certificados: " + error.message)
+                } finally {
+                  setGeneratingPdf(false)
+                }
+              }}
+            >
+              <FileDown className="w-4 h-4 mr-2" />
+              {generatingPdf ? "Generando..." : "Generar Certificados"}
+            </Button>
+          )}
+          {/* Botón eliminar todas las fechas */}
+          {canEdit && data.fechas.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50">
+                  <Trash2 className="w-4 h-4 mr-2" /> Eliminar todas las fechas
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar todas las fechas?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se eliminarán las {data.fechas.length} fechas y toda la asistencia registrada en este ciclo. Los participantes se mantienen. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={async () => {
+                      try {
+                        await discipuladoCiclosService.deleteAllFechas(data.ciclo.id, audit)
+                        toast.success("Todas las fechas han sido eliminadas")
+                        await loadData()
+                      } catch (error: any) {
+                        toast.error("Error: " + error.message)
+                      }
+                    }}
+                  >
+                    Eliminar todo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
 
