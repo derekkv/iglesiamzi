@@ -99,6 +99,8 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
   const [isCreating, setIsCreating] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [searchFilter, setSearchFilter] = useState("")
+  const [allLeaders, setAllLeaders] = useState<Record<string, string[]>>({})
   const { user: currentUser, isLoading: authLoading } = useAuth()
   const { checkAndExecute } = useSecurityCheck()
   const router = useRouter()
@@ -141,6 +143,15 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
 
     if (usersResult.success) {
       setUsers(usersResult.users || [])
+      // Cargar líderes de todos los usuarios
+      const leadersMap: Record<string, string[]> = {}
+      for (const u of (usersResult.users || [])) {
+        const lr = await getUserGroupLeaders(u.id)
+        if (lr.success && lr.groupIds.length > 0) {
+          leadersMap[u.id] = lr.groupIds
+        }
+      }
+      setAllLeaders(leadersMap)
     }
 
     if (modulesResult.success) {
@@ -443,28 +454,10 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                     <DialogHeader>
                       <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                       <DialogDescription>
-                        Complete los datos para crear una cuenta personal o de ministerio
+                        Complete los datos para crear una nueva cuenta
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label>Tipo de Cuenta *</Label>
-                        <Select
-                          value={newUserForm.accountType}
-                          onValueChange={(value: "personal" | "ministerio") =>
-                            setNewUserForm({ ...newUserForm, accountType: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="personal">Personal</SelectItem>
-                            <SelectItem value="ministerio">Ministerio</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
                       <div className="grid grid-cols-2 gap-4">
                         <div className="grid gap-2">
                           <Label>Usuario *</Label>
@@ -493,27 +486,14 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                         />
                       </div>
 
-                      {newUserForm.accountType === "ministerio" && (
-                        <div className="grid gap-2">
-                          <Label>Nombre del Ministerio *</Label>
-                          <Input
-                            value={newUserForm.ministerioName}
-                            onChange={(e) => setNewUserForm({ ...newUserForm, ministerioName: e.target.value })}
-                            placeholder="Alabanza y Adoración"
-                          />
-                        </div>
-                      )}
-
-                      {newUserForm.accountType === "personal" && (
-                        <div className="grid gap-2">
-                          <Label>Cédula</Label>
-                          <Input
-                            value={newUserForm.cedula}
-                            onChange={(e) => setNewUserForm({ ...newUserForm, cedula: e.target.value })}
-                            placeholder="1234567890"
-                          />
-                        </div>
-                      )}
+                      <div className="grid gap-2">
+                        <Label>Cédula</Label>
+                        <Input
+                          value={newUserForm.cedula}
+                          onChange={(e) => setNewUserForm({ ...newUserForm, cedula: e.target.value })}
+                          placeholder="1234567890"
+                        />
+                      </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="grid gap-2">
@@ -549,34 +529,52 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Lista de Usuarios</CardTitle>
+                                    <CardTitle>Lista de Usuarios</CardTitle>
                   <CardDescription>Total: {users.length} usuarios registrados</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4">
+                    <Input
+                      placeholder="Buscar por nombre o usuario..."
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Usuario</TableHead>
                         <TableHead>Nombre</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Ministerio</TableHead>
+                        <TableHead>Rol</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
+                      {users
+                        .filter((u) => {
+                          if (!searchFilter) return true
+                          const q = searchFilter.toLowerCase()
+                          return u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)
+                        })
+                        .map((user) => {
+                          const isLeader = !!allLeaders[user.id]?.length
+                          const leaderGroupNames = isLeader ? moduleGroups.filter((g) => allLeaders[user.id]?.includes(g.id)).map((g) => g.display_name) : []
+                          return (
+                        <TableRow key={user.id} className={isLeader ? "bg-amber-50/60 border-l-4 border-l-amber-400" : ""}>
                           <TableCell className="font-medium">{user.username}</TableCell>
                           <TableCell>{user.displayName}</TableCell>
                           <TableCell>
-                            <Badge variant={user.account_type === "personal" ? "default" : "secondary"}>
-                              {user.account_type === "personal" ? "Personal" : "Ministerio"}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1">
+                              {isLeader && leaderGroupNames.map((name) => (
+                                <Badge key={name} className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0.5">Líder {name}</Badge>
+                              ))}
+                              {!isLeader && <span className="text-sm text-gray-400">—</span>}
+                            </div>
                           </TableCell>
-                          <TableCell>{user.ministerio_name || "-"}</TableCell>
                           <TableCell>
-                            <Badge variant={user.is_active ? "default" : "destructive"}>
+                            <Badge variant={user.is_active ? "default" : "destructive"} className={user.is_active ? "bg-green-600 hover:bg-green-700" : ""}>
                               {user.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
@@ -601,7 +599,8 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                          )
+                        })}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -779,22 +778,25 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
           </Dialog>
 
           <Dialog open={isPermissionsDialogOpen} onOpenChange={setIsPermissionsDialogOpen}>
-            <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Permisos de {selectedUser?.displayName}</DialogTitle>
-                <DialogDescription>Configure los permisos de Vista y Edición por módulo para este usuario. Use los checkboxes de grupo para activar/desactivar todos los sub-módulos.</DialogDescription>
+            <DialogContent className="w-[75vw] max-w-none max-h-[85vh] flex flex-col">
+              <DialogHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 -mx-6 -mt-6 px-6 py-5 rounded-t-lg">
+                <DialogTitle className="text-white text-lg">Permisos de {selectedUser?.displayName}</DialogTitle>
+                <DialogDescription className="text-blue-100">Configure los permisos de Vista, Edición y Líder por grupo para este usuario.</DialogDescription>
               </DialogHeader>
               <div className="py-4 overflow-y-auto flex-1 space-y-6">
                 {/* Módulos sin grupo (ej. Administración panel) */}
                 {ungroupedModules.length > 0 && (
-                  <div>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-slate-700 px-4 py-2">
+                      <span className="text-sm font-semibold text-white">Módulos Generales</span>
+                    </div>
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="bg-slate-50">
                           <TableHead>Módulo</TableHead>
-                          <TableHead className="text-center">Ver</TableHead>
-                          <TableHead className="text-center">Editar</TableHead>
-                          <TableHead className="text-center">Admin</TableHead>
+                          <TableHead className="text-center w-20">Ver</TableHead>
+                          <TableHead className="text-center w-20">Editar</TableHead>
+                          <TableHead className="text-center w-20">Admin</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -873,9 +875,9 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                   const isIndeterminate = !allChecked && !noneChecked
 
                   return (
-                    <div key={group.id} className="border rounded-lg overflow-hidden">
+                    <div key={group.id} className="border rounded-lg overflow-hidden shadow-sm">
                       {/* Header del grupo con checkbox padre */}
-                      <div className="bg-gray-100 px-4 py-3 flex items-center justify-between">
+                      <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-4 py-3 flex items-center justify-between border-b">
                         <div className="flex items-center space-x-3">
                           <Checkbox
                             checked={isIndeterminate ? "indeterminate" : allChecked}
@@ -917,7 +919,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                           <Badge variant="outline" className="text-xs">
                             {viewCount}/{groupModuleIds.length} activos
                           </Badge>
-                          <div className="flex items-center space-x-2">
+                          <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full ${userLeaderGroups.includes(group.id) ? "bg-amber-100 border border-amber-400" : "bg-gray-50 border border-gray-200"}`}>
                             <Checkbox
                               id={`leader-${group.id}`}
                               checked={userLeaderGroups.includes(group.id)}
@@ -942,13 +944,22 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                                       ? [...prev, group.id]
                                       : prev.filter(id => id !== group.id)
                                   )
+                                  setAllLeaders(prev => {
+                                    const current = prev[selectedUser.id] || []
+                                    return {
+                                      ...prev,
+                                      [selectedUser.id]: !isCurrentlyLeader
+                                        ? [...current, group.id]
+                                        : current.filter(id => id !== group.id)
+                                    }
+                                  })
                                 } else {
                                   toast.error("Error al actualizar líder de grupo")
                                 }
                               }}
                             />
-                            <Label htmlFor={`leader-${group.id}`} className="text-xs font-medium text-gray-700 cursor-pointer">
-                              Líder
+                            <Label htmlFor={`leader-${group.id}`} className={`text-xs font-semibold cursor-pointer ${userLeaderGroups.includes(group.id) ? "text-amber-700" : "text-gray-500"}`}>
+                              {userLeaderGroups.includes(group.id) ? "★ Líder" : "Líder"}
                             </Label>
                           </div>
                         </div>
@@ -957,10 +968,10 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                       {/* Sub-módulos */}
                       <Table>
                         <TableHeader>
-                          <TableRow>
+                          <TableRow className="bg-slate-50/50">
                             <TableHead className="pl-12">Sub-módulo</TableHead>
-                            <TableHead className="text-center">Ver</TableHead>
-                            <TableHead className="text-center">Editar</TableHead>
+                            <TableHead className="text-center w-20">Ver</TableHead>
+                            <TableHead className="text-center w-20">Editar</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1003,8 +1014,8 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                   )
                 })}
               </div>
-              <DialogFooter>
-                <Button onClick={() => setIsPermissionsDialogOpen(false)}>Cerrar</Button>
+              <DialogFooter className="border-t pt-4">
+                <Button onClick={() => setIsPermissionsDialogOpen(false)} className="bg-blue-600 hover:bg-blue-700">Cerrar</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
