@@ -96,7 +96,7 @@ export async function generateCertificadosPDF(
 export async function downloadCertificados(aprobados: string[], tipo: CicloTipo) {
   const pdfBytes = await generateCertificadosPDF(aprobados, tipo)
 
-  const blob = new Blob([pdfBytes], { type: "application/pdf" })
+  const blob = new Blob([pdfBytes.buffer], { type: "application/pdf" })
   const url = URL.createObjectURL(blob)
 
   const link = document.createElement("a")
