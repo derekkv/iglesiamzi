@@ -18,17 +18,19 @@ export interface LoginCredentials {
   password: string
 }
 
-// Función para hacer login
+// Función para hacer login (acepta username, email o teléfono)
 export async function login(
   credentials: LoginCredentials,
 ): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
   try {
-    // Buscar usuario por username
+    const identifier = credentials.username.trim()
+
+    // Buscar usuario por username, email o phone
     const { data: user, error } = await supabase
       .from("users")
       .select("*")
-      .eq("username", credentials.username)
       .eq("is_active", true)
+      .or(`username.eq.${identifier},email.eq.${identifier},phone.eq.${identifier}`)
       .single()
 
     if (error || !user) {

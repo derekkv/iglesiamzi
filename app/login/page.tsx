@@ -57,12 +57,12 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-sm font-medium text-gray-700">
-                Usuario o Ministerio
+                Usuario, Correo o Teléfono
               </Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="Ingrese su usuario"
+                placeholder="Ingrese su usuario, correo o teléfono"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full"
