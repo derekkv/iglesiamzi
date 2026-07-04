@@ -24,8 +24,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
-import { ArrowLeft, Plus, Trash2, Search, X } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Search, X, Pencil } from "lucide-react"
 import { toast } from "sonner"
 
 interface CronogramaServicioProps {
@@ -63,6 +71,18 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
 
   // Delete
   const [pendingDelete, setPendingDelete] = useState<CronogramaEntry | null>(null)
+
+  // Edit
+  const [editEntry, setEditEntry] = useState<CronogramaEntry | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editForm, setEditForm] = useState({
+    asignacion: "",
+    fecha: "",
+    horaEntrada: "",
+    ministerio: "",
+    evento: "",
+  })
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Modal de conflicto
   const [conflictMessage, setConflictMessage] = useState("")
@@ -172,6 +192,50 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
       loadEntries()
     } catch (error) {
       console.error("Error deleting:", error)
+    }
+  }
+
+  const handleEdit = (entry: CronogramaEntry) => {
+    checkAndExecute(entry.created_at || new Date().toISOString(), () => {
+      setEditEntry(entry)
+      setEditForm({
+        asignacion: entry.asignacion || "",
+        fecha: entry.fecha || "",
+        horaEntrada: entry.hora_entrada || "",
+        ministerio: entry.ministerio || "",
+        evento: entry.evento || "",
+      })
+      setIsEditDialogOpen(true)
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editEntry?.id || !editForm.asignacion || !editForm.fecha || !editForm.ministerio) {
+      toast.error("Complete los campos requeridos")
+      return
+    }
+
+    setIsUpdating(true)
+    try {
+      await cronogramaService.update(
+        editEntry.id,
+        {
+          asignacion: editForm.asignacion,
+          fecha: editForm.fecha,
+          hora_entrada: editForm.horaEntrada || undefined,
+          ministerio: editForm.ministerio,
+          evento: editForm.evento || undefined,
+        },
+        { user_id: user!.id, user_name: user!.username }
+      )
+      toast.success("Servicio actualizado")
+      setIsEditDialogOpen(false)
+      setEditEntry(null)
+      loadEntries()
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar")
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -409,9 +473,14 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                           <TableCell className="text-xs text-gray-500">{entry.evento || "-"}</TableCell>
                           {canEdit && (
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(entry)}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(entry)}>
+                                  <Pencil className="h-4 w-4 text-blue-500" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(entry)}>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
                             </TableCell>
                           )}
                         </TableRow>
@@ -461,6 +530,75 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de edición */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Servicio</DialogTitle>
+            <DialogDescription>
+              Modifique los datos del servicio de {editEntry?.user_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Ministerio *</Label>
+              <Select value={editForm.ministerio} onValueChange={(v) => setEditForm({ ...editForm, ministerio: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar ministerio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ministerios.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Asignación *</Label>
+              <Input
+                value={editForm.asignacion}
+                onChange={(e) => setEditForm({ ...editForm, asignacion: e.target.value })}
+                placeholder="Ej: Salón / Auditorio / Puerta..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Fecha *</Label>
+                <Input
+                  type="date"
+                  value={editForm.fecha}
+                  onChange={(e) => setEditForm({ ...editForm, fecha: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Hora de Entrada</Label>
+                <Input
+                  type="time"
+                  value={editForm.horaEntrada}
+                  onChange={(e) => setEditForm({ ...editForm, horaEntrada: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Evento <span className="text-gray-400 font-normal">(opcional)</span></Label>
+              <Input
+                value={editForm.evento}
+                onChange={(e) => setEditForm({ ...editForm, evento: e.target.value })}
+                placeholder="Ej: Culto dominical, Conferencia..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isUpdating}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isUpdating || !editForm.asignacion || !editForm.fecha || !editForm.ministerio}>
+              {isUpdating ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

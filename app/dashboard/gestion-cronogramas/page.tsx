@@ -180,7 +180,7 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
                 </Card>
               ) : (
                 <div className="rounded-md border overflow-x-auto">
-                  <Table className="min-w-[700px]">
+                  <Table className="min-w-[900px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-xs">Fecha</TableHead>
@@ -189,6 +189,9 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
                         <TableHead className="text-xs">H. Entrada</TableHead>
                         <TableHead className="text-xs">H. Llegada</TableHead>
                         <TableHead className="text-xs">¿Llegó tarde?</TableHead>
+                        <TableHead className="text-xs text-center">Acuse</TableHead>
+                        <TableHead className="text-xs text-center">Alerta 2</TableHead>
+                        <TableHead className="text-xs text-center">Alerta 1</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -232,6 +235,46 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
                               ) : (
                                 <span className="text-gray-300 text-xs">-</span>
                               )
+                            )}
+                          </TableCell>
+                          {/* Acuse de asignación */}
+                          <TableCell className="text-center">
+                            {entry.acuse_asignacion ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_asignacion_at ? `Confirmado: ${new Date(entry.acuse_asignacion_at).toLocaleString("es-ES")}` : ""}>
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full" title="Pendiente de confirmar">
+                                ⏳
+                              </span>
+                            )}
+                          </TableCell>
+                          {/* Alerta 2 (5 días) */}
+                          <TableCell className="text-center">
+                            {!entry.alerta2_enviada ? (
+                              <span className="text-[10px] text-gray-400">—</span>
+                            ) : entry.acuse_alerta2 ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_alerta2_at ? `Confirmado: ${new Date(entry.acuse_alerta2_at).toLocaleString("es-ES")}` : ""}>
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded-full" title={entry.alerta2_enviada_at ? `Enviada: ${new Date(entry.alerta2_enviada_at).toLocaleString("es-ES")}` : "Enviada"}>
+                                ⏳
+                              </span>
+                            )}
+                          </TableCell>
+                          {/* Alerta 1 (1 día) */}
+                          <TableCell className="text-center">
+                            {!entry.alerta1_enviada ? (
+                              <span className="text-[10px] text-gray-400">—</span>
+                            ) : entry.acuse_alerta1 ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_alerta1_at ? `Confirmado: ${new Date(entry.acuse_alerta1_at).toLocaleString("es-ES")}` : ""}>
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full" title={entry.alerta1_enviada_at ? `Enviada: ${new Date(entry.alerta1_enviada_at).toLocaleString("es-ES")}` : "Enviada"}>
+                                ⏳
+                              </span>
                             )}
                           </TableCell>
                         </TableRow>

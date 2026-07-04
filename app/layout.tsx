@@ -11,12 +11,16 @@ import { AuthProvider } from "@/contexts/auth-context";
 import { SecurityCheckProvider } from "@/contexts/security-context";
 import { SecurityKeyDialog } from "@/components/SecurityKeyDialog";
 import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
-import { ServiceAlertModal } from "@/components/ServiceAlertModal";
+import { ServiceAcknowledgeModal } from "@/components/ServiceAcknowledgeModal";
 import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
 import { NotificacionModal } from "@/components/NotificacionModal";
 
 export const metadata: Metadata = {
   title: "Regalo de Dios",
+  robots: {
+    index: false,
+    follow: false,
+  },
   manifest: "/manifest.json",
   icons: {
     icon: "/logo.png",
@@ -36,7 +40,7 @@ export default function RootLayout({
                     <SecurityCheckProvider>
             <MonthProvider>{children}</MonthProvider>
               <SecurityKeyDialog />
-              <ServiceAlertModal />
+              <ServiceAcknowledgeModal />
               <PushNotificationPrompt />
               <NotificacionModal />
         </SecurityCheckProvider>

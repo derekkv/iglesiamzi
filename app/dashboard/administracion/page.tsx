@@ -39,6 +39,7 @@ import { PermissionsGuard } from "@/lib/permissions-guard"
 import { Pencil, Trash2, RefreshCw, Copy, Check, ArrowLeft } from "lucide-react"
 import { getSecurityKeys, regenerateAllKeys} from "@/lib/security-keys"
 import { AuditLogTab } from "./AuditLogTab"
+import { WhatsAppTab } from "./WhatsAppTab"
 import { auditService } from "@/lib/mod/audit-service"
 
 interface User {
@@ -418,6 +419,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
               <TabsTrigger value="users">Usuarios y Ministerios</TabsTrigger>
               {canAdmin && <TabsTrigger value="keys">Clave</TabsTrigger>}
               {canAdmin && <TabsTrigger value="audit">Logs</TabsTrigger>}
+              {canAdmin && <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="users" className="space-y-4">
@@ -706,6 +708,10 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
 
             <TabsContent value="audit">
               <AuditLogTab />
+            </TabsContent>
+
+            <TabsContent value="whatsapp">
+              <WhatsAppTab />
             </TabsContent>
           </Tabs>
 

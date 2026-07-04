@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getUserPermissions } from "@/lib/auth"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
+import { useNotificaciones } from "@/hooks/use-notificaciones"
 import { CreateMonthModal } from "@/components/CreateMonthModal"
 import { ChangePasswordModal } from "@/components/ChangePasswordModal"
 import { BuzonNotificaciones } from "@/components/BuzonNotificaciones"
@@ -110,6 +111,7 @@ export default function DashboardPage() {
   const [permissions, setPermissions] = useState<ModulePermission[]>([])
   const [loading, setLoading] = useState(true)
   const [openCreateModal, setOpenCreateModal] = useState(false)
+  const { noLeidos } = useNotificaciones()
   // Vista: "cards" (tarjetas de grupo, default) o "classic" (todos los módulos)
   const [viewMode, setViewMode] = useState<"cards" | "classic">(() => {
     if (typeof window !== "undefined") {
@@ -378,7 +380,12 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent className="text-center">
                     {isAccessible ? (
-                      <Badge className="bg-green-100 text-green-800 border-green-200">Disponible</Badge>
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge className="bg-green-100 text-green-800 border-green-200">Disponible</Badge>
+                        {noLeidos > 0 && (
+                          <Badge className="bg-red-100 text-red-800 border-red-200">{noLeidos} nuevos</Badge>
+                        )}
+                      </div>
                     ) : isBlocked ? (
                       <Badge className="bg-amber-100 text-amber-800 border-amber-200">Requiere mes activo</Badge>
                     ) : (
@@ -421,9 +428,16 @@ export default function DashboardPage() {
                         <span className="text-sm text-gray-500 self-center">+{group.modules.length - 4}</span>
                       )}
                     </div>
-                    <Button size="sm" variant="outline">
-                      Abrir
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {noLeidos > 0 && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                          {noLeidos > 9 ? "9+" : noLeidos}
+                        </span>
+                      )}
+                      <Button size="sm" variant="outline">
+                        Abrir
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
