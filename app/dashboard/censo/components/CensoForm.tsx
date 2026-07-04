@@ -11,6 +11,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Settings, Plus, Trash2 } from "lucide-react"
 import { censoService, type CensoRecord, type CatalogOption, type HijoData, type ConfiguracionesGlobales } from "@/lib/mod/censo-service"
 
+const CELULAS = [
+  "Carlos y Ruth",
+  "Sarita y Lady",
+  "Jessy Mendoza",
+  "Líder y Angela",
+  "Juan Pablo y Angie",
+  "Alina y Anita",
+  "Neyda y Carmen",
+  "Yadira y Tania",
+  "Luis y Ariana",
+  "Layla Salem",
+  "Estuardo y Catalina",
+  "Gabriela López",
+]
+
 interface CensoFormProps {
   formData: CensoRecord
   onChangeFormData: (data: CensoRecord) => void
@@ -499,6 +514,30 @@ export function CensoForm({
             {formData.proyecto_mario && (
               <div className="ml-6 mt-3 border-l-2 border-orange-300 pl-4 py-2">
                 {renderFormField("Detalle", "proyecto_mario_detalle", "textarea")}
+              </div>
+            )}
+          </div>
+
+          {/* Célula */}
+          <div className="border-t border-orange-200 pt-4">
+            <p className="text-sm font-medium text-orange-700 mb-3">Célula</p>
+            {renderCheckbox("¿Asiste a una célula?", "celula_asiste")}
+            {formData.celula_asiste && (
+              <div className="ml-6 mt-3 border-l-2 border-orange-300 pl-4 py-2">
+                <Label className="text-sm text-gray-700">Célula asignada</Label>
+                <Select
+                  value={formData.celula_nombre || ""}
+                  onValueChange={(value) => setFormField("celula_nombre", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar célula" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CELULAS.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </div>

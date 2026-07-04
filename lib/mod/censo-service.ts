@@ -66,6 +66,9 @@ export interface CensoRecord {
   // Proyecto Mario
   proyecto_mario?: boolean
   proyecto_mario_detalle?: string
+  // Célula
+  celula_asiste?: boolean
+  celula_nombre?: string
   // Nuevo creyente (usado en censo MDG)
   nuevo_creyente?: boolean
   // Timestamps
