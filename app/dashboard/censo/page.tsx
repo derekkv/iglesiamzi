@@ -335,7 +335,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          <Tabs defaultValue="list" className="w-full">
+          <Tabs defaultValue={canEdit ? "add" : "list"} className="w-full">
           <TabsList className={canEdit ? "grid w-full grid-cols-2" : "grid w-full grid-cols-1"}>
             <TabsTrigger value="list">Lista de Registros</TabsTrigger>
             {canEdit && <TabsTrigger value="add">Agregar Nuevo</TabsTrigger>}

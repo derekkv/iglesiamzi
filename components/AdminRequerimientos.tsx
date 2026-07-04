@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/auth-context"
+import { useSecurityCheck } from "@/contexts/security-context"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useNotificaciones } from "@/hooks/use-notificaciones"
 import { Button } from "@/components/ui/button"
@@ -22,10 +23,15 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Clock, CheckCircle, XCircle, PauseCircle, Eye, Filter,
-  ClipboardList, User, Calendar
+  ClipboardList, User, Calendar, Trash2
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Requerimiento } from "./RequerimientosBienesServicios"
+import { getSemaforoActual } from "./RequerimientosBienesServicios"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 function getEstadoBadge(respuesta: Requerimiento["respuesta"]) {
   switch (respuesta) {
@@ -42,6 +48,7 @@ function getEstadoBadge(respuesta: Requerimiento["respuesta"]) {
 
 export function AdminRequerimientos() {
   const { user } = useAuth()
+  const { checkAndExecute } = useSecurityCheck()
   const { enviarNotificacion } = useNotificaciones()
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([])
   const [loading, setLoading] = useState(true)
@@ -155,6 +162,23 @@ export function AdminRequerimientos() {
     }
   }
 
+  const handleDeleteReq = async (req: Requerimiento) => {
+    checkAndExecute(req.created_at, async () => {
+      try {
+        const { error } = await supabase
+          .from("requerimientos_bienes_servicios")
+          .delete()
+          .eq("id", req.id)
+
+        if (error) throw error
+        toast.success("Requerimiento eliminado")
+      } catch (error) {
+        console.error("Error eliminando:", error)
+        toast.error("Error al eliminar requerimiento")
+      }
+    })
+  }
+
   const pendientes = requerimientos.filter((r) => r.respuesta === "pendiente").length
   const totalAll = requerimientos.length
 
@@ -254,11 +278,14 @@ export function AdminRequerimientos() {
                   <TableHead className="text-xs">Requerimiento</TableHead>
                   <TableHead className="text-xs">Valor</TableHead>
                   <TableHead className="text-xs">Estado</TableHead>
+                  <TableHead className="text-xs text-center">Cumplimiento</TableHead>
                   <TableHead className="text-xs">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {requerimientos.map((req) => (
+                {requerimientos.map((req) => {
+                  const semaforo = getSemaforoActual(req)
+                  return (
                   <TableRow key={req.id} className={req.respuesta === "pendiente" ? "bg-yellow-50/50" : ""}>
                     <TableCell className="text-xs whitespace-nowrap">
                       {new Date(req.fecha_requerimiento).toLocaleDateString("es")}
@@ -279,7 +306,34 @@ export function AdminRequerimientos() {
                     <TableCell className="text-xs">
                       {req.valor ? `$${req.valor.toFixed(2)}` : "-"}
                     </TableCell>
-                    <TableCell>{getEstadoBadge(req.respuesta)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {getEstadoBadge(req.respuesta)}
+                        {req.recibido && (
+                          <Badge variant="outline" className="text-green-600 border-green-300 text-[10px] px-1" title={`Recibido: ${new Date(req.fecha_recibido!).toLocaleString("es")}`}>
+                            Recibido
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {semaforo ? (
+                        <span
+                          className={`inline-block w-4 h-4 rounded-full ${
+                            semaforo === "verde" ? "bg-green-500" :
+                            semaforo === "amarillo" ? "bg-yellow-400" :
+                            "bg-red-500"
+                          }`}
+                          title={
+                            semaforo === "verde" ? "Cumplido a tiempo (≤24h)" :
+                            semaforo === "amarillo" ? "Entrega tardía (24-48h)" :
+                            "Incumplimiento (>48h)"
+                          }
+                        />
+                      ) : (
+                        <span className="text-gray-300 text-xs">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
@@ -308,10 +362,32 @@ export function AdminRequerimientos() {
                             Responder
                           </Button>
                         )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" title="Eliminar">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar requerimiento?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Se eliminará permanentemente este requerimiento. Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => handleDeleteReq(req)}>
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
               </TableBody>
             </Table>
           </div>

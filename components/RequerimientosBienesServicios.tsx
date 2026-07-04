@@ -25,8 +25,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Send, Clock, CheckCircle, XCircle, PauseCircle, Eye, Lock, Pencil, History } from "lucide-react"
+import { Plus, Send, Clock, CheckCircle, XCircle, PauseCircle, Eye, Lock, Pencil, History, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export interface Requerimiento {
   id: number
@@ -44,8 +48,61 @@ export interface Requerimiento {
   respondido_por_id: string | null
   respondido_por_nombre: string | null
   fecha_respuesta: string | null
+  recibido: boolean
+  fecha_recibido: string | null
   created_at: string
   updated_at: string
+}
+
+/**
+ * Calcula el color del semáforo de cumplimiento.
+ * Basado en la diferencia entre fecha_entrega (puesta por admin) y fecha_recibido (cuando el solicitante confirma).
+ * - Verde: entregado dentro de 24h después de la fecha de entrega
+ * - Amarillo: entregado entre 24h y 48h después
+ * - Rojo: entregado después de 72h o más
+ * - null: no aplica (no tiene fecha_entrega o no ha sido recibido)
+ */
+export function getSemaforoCumplimiento(req: Requerimiento): "verde" | "amarillo" | "rojo" | null {
+  // Solo aplica si está aprobado, tiene fecha de entrega y fue recibido
+  if (req.respuesta !== "aprobado") return null
+  if (!req.fecha_entrega) return null
+  if (!req.recibido || !req.fecha_recibido) return null
+
+  const entrega = new Date(req.fecha_entrega + "T23:59:59")
+  const recibido = new Date(req.fecha_recibido)
+
+  const diffMs = recibido.getTime() - entrega.getTime()
+  const diffHoras = diffMs / (1000 * 60 * 60)
+
+  if (diffHoras <= 24) return "verde"
+  if (diffHoras <= 48) return "amarillo"
+  return "rojo"
+}
+
+/**
+ * Para requerimientos aprobados NO recibidos, calcula el semáforo basado en la fecha actual.
+ * Esto muestra el estado en tiempo real de si se está cumpliendo o no.
+ */
+export function getSemaforoActual(req: Requerimiento): "verde" | "amarillo" | "rojo" | null {
+  if (req.respuesta !== "aprobado") return null
+  if (!req.fecha_entrega) return null
+
+  // Si ya fue recibido, usar la fecha de recepción
+  if (req.recibido && req.fecha_recibido) {
+    return getSemaforoCumplimiento(req)
+  }
+
+  // Si no ha sido recibido, calcular con la fecha actual
+  const entrega = new Date(req.fecha_entrega + "T23:59:59")
+  const ahora = new Date()
+
+  const diffMs = ahora.getTime() - entrega.getTime()
+  const diffHoras = diffMs / (1000 * 60 * 60)
+
+  if (diffHoras <= 24) return "verde"
+  if (diffHoras <= 48) return "amarillo"
+  if (diffHoras > 48) return "rojo"
+  return "verde" // aún no pasa la fecha
 }
 
 interface Props {
@@ -273,6 +330,68 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
     }
   }
 
+  const handleDelete = async (req: Requerimiento) => {
+    if (!user) return
+    checkAndExecute(req.created_at, async () => {
+      setIsSaving(true)
+      try {
+        const { error } = await supabase
+          .from("requerimientos_bienes_servicios")
+          .delete()
+          .eq("id", req.id)
+
+        if (error) throw error
+
+        await auditService.log({
+          user_id: user.id,
+          user_name: user.displayName,
+          module: `requerimientos-${modulo}`,
+          action: "eliminar",
+          description: `Eliminó requerimiento #${req.id}: ${req.requerimiento.substring(0, 60)}`,
+          details: { id: req.id, requerimiento: req.requerimiento, ministerio: req.ministerio },
+        })
+
+        toast.success("Requerimiento eliminado")
+      } catch (error) {
+        console.error("Error eliminando requerimiento:", error)
+        toast.error("Error al eliminar requerimiento")
+      } finally {
+        setIsSaving(false)
+      }
+    })
+  }
+
+  const handleConfirmarRecepcion = async (req: Requerimiento) => {
+    if (!user) return
+    checkAndExecute(req.created_at, async () => {
+      try {
+        const { error } = await supabase
+          .from("requerimientos_bienes_servicios")
+          .update({
+            recibido: true,
+            fecha_recibido: new Date().toISOString(),
+          })
+          .eq("id", req.id)
+
+        if (error) throw error
+
+        await auditService.log({
+          user_id: user.id,
+          user_name: user.displayName,
+          module: `requerimientos-${modulo}`,
+          action: "editar",
+          description: `Confirmó recepción del requerimiento #${req.id}`,
+          details: { id: req.id },
+        })
+
+        toast.success("Recepción confirmada")
+      } catch (error) {
+        console.error("Error confirmando recepción:", error)
+        toast.error("Error al confirmar recepción")
+      }
+    })
+  }
+
   // Filtrar por tabs
   const pendientes = requerimientos.filter((r) => r.respuesta === "pendiente")
   const respondidos = requerimientos.filter((r) => r.respuesta !== "pendiente")
@@ -346,11 +465,14 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
                       <TableHead className="text-xs">Requerimiento</TableHead>
                       <TableHead className="text-xs">Valor</TableHead>
                       <TableHead className="text-xs">Estado</TableHead>
+                      <TableHead className="text-xs text-center">Cumplimiento</TableHead>
                       <TableHead className="text-xs">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentList.map((req) => (
+                    {currentList.map((req) => {
+                      const semaforo = getSemaforoActual(req)
+                      return (
                       <TableRow key={req.id} className={req.updated_at !== req.created_at ? "bg-blue-50/30" : ""}>
                         <TableCell className="text-xs whitespace-nowrap">
                           {new Date(req.fecha_requerimiento).toLocaleDateString("es")}
@@ -366,12 +488,35 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             {getEstadoBadge(req.respuesta)}
+                            {req.recibido && (
+                              <Badge variant="outline" className="text-green-600 border-green-300 text-[10px] px-1">
+                                Recibido
+                              </Badge>
+                            )}
                             {req.updated_at !== req.created_at && req.respuesta === "pendiente" && (
                               <Badge variant="outline" className="text-blue-600 border-blue-300 text-[10px] px-1">
                                 <Pencil className="h-2.5 w-2.5" />
                               </Badge>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {semaforo ? (
+                            <span
+                              className={`inline-block w-4 h-4 rounded-full ${
+                                semaforo === "verde" ? "bg-green-500" :
+                                semaforo === "amarillo" ? "bg-yellow-400" :
+                                "bg-red-500"
+                              }`}
+                              title={
+                                semaforo === "verde" ? "Cumplido a tiempo (≤24h)" :
+                                semaforo === "amarillo" ? "Entrega tardía (24-48h)" :
+                                "Incumplimiento (>48h)"
+                              }
+                            />
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -395,10 +540,47 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
                                 <Lock className="h-3.5 w-3.5" />
                               </Button>
                             )}
+                            {/* Confirmar recepción: solo el solicitante y solo si está aprobado y no recibido */}
+                            {req.persona_id === user?.id && req.respuesta === "aprobado" && !req.recibido && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-green-600"
+                                title="Confirmar recepción"
+                                onClick={() => handleConfirmarRecepcion(req)}
+                              >
+                                Recibido
+                              </Button>
+                            )}
+                            {/* Eliminar: solo el que lo creó o si canEdit */}
+                            {canEdit && req.persona_id === user?.id && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" title="Eliminar">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Eliminar requerimiento?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Se eliminará permanentemente este requerimiento. Esta acción no se puede deshacer.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => handleDelete(req)}>
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>
