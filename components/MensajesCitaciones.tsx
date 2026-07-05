@@ -224,7 +224,7 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
           .select("id, email, phone, displayName")
           .in("id", destinatarioIds)
 
-        const asunto = tipoMensaje === "citacion" ? "Citación" : "Mensaje"
+        const asunto = tipoMensaje === "invitacion" ? "Citación" : "Mensaje"
         const cuerpo = `${asunto} de ${user.displayName} (${title}): ${detalle.trim()}${fecha ? ` - Fecha: ${fecha}` : ""}${eventoLugar ? ` - Lugar: ${eventoLugar}` : ""}`
 
         for (const dest of (destUsers || [])) {
