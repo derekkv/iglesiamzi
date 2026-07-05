@@ -16,6 +16,7 @@ import { CloseMonthModal } from "@/components/CloseMonthModal"
 import { supabase } from "@/lib/supabase"
 import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { useRestrictedAccess } from "@/hooks/use-restricted-access"
+import { currentMonthNameEcuador } from "@/lib/timezone"
 
 import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign } from "lucide-react"
 
@@ -161,7 +162,7 @@ const [openCloseModal, setOpenCloseModal] = useState(false)
                 </span>
               )}
               <Badge variant="outline" className="text-blue-600 border-blue-200">
-                {currentMonth?.name || "Sin mes activo"}
+                {currentMonthNameEcuador()}
               </Badge>
             </div>
           </div>

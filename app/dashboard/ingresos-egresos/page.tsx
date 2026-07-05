@@ -56,6 +56,7 @@ import {
 import { storage } from "@/lib/storage";
 import { useAuth } from "@/contexts/auth-context";
 import { useSecurityCheck } from "@/contexts/security-context"
+import { todayEcuador } from "@/lib/timezone"
 
 interface FinancialRecord {
   id: number;
@@ -131,7 +132,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
 
 
   const [formData, setFormData] = useState({
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: todayEcuador(),
     tipo: "Ingreso" as "Ingreso" | "Egreso",
     ministerio: "",
     categoria_principal: "",
@@ -301,7 +302,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
 
       // Reset form
       setFormData({
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: todayEcuador(),
         tipo: "Ingreso",
         ministerio: "",
         categoria_principal: "",
@@ -339,7 +340,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
     }
     setEditingRecord(record);
     setFormData({
-      fecha: formatDateForInput(record.fecha),
+      fecha: todayEcuador(),
       tipo: record.tipo,
       ministerio: record.ministerio,
       categoria_principal: record.categoria_principal,
@@ -751,18 +752,6 @@ function formatDateForTable(dateString: string) {
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="fecha">Fecha *</Label>
-                        <Input
-                          id="fecha"
-                          type="date"
-                          value={formData.fecha}
-                          onChange={(e) =>
-                            setFormData({ ...formData, fecha: e.target.value })
-                          }
-                          required
-                        />
-                      </div>
                       <div>
                         <Label htmlFor="tipo">Tipo *</Label>
                         <Select
@@ -1275,18 +1264,6 @@ function formatDateForTable(dateString: string) {
 
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-fecha">Fecha *</Label>
-                <Input
-                  id="edit-fecha"
-                  type="date"
-                  value={formData.fecha}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fecha: e.target.value })
-                  }
-                  required
-                />
-              </div>
               <div>
                 <Label htmlFor="edit-tipo">Tipo *</Label>
                 <Select

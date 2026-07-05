@@ -12,6 +12,7 @@ import { getUserPermissions } from "@/lib/auth"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotificaciones } from "@/hooks/use-notificaciones"
+import { todayEcuador } from "@/lib/timezone"
 import { CreateMonthModal } from "@/components/CreateMonthModal"
 import { ChangePasswordModal } from "@/components/ChangePasswordModal"
 import { BuzonNotificaciones } from "@/components/BuzonNotificaciones"
@@ -268,7 +269,7 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
               <BuzonNotificaciones />
               <Badge variant="outline" className="text-blue-600 border-blue-200 text-xs hidden sm:inline-flex">
-                {currentMonth?.name || "Sin mes activo"}
+                {new Date(todayEcuador() + "T12:00:00").toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}
               </Badge>
               <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs sm:text-sm">
                 Salir

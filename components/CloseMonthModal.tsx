@@ -5,13 +5,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import { useState } from "react"
 import { useMonth } from "@/contexts/month-context"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { todayEcuador } from "@/lib/timezone"
 
 interface CloseMonthModalProps {
   open: boolean
@@ -20,12 +21,20 @@ interface CloseMonthModalProps {
 
 export function CloseMonthModal({ open, setOpen }: CloseMonthModalProps) {
   const { currentMonth, closeCurrentMonth } = useMonth()
-  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0])
+  const [isClosing, setIsClosing] = useState(false)
 
-  const handleSave = async () => {
-    await closeCurrentMonth(endDate)
-    toast("Mes cerrado correctamente ✔️")
-    setOpen(false)
+  const handleClose = async () => {
+    setIsClosing(true)
+    try {
+      const endDate = todayEcuador()
+      await closeCurrentMonth(endDate)
+      toast.success("Mes cerrado correctamente")
+      setOpen(false)
+    } catch (error) {
+      toast.error("Error al cerrar el mes")
+    } finally {
+      setIsClosing(false)
+    }
   }
 
   if (!currentMonth) return null
@@ -35,19 +44,20 @@ export function CloseMonthModal({ open, setOpen }: CloseMonthModalProps) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Cerrar Mes</DialogTitle>
+          <DialogDescription>
+            Se cerrará el mes <strong>{currentMonth.name}</strong> con fecha de cierre de hoy.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div>
-            <label>Fecha de cierre</label>
-            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-          </div>
+        <div className="py-4 text-center">
+          <p className="text-sm text-gray-600">Fecha de cierre:</p>
+          <p className="text-lg font-semibold text-red-600">{todayEcuador()}</p>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={handleSave} className="bg-red-600 text-white hover:bg-red-700">
-            Cerrar Mes
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isClosing}>Cancelar</Button>
+          <Button onClick={handleClose} disabled={isClosing} className="bg-red-600 text-white hover:bg-red-700">
+            {isClosing ? "Cerrando..." : "Cerrar Mes"}
           </Button>
         </DialogFooter>
       </DialogContent>
