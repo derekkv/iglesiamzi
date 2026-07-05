@@ -8,6 +8,10 @@ export interface OfrendaCelula {
   mes: number
   anio: number
   valor: number
+  recibido: boolean
+  recibido_por: string | null
+  recibido_por_nombre: string | null
+  recibido_at: string | null
   registrado_por: string | null
   registrado_por_nombre: string | null
   created_at: string
@@ -147,4 +151,30 @@ export async function getHistorialOfrendas(celula: string): Promise<OfrendaCelul
 
   if (error) return []
   return data || []
+}
+
+
+
+/**
+ * Marcar/desmarcar una ofrenda como recibida
+ */
+export async function toggleRecibido(params: {
+  id: number
+  recibido: boolean
+  userId: string
+  userName: string
+}): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase
+    .from("ofrendas_celulas")
+    .update({
+      recibido: params.recibido,
+      recibido_por: params.recibido ? params.userId : null,
+      recibido_por_nombre: params.recibido ? params.userName : null,
+      recibido_at: params.recibido ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
 }

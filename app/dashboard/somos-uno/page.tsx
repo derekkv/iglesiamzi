@@ -612,21 +612,6 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-sm font-medium">¿Asistió a la célula?</Label>
-              <div className="flex gap-3 mt-2">
-                <Button
-                  variant={gestionAsistio === true ? "default" : "outline"}
-                  className={gestionAsistio === true ? "bg-green-600 hover:bg-green-700" : ""}
-                  onClick={() => setGestionAsistio(true)}
-                >Asistió</Button>
-                <Button
-                  variant={gestionAsistio === false ? "default" : "outline"}
-                  className={gestionAsistio === false ? "bg-red-600 hover:bg-red-700" : ""}
-                  onClick={() => setGestionAsistio(false)}
-                >Faltó</Button>
-              </div>
-            </div>
-            <div>
               <Label className="text-sm font-medium">¿Se pudo gestionar?</Label>
               <div className="flex gap-3 mt-2">
                 <Button
@@ -720,21 +705,6 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
             <DialogDescription>Semana del {editingGestion?.semana_inicio}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div>
-              <Label className="text-sm font-medium">¿Asistió a la célula?</Label>
-              <div className="flex gap-3 mt-2">
-                <Button
-                  variant={editAsistio === true ? "default" : "outline"}
-                  className={editAsistio === true ? "bg-green-600 hover:bg-green-700" : ""}
-                  onClick={() => setEditAsistio(true)}
-                >Asistió</Button>
-                <Button
-                  variant={editAsistio === false ? "default" : "outline"}
-                  className={editAsistio === false ? "bg-red-600 hover:bg-red-700" : ""}
-                  onClick={() => setEditAsistio(false)}
-                >Faltó</Button>
-              </div>
-            </div>
             <div>
               <Label className="text-sm font-medium">¿Se pudo gestionar?</Label>
               <div className="flex gap-3 mt-2">

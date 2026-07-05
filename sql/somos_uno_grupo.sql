@@ -26,17 +26,17 @@ VALUES (
   (SELECT id FROM module_groups WHERE name = 'somos_uno' LIMIT 1)
 ) ON CONFLICT (name) DO NOTHING;
 
--- 4. Crear sub-módulo: Ofrenda de Células
+-- 4. Crear sub-módulo: Ofrenda de Células (en grupo Administración)
 INSERT INTO system_modules (name, display_name, description, icon, route, requires_active_month, is_active, group_id)
 VALUES (
   'ofrenda-celulas',
-  'Ofrenda',
+  'Ofrenda de Células',
   'Resumen y registro de ofrendas semanales por célula',
   '💰',
   '/dashboard/ofrenda-celulas',
   false,
   true,
-  (SELECT id FROM module_groups WHERE name = 'somos_uno' LIMIT 1)
+  (SELECT id FROM module_groups WHERE name = 'administracion' LIMIT 1)
 ) ON CONFLICT (name) DO NOTHING;
 
 -- 5. Tabla de ofrendas por célula (cada jueves)
@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS ofrendas_celulas (
   mes INTEGER NOT NULL,           -- Mes (1-12)
   anio INTEGER NOT NULL,          -- Año
   valor DECIMAL(10,2) NOT NULL DEFAULT 0,
+  recibido BOOLEAN NOT NULL DEFAULT FALSE,  -- Check de confirmación de recepción
+  recibido_por UUID REFERENCES users(id),
+  recibido_por_nombre TEXT,
+  recibido_at TIMESTAMPTZ,
   registrado_por UUID REFERENCES users(id),
   registrado_por_nombre TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
