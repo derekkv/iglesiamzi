@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useAuth } from "@/contexts/auth-context"
+import { registrarAtraso, eliminarAtraso, notificarLiderAtraso } from "@/lib/mod/gestion-atrasados-service"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -42,6 +43,7 @@ const ESTADO_OPTIONS = [
   { value: "asistio", label: "A", color: "bg-green-100 text-green-800" },
   { value: "falto", label: "F", color: "bg-red-100 text-red-800" },
   { value: "justifico", label: "J", color: "bg-blue-100 text-blue-800" },
+  { value: "atrasado", label: "AT", color: "bg-amber-100 text-amber-800" },
 ]
 
 function getDomingosDelMes(year: number, month: number): string[] {
@@ -198,6 +200,28 @@ export function ControlAsistenciaServidores({ moduloKey, moduleName, title, canE
         }
         return filtered
       })
+
+      // Si marcaron "atrasado", registrar y notificar al líder
+      if (estado === "atrasado" && user) {
+        const result = await registrarAtraso({
+          modulo: moduloKey,
+          userId,
+          userName,
+          fecha,
+          registradoPor: user.id,
+          registradoPorNombre: user.username,
+        })
+        if (result.success && result.id) {
+          notificarLiderAtraso({ modulo: moduloKey, userName, fecha, atrasoId: result.id })
+          toast.info("Se notificará al líder sobre el atraso")
+        }
+      }
+
+      // Si cambiaron de "atrasado" a otro estado, eliminar registro de atraso
+      const prevEstado = records.find((r) => r.user_id === userId && r.fecha === fecha)?.estado
+      if (prevEstado === "atrasado" && estado !== "atrasado") {
+        await eliminarAtraso(moduloKey, userId, fecha)
+      }
     } catch (error: any) {
       toast.error("Error al guardar: " + error.message)
     }
@@ -210,9 +234,10 @@ export function ControlAsistenciaServidores({ moduloKey, moduleName, title, canE
       const asistencias = userRecords.filter((r) => r.estado === "asistio").length
       const faltas = userRecords.filter((r) => r.estado === "falto").length
       const justificadas = userRecords.filter((r) => r.estado === "justifico").length
+      const atrasados = userRecords.filter((r) => r.estado === "atrasado").length
       const total = domingos.length
       const porcentaje = total > 0 ? Math.round((asistencias / total) * 100) : 0
-      return { ...u, asistencias, faltas, justificadas, total, porcentaje }
+      return { ...u, asistencias, faltas, justificadas, atrasados, total, porcentaje }
     })
     return stats.sort((a, b) => b.porcentaje - a.porcentaje)
   }

@@ -477,6 +477,8 @@ export function CensoForm({
                       ))}
                       <SelectItem value="Anciano">Anciano</SelectItem>
                       <SelectItem value="Pastor/a Vitalicio">Pastor/a Vitalicio</SelectItem>
+                      <SelectItem value="Profesionales Externos">Profesionales Externos</SelectItem>
+                      <SelectItem value="Pastores Externos">Pastores Externos</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

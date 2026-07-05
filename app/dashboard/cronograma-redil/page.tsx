@@ -6,13 +6,8 @@ import { CronogramaServicio } from "@/components/CronogramaServicio"
 export default function CronogramaRedilPage() {
   return (
     <PermissionsGuard moduleName="cronograma-redil">
-      {(canEdit) => (
-        <CronogramaServicio
-          canEdit={canEdit}
-          moduloKey="redil"
-          moduleName="cronograma-redil"
-          title="Redil"
-        />
+      {(canEdit, canAdmin, canLeader) => (
+        <CronogramaServicio canEdit={canEdit} moduloKey="redil" moduleName="cronograma-redil" title="Redil" canLeader={canLeader} />
       )}
     </PermissionsGuard>
   )

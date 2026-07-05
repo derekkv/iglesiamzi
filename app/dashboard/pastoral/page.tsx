@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation"
 import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowLeft } from "lucide-react"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { supabase } from "@/lib/supabase"
+import { getTodosLosAtrasados, type GestionAtrasado } from "@/lib/mod/gestion-atrasados-service"
 
 interface ColumnData {
   id: number
@@ -38,6 +41,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
   const [columns, setColumns] = useState<ColumnData[]>([])
   const [details, setDetails] = useState<DetailData[]>([])
   const [data, setData] = useState<AttendanceEntry[]>([])
+  const [atrasados, setAtrasados] = useState<GestionAtrasado[]>([])
   const [loading, setLoading] = useState(true)
 
   // Fecha de hoy en formato YYYY-MM-DD
@@ -45,11 +49,18 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
   useEffect(() => {
     if (currentMonth) loadData()
+    loadAtrasados()
   }, [currentMonth])
 
+  const loadAtrasados = async () => {
+    const data = await getTodosLosAtrasados()
+    setAtrasados(data)
+  }
+
   // Realtime: refrescar cuando cambian datos de asistencia
-  useRealtimeMultiple(["asistencia_columnas", "asistencia_detalles", "asistencia_datos"], () => {
+  useRealtimeMultiple(["asistencia_columnas", "asistencia_detalles", "asistencia_datos", "gestion_atrasados"], () => {
     if (currentMonth) loadData(true)
+    loadAtrasados()
   })
 
   const loadData = async (silent = false) => {
@@ -308,6 +319,57 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
               <div className="text-center py-12 text-gray-500">
                 <p>No hay registros de asistencia para este mes.</p>
                 <p className="text-sm mt-1">Registre la asistencia en el módulo de Estadísticas de Asistencia.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Resumen de Atrasados */}
+        <Card className="border-amber-200 mt-6">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="text-amber-600">Resumen de Atrasados</span>
+              <Badge variant="outline" className="text-amber-600 border-amber-300">{atrasados.length}</Badge>
+            </CardTitle>
+            <CardDescription>Estado de gestión de servidores con atrasos en todos los módulos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {atrasados.length === 0 ? (
+              <p className="text-center text-gray-500 py-6 text-sm">No hay atrasados registrados</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Módulo</TableHead>
+                      <TableHead className="text-xs">Persona</TableHead>
+                      <TableHead className="text-xs">Fecha</TableHead>
+                      <TableHead className="text-xs">Gestionado</TableHead>
+                      <TableHead className="text-xs">Acuerdo</TableHead>
+                      <TableHead className="text-xs">Gestionado Por</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {atrasados.map((a) => (
+                      <TableRow key={a.id} className={!a.gestionado ? "bg-amber-50/50" : ""}>
+                        <TableCell className="text-xs font-medium capitalize">{a.modulo}</TableCell>
+                        <TableCell className="text-xs">{a.user_name}</TableCell>
+                        <TableCell className="text-xs">{a.fecha}</TableCell>
+                        <TableCell className="text-xs">
+                          {a.gestionado ? (
+                            <Badge className={a.respuesta_gestion ? "bg-green-100 text-green-700 text-[10px]" : "bg-red-100 text-red-700 text-[10px]"}>
+                              {a.respuesta_gestion ? "Sí" : "No"}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px]">Pendiente</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">{a.acuerdo || "-"}</TableCell>
+                        <TableCell className="text-xs text-gray-500">{a.gestionado_por_nombre || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>

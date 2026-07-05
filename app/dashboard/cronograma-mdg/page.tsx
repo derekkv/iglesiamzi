@@ -6,13 +6,8 @@ import { CronogramaServicio } from "@/components/CronogramaServicio"
 export default function CronogramaMDGPage() {
   return (
     <PermissionsGuard moduleName="cronograma-mdg">
-      {(canEdit) => (
-        <CronogramaServicio
-          canEdit={canEdit}
-          moduloKey="mdg"
-          moduleName="cronograma-mdg"
-          title="Mujeres de Gracia"
-        />
+      {(canEdit, canAdmin, canLeader) => (
+        <CronogramaServicio canEdit={canEdit} moduloKey="mdg" moduleName="cronograma-mdg" title="Mujeres de Gracia" canLeader={canLeader} />
       )}
     </PermissionsGuard>
   )

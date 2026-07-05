@@ -6,13 +6,8 @@ import { CronogramaServicio } from "@/components/CronogramaServicio"
 export default function CronogramaAdministracionPage() {
   return (
     <PermissionsGuard moduleName="cronograma-administracion">
-      {(canEdit) => (
-        <CronogramaServicio
-          canEdit={canEdit}
-          moduloKey="administracion"
-          moduleName="cronograma-administracion"
-          title="Administración"
-        />
+      {(canEdit, canAdmin, canLeader) => (
+        <CronogramaServicio canEdit={canEdit} moduloKey="administracion" moduleName="cronograma-administracion" title="Administración" isAdmin canLeader={canLeader} />
       )}
     </PermissionsGuard>
   )

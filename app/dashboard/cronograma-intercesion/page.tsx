@@ -6,13 +6,8 @@ import { CronogramaServicio } from "@/components/CronogramaServicio"
 export default function CronogramaIntercesionPage() {
   return (
     <PermissionsGuard moduleName="cronograma-intercesion">
-      {(canEdit) => (
-        <CronogramaServicio
-          canEdit={canEdit}
-          moduloKey="intercesion"
-          moduleName="cronograma-intercesion"
-          title="Intercesión"
-        />
+      {(canEdit, canAdmin, canLeader) => (
+        <CronogramaServicio canEdit={canEdit} moduloKey="intercesion" moduleName="cronograma-intercesion" title="Intercesión" canLeader={canLeader} />
       )}
     </PermissionsGuard>
   )

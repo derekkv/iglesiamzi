@@ -35,16 +35,20 @@ import {
 
 import { ArrowLeft, Plus, Trash2, Search, X, Pencil } from "lucide-react"
 import { toast } from "sonner"
+import { getAtrasadosPorModulo, gestionarAtraso, type GestionAtrasado } from "@/lib/mod/gestion-atrasados-service"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 
 interface CronogramaServicioProps {
   canEdit: boolean
   moduloKey: string
   moduleName: string
   title: string
-  isAdmin?: boolean // Si es true, muestra controles de hora llegada y atraso
+  isAdmin?: boolean
+  canLeader?: boolean
 }
 
-export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAdmin = false }: CronogramaServicioProps) {
+export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAdmin = false, canLeader = false }: CronogramaServicioProps) {
   const router = useRouter()
   const { user } = useAuth()
   const { checkAndExecute } = useSecurityCheck()
@@ -52,6 +56,14 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
   const [entries, setEntries] = useState<CronogramaEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  // Atrasados (solo líder)
+  const [atrasados, setAtrasados] = useState<GestionAtrasado[]>([])
+  const [activeMainTab, setActiveMainTab] = useState<"cronograma" | "atrasados">("cronograma")
+  const [gestionandoId, setGestionandoId] = useState<number | null>(null)
+  const [gestionRespuesta, setGestionRespuesta] = useState<boolean | null>(null)
+  const [gestionAcuerdo, setGestionAcuerdo] = useState("")
+  const [savingGestion, setSavingGestion] = useState(false)
 
   // Form
   const [showForm, setShowForm] = useState(false)
@@ -90,9 +102,38 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
   useEffect(() => {
     loadEntries()
     loadMinisterios()
+    if (canLeader) loadAtrasados()
   }, [])
 
   useRealtime({ table: "cronograma_servicio", onChange: () => loadEntries(true) })
+  useRealtime({ table: "gestion_atrasados", enabled: canLeader, onChange: () => loadAtrasados() })
+
+  const loadAtrasados = async () => {
+    const data = await getAtrasadosPorModulo(moduloKey)
+    setAtrasados(data)
+  }
+
+  const handleGestionarAtrasado = async () => {
+    if (gestionandoId === null || gestionRespuesta === null || !user) return
+    setSavingGestion(true)
+    const result = await gestionarAtraso({
+      id: gestionandoId,
+      respuestaGestion: gestionRespuesta,
+      acuerdo: gestionAcuerdo,
+      gestionadoPor: user.id,
+      gestionadoPorNombre: user.username,
+    })
+    setSavingGestion(false)
+    if (result.success) {
+      toast.success("Gestión registrada")
+      setGestionandoId(null)
+      setGestionRespuesta(null)
+      setGestionAcuerdo("")
+      loadAtrasados()
+    } else {
+      toast.error(result.error || "Error al gestionar")
+    }
+  }
 
   const loadEntries = async (silent = false) => {
     try {
@@ -293,6 +334,85 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Tab de líder para atrasados */}
+        {canLeader && (
+          <div className="flex gap-2 mb-2">
+            <Button variant={activeMainTab === "cronograma" ? "default" : "outline"} size="sm" onClick={() => setActiveMainTab("cronograma")}>Cronograma</Button>
+            <Button variant={activeMainTab === "atrasados" ? "default" : "outline"} size="sm" onClick={() => setActiveMainTab("atrasados")} className={activeMainTab === "atrasados" ? "bg-amber-600 hover:bg-amber-700" : ""}>
+              Atrasados ({atrasados.filter(a => !a.gestionado).length})
+            </Button>
+          </div>
+        )}
+
+        {canLeader && activeMainTab === "atrasados" ? (
+          <Card className="border-amber-200">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><span className="text-amber-600">Gestión de Atrasados</span></CardTitle>
+              <CardDescription>Registre si gestionó la situación y el acuerdo al que llegaron (máx. 240 caracteres)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {atrasados.length === 0 ? (
+                <p className="text-center text-gray-500 py-6">No hay atrasados registrados</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Persona</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Acuerdo</TableHead>
+                        <TableHead className="text-right">Acción</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {atrasados.map((a) => (
+                        <TableRow key={a.id} className={a.gestionado ? "opacity-60" : ""}>
+                          <TableCell className="font-medium">{a.user_name}</TableCell>
+                          <TableCell className="text-xs">{a.fecha}</TableCell>
+                          <TableCell>
+                            {a.gestionado ? (
+                              <Badge className={a.respuesta_gestion ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                                {a.respuesta_gestion ? "Gestionado" : "No gestionado"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-amber-600 border-amber-300">Pendiente</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate">{a.acuerdo || "-"}</TableCell>
+                          <TableCell className="text-right">
+                            {!a.gestionado && (
+                              <Button size="sm" variant="outline" onClick={() => { setGestionandoId(a.id); setGestionRespuesta(null); setGestionAcuerdo("") }}>Gestionar</Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {gestionandoId !== null && (
+                <div className="mt-4 p-4 border border-amber-200 rounded-lg bg-amber-50/50 space-y-3">
+                  <p className="font-medium text-sm">Registrar gestión:</p>
+                  <div className="flex gap-3">
+                    <Button size="sm" variant={gestionRespuesta === true ? "default" : "outline"} className={gestionRespuesta === true ? "bg-green-600" : ""} onClick={() => setGestionRespuesta(true)}>Sí</Button>
+                    <Button size="sm" variant={gestionRespuesta === false ? "default" : "outline"} className={gestionRespuesta === false ? "bg-red-600" : ""} onClick={() => setGestionRespuesta(false)}>No</Button>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Acuerdo al que llegaron (máx. 240 caracteres)</Label>
+                    <Textarea value={gestionAcuerdo} onChange={(e) => setGestionAcuerdo(e.target.value.slice(0, 240))} placeholder="Describir el acuerdo..." className="mt-1" maxLength={240} />
+                    <p className="text-xs text-gray-400 text-right">{gestionAcuerdo.length}/240</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setGestionandoId(null)}>Cancelar</Button>
+                    <Button size="sm" onClick={handleGestionarAtrasado} disabled={savingGestion || gestionRespuesta === null}>{savingGestion ? "Guardando..." : "Guardar"}</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+        <>
         {showForm && canEdit && (
           <Card className="border-blue-200 bg-blue-50/30">
             <CardHeader>
@@ -492,6 +612,8 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
             )}
           </CardContent>
         </Card>
+        </>
+        )}
       </main>
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null) }}>

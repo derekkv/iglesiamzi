@@ -6,26 +6,31 @@ import { supabase } from "@/lib/supabase"
 import { useRealtime } from "@/hooks/use-realtime"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
+import { useSecurityCheck } from "@/contexts/security-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Users, UserPlus, Lock } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, Users, UserPlus, Lock, Eye, ClipboardCheck, History } from "lucide-react"
+import { toast } from "sonner"
+import {
+  registrarGestion,
+  editarGestion,
+  getHistorialGestiones,
+  getGestionesSemanaActual,
+  getLunesSemanaActual,
+  type GestionCelula,
+} from "@/lib/mod/gestion-celulas-service"
+
 
 const CELULAS = [
-  "Carlos y Ruth",
-  "Sarita y Lady",
-  "Jessy Mendoza",
-  "Líder y Angela",
-  "Juan Pablo y Angie",
-  "Alina y Anita",
-  "Neyda y Carmen",
-  "Yadira y Tania",
-  "Luis y Ariana",
-  "Layla Salem",
-  "Estuardo y Catalina",
-  "Gabriela López",
+  "Carlos y Ruth", "Sarita y Lady", "Jessy Mendoza", "Líder y Angela",
+  "Juan Pablo y Angie", "Alina y Anita", "Neyda y Carmen", "Yadira y Tania",
+  "Luis y Ariana", "Layla Salem", "Estuardo y Catalina", "Gabriela López",
 ]
 
 const CELULA_IMAGES: Record<string, string> = {
@@ -53,32 +58,58 @@ interface MiembroCelula {
   celula_asiste: boolean
   celula_nombre: string
   fuente: "protocolo" | "mdg"
+  // Campos extra del censo para el detalle
+  cedula?: string
+  fecha_nacimiento?: string
+  edad?: number
+  estado_civil?: string
+  sexo?: string
+  direccion?: string
+  correo?: string
 }
+
 
 function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
+  const { user } = useAuth()
+  const { checkAndExecute } = useSecurityCheck()
   const [miembros, setMiembros] = useState<MiembroCelula[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCelula, setSelectedCelula] = useState<string | null>(null)
 
+  // Modales
+  const [detailMember, setDetailMember] = useState<MiembroCelula | null>(null)
+  const [gestionMember, setGestionMember] = useState<MiembroCelula | null>(null)
+  const [historialMember, setHistorialMember] = useState<MiembroCelula | null>(null)
+  const [historial, setHistorial] = useState<GestionCelula[]>([])
+  const [gestionesSemana, setGestionesSemana] = useState<GestionCelula[]>([])
+
+  // Form gestión
+  const [gestionRespuesta, setGestionRespuesta] = useState("")
+  const [gestionValue, setGestionValue] = useState<boolean | null>(null)
+  const [gestionAsistio, setGestionAsistio] = useState<boolean | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Editar gestión
+  const [editingGestion, setEditingGestion] = useState<GestionCelula | null>(null)
+  const [editRespuesta, setEditRespuesta] = useState("")
+  const [editValue, setEditValue] = useState<boolean>(false)
+  const [editAsistio, setEditAsistio] = useState<boolean>(false)
+
   const loadMiembros = useCallback(async () => {
     try {
       const [{ data: protocolo }, { data: mdg }] = await Promise.all([
-        supabase
-          .from("censo")
-          .select("id, apellidos_nombres, celular, convencional, conyuge, hijos, celula_asiste, celula_nombre")
+        supabase.from("censo")
+          .select("id, apellidos_nombres, celular, convencional, conyuge, hijos, celula_asiste, celula_nombre, cedula, fecha_nacimiento, edad, estado_civil, sexo, direccion, correo")
           .not("celula_nombre", "is", null),
-        supabase
-          .from("censo_mdg")
-          .select("id, apellidos_nombres, celular, convencional, conyuge, hijos, celula_asiste, celula_nombre")
+        supabase.from("censo_mdg")
+          .select("id, apellidos_nombres, celular, convencional, conyuge, hijos, celula_asiste, celula_nombre, cedula, fecha_nacimiento, edad, estado_civil, sexo, direccion, correo")
           .not("celula_nombre", "is", null),
       ])
-
       const all: MiembroCelula[] = [
         ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
         ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
       ]
-
       setMiembros(all)
     } catch (error) {
       console.error("Error cargando miembros:", error)
@@ -88,18 +119,96 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   }, [])
 
   useEffect(() => { loadMiembros() }, [loadMiembros])
-
   useRealtime({ table: "censo", onChange: () => loadMiembros() })
   useRealtime({ table: "censo_mdg", onChange: () => loadMiembros() })
+  useRealtime({ table: "gestion_celulas", onChange: () => { if (selectedCelula) loadGestionesSemana(selectedCelula) } })
 
-  // Miembros que SÍ asisten a célula
+
+  const loadGestionesSemana = async (celula: string) => {
+    const data = await getGestionesSemanaActual(celula)
+    setGestionesSemana(data)
+  }
+
+  useEffect(() => {
+    if (selectedCelula) loadGestionesSemana(selectedCelula)
+  }, [selectedCelula])
+
   const miembrosActivos = miembros.filter((m) => m.celula_asiste)
-  // Miembros que NO asisten pero tienen célula asignada
   const posiblesMiembros = miembros.filter((m) => !m.celula_asiste)
-
-  // Agrupar por célula
   const activosPorCelula = (celula: string) => miembrosActivos.filter((m) => m.celula_nombre === celula)
   const posiblesPorCelula = (celula: string) => posiblesMiembros.filter((m) => m.celula_nombre === celula)
+
+  const isGestionadoEstaSemana = (m: MiembroCelula) => {
+    return gestionesSemana.some((g) => g.miembro_id === m.id && g.fuente === m.fuente)
+  }
+
+  const handleGestionar = (m: MiembroCelula) => {
+    if (isGestionadoEstaSemana(m)) {
+      toast.error("Este miembro ya fue gestionado esta semana")
+      return
+    }
+    setGestionMember(m)
+    setGestionValue(null)
+    setGestionAsistio(null)
+    setGestionRespuesta("")
+  }
+
+  const handleSaveGestion = async () => {
+    if (!gestionMember || gestionValue === null || gestionAsistio === null || !user) return
+    setIsSaving(true)
+    const result = await registrarGestion({
+      miembroId: gestionMember.id,
+      fuente: gestionMember.fuente,
+      celulaNombre: gestionMember.celula_nombre,
+      gestionado: gestionValue,
+      respuesta: gestionRespuesta,
+      asistio: gestionAsistio,
+      userId: user.id,
+      userName: user.username,
+    })
+    setIsSaving(false)
+    if (result.success) {
+      toast.success("Gestión registrada")
+      setGestionMember(null)
+      if (selectedCelula) loadGestionesSemana(selectedCelula)
+    } else {
+      toast.error(result.error || "Error al registrar")
+    }
+  }
+
+  const handleOpenHistorial = async (m: MiembroCelula) => {
+    setHistorialMember(m)
+    const data = await getHistorialGestiones(m.id, m.fuente)
+    setHistorial(data)
+  }
+
+  const handleEditGestion = (g: GestionCelula) => {
+    checkAndExecute(g.created_at, () => {
+      setEditingGestion(g)
+      setEditValue(g.gestionado)
+      setEditRespuesta(g.respuesta || "")
+      setEditAsistio(g.asistio ?? false)
+    })
+  }
+
+  const handleSaveEditGestion = async () => {
+    if (!editingGestion) return
+    setIsSaving(true)
+    const result = await editarGestion(editingGestion.id, { gestionado: editValue, respuesta: editRespuesta, asistio: editAsistio })
+    setIsSaving(false)
+    if (result.success) {
+      toast.success("Gestión actualizada")
+      setEditingGestion(null)
+      if (historialMember) {
+        const data = await getHistorialGestiones(historialMember.id, historialMember.fuente)
+        setHistorial(data)
+      }
+      if (selectedCelula) loadGestionesSemana(selectedCelula)
+    } else {
+      toast.error(result.error || "Error al actualizar")
+    }
+  }
+
 
   const renderMiembrosTable = (lista: MiembroCelula[], emptyMsg: string) => {
     if (lista.length === 0) {
@@ -111,33 +220,57 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           <TableHeader>
             <TableRow>
               <TableHead className="text-xs">#</TableHead>
-              <TableHead className="text-xs">Nombres y Apellidos</TableHead>
+              <TableHead className="text-xs">Nombre</TableHead>
               <TableHead className="text-xs">Celular</TableHead>
-              <TableHead className="text-xs">Tel. Opcional</TableHead>
-              <TableHead className="text-xs">Cónyuge</TableHead>
-              <TableHead className="text-xs">Hijos</TableHead>
+              <TableHead className="text-xs">Estado Semana</TableHead>
+              <TableHead className="text-xs text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {lista.map((m, idx) => (
-              <TableRow key={`${m.fuente}-${m.id}`}>
-                <TableCell className="text-xs">{idx + 1}</TableCell>
-                <TableCell className="text-xs font-medium">{m.apellidos_nombres}</TableCell>
-                <TableCell className="text-xs">{m.celular || "-"}</TableCell>
-                <TableCell className="text-xs">{m.convencional || "-"}</TableCell>
-                <TableCell className="text-xs">{m.conyuge || "-"}</TableCell>
-                <TableCell className="text-xs">
-                  {m.hijos && m.hijos.length > 0
-                    ? m.hijos.map((h) => `${h.nombre} (${h.edad})`).join(", ")
-                    : "-"}
-                </TableCell>
-              </TableRow>
-            ))}
+            {lista.map((m, idx) => {
+              const gestionado = isGestionadoEstaSemana(m)
+              const gestionSemana = gestionesSemana.find((g) => g.miembro_id === m.id && g.fuente === m.fuente)
+              return (
+                <TableRow key={`${m.fuente}-${m.id}`}>
+                  <TableCell className="text-xs">{idx + 1}</TableCell>
+                  <TableCell className="text-xs font-medium">{m.apellidos_nombres}</TableCell>
+                  <TableCell className="text-xs">{m.celular || "-"}</TableCell>
+                  <TableCell className="text-xs">
+                    {gestionado ? (
+                      <Badge className={gestionSemana?.gestionado ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                        {gestionSemana?.gestionado ? "Sí" : "No"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-gray-400">Pendiente</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" title="Ver datos" onClick={() => setDetailMember(m)}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" title="Gestionar"
+                        onClick={() => handleGestionar(m)}
+                        disabled={gestionado || !canEdit}
+                        className={gestionado ? "opacity-40" : "text-blue-600"}
+                      >
+                        <ClipboardCheck className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" title="Historial" onClick={() => handleOpenHistorial(m)}>
+                        <History className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       </div>
     )
   }
+
 
   if (loading) {
     return (
@@ -161,7 +294,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                   {selectedCelula ? `Célula: ${selectedCelula}` : "Somos Uno - Células"}
                 </h1>
                 <p className="text-xs text-gray-500">
-                  {miembrosActivos.length} miembros activos | {posiblesMiembros.length} posibles miembros
+                  {miembrosActivos.length} activos | {posiblesMiembros.length} posibles | Semana: {getLunesSemanaActual()}
                 </p>
               </div>
             </div>
@@ -176,51 +309,28 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {!selectedCelula ? (
-          /* Vista de tarjetas de células */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {CELULAS.map((celula) => {
               const activos = activosPorCelula(celula).length
               const posibles = posiblesPorCelula(celula).length
               const image = CELULA_IMAGES[celula]
               return (
-                <Card
-                  key={celula}
-                  className="cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all duration-200 overflow-hidden border-0 rounded-xl group p-0"
-                  onClick={() => setSelectedCelula(celula)}
-                >
+                <Card key={celula} className="cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all duration-200 overflow-hidden border-0 rounded-xl group p-0" onClick={() => setSelectedCelula(celula)}>
                   <div className="relative h-44 overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600">
                     {image ? (
-                      <img
-                        src={image}
-                        alt={celula}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
+                      <img src={image} alt={celula} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Users className="w-16 h-16 text-white/40" />
-                      </div>
+                      <div className="w-full h-full flex items-center justify-center"><Users className="w-16 h-16 text-white/40" /></div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                    <div className="absolute bottom-3 left-4 right-4">
-                      <h3 className="text-lg font-bold text-white drop-shadow-md">{celula}</h3>
-                    </div>
-                    <div className="absolute top-3 right-3">
-                      <Badge className="bg-white/90 text-gray-800 text-xs font-semibold shadow">
-                        {activos + posibles}
-                      </Badge>
-                    </div>
+                    <div className="absolute bottom-3 left-4 right-4"><h3 className="text-lg font-bold text-white drop-shadow-md">{celula}</h3></div>
+                    <div className="absolute top-3 right-3"><Badge className="bg-white/90 text-gray-800 text-xs font-semibold shadow">{activos + posibles}</Badge></div>
                   </div>
                   <CardContent className="p-3">
                     <div className="flex justify-between items-center">
                       <div className="flex gap-3 text-sm">
-                        <span className="text-green-600 flex items-center gap-1 font-medium">
-                          <Users className="w-3.5 h-3.5" /> {activos} activos
-                        </span>
-                        {posibles > 0 && (
-                          <span className="text-amber-600 flex items-center gap-1 font-medium">
-                            <UserPlus className="w-3.5 h-3.5" /> {posibles} posibles
-                          </span>
-                        )}
+                        <span className="text-green-600 flex items-center gap-1 font-medium"><Users className="w-3.5 h-3.5" /> {activos} activos</span>
+                        {posibles > 0 && <span className="text-amber-600 flex items-center gap-1 font-medium"><UserPlus className="w-3.5 h-3.5" /> {posibles} posibles</span>}
                       </div>
                       <Button size="sm" variant="outline" className="text-xs">Ver</Button>
                     </div>
@@ -229,42 +339,228 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               )
             })}
           </div>
+
+
         ) : (
-          /* Vista interna de una célula con 2 tabs */
           <Tabs defaultValue="activos" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="activos">
-                <Users className="w-4 h-4 mr-2" /> Miembros Activos ({activosPorCelula(selectedCelula).length})
-              </TabsTrigger>
-              <TabsTrigger value="posibles">
-                <UserPlus className="w-4 h-4 mr-2" /> Posibles Miembros ({posiblesPorCelula(selectedCelula).length})
-              </TabsTrigger>
+              <TabsTrigger value="activos"><Users className="w-4 h-4 mr-2" /> Miembros Activos ({activosPorCelula(selectedCelula).length})</TabsTrigger>
+              <TabsTrigger value="posibles"><UserPlus className="w-4 h-4 mr-2" /> Posibles Miembros ({posiblesPorCelula(selectedCelula).length})</TabsTrigger>
             </TabsList>
-
             <TabsContent value="activos">
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Miembros que asisten a esta célula</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {renderMiembrosTable(activosPorCelula(selectedCelula), "No hay miembros activos en esta célula")}
-                </CardContent>
+                <CardHeader className="pb-2"><CardTitle className="text-base">Miembros que asisten a esta célula</CardTitle></CardHeader>
+                <CardContent>{renderMiembrosTable(activosPorCelula(selectedCelula), "No hay miembros activos en esta célula")}</CardContent>
               </Card>
             </TabsContent>
-
             <TabsContent value="posibles">
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Posibles miembros (no asisten pero tienen esta célula asignada)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {renderMiembrosTable(posiblesPorCelula(selectedCelula), "No hay posibles miembros para esta célula")}
-                </CardContent>
+                <CardHeader className="pb-2"><CardTitle className="text-base">Posibles miembros (célula asignada pero no asisten)</CardTitle></CardHeader>
+                <CardContent>{renderMiembrosTable(posiblesPorCelula(selectedCelula), "No hay posibles miembros para esta célula")}</CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         )}
       </main>
+
+      {/* Modal: Ver Datos Completos */}
+      <Dialog open={!!detailMember} onOpenChange={() => setDetailMember(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Datos de {detailMember?.apellidos_nombres}</DialogTitle>
+          </DialogHeader>
+          {detailMember && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><span className="text-gray-500">Cédula:</span> <span className="font-medium">{detailMember.cedula || "-"}</span></div>
+                <div><span className="text-gray-500">Edad:</span> <span className="font-medium">{detailMember.edad || "-"}</span></div>
+                <div><span className="text-gray-500">Sexo:</span> <span className="font-medium">{detailMember.sexo || "-"}</span></div>
+                <div><span className="text-gray-500">Estado Civil:</span> <span className="font-medium">{detailMember.estado_civil || "-"}</span></div>
+                <div><span className="text-gray-500">Celular:</span> <span className="font-medium">{detailMember.celular || "-"}</span></div>
+                <div><span className="text-gray-500">Tel. Convencional:</span> <span className="font-medium">{detailMember.convencional || "-"}</span></div>
+                <div><span className="text-gray-500">Correo:</span> <span className="font-medium">{detailMember.correo || "-"}</span></div>
+                <div><span className="text-gray-500">Cónyuge:</span> <span className="font-medium">{detailMember.conyuge || "-"}</span></div>
+                <div className="col-span-2"><span className="text-gray-500">Dirección:</span> <span className="font-medium">{detailMember.direccion || "-"}</span></div>
+                <div className="col-span-2"><span className="text-gray-500">Célula:</span> <span className="font-medium">{detailMember.celula_nombre}</span></div>
+                <div className="col-span-2"><span className="text-gray-500">Asiste:</span> <Badge className={detailMember.celula_asiste ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{detailMember.celula_asiste ? "Sí" : "No"}</Badge></div>
+              </div>
+              {detailMember.hijos && detailMember.hijos.length > 0 && (
+                <div>
+                  <span className="text-gray-500">Hijos:</span>
+                  <ul className="list-disc ml-5 mt-1">{detailMember.hijos.map((h, i) => <li key={i}>{h.nombre} ({h.edad})</li>)}</ul>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Modal: Gestionar */}
+      <Dialog open={!!gestionMember} onOpenChange={() => setGestionMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gestionar: {gestionMember?.apellidos_nombres}</DialogTitle>
+            <DialogDescription>Semana del {getLunesSemanaActual()}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-medium">¿Asistió a la célula?</Label>
+              <div className="flex gap-3 mt-2">
+                <Button
+                  variant={gestionAsistio === true ? "default" : "outline"}
+                  className={gestionAsistio === true ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => setGestionAsistio(true)}
+                >Asistió</Button>
+                <Button
+                  variant={gestionAsistio === false ? "default" : "outline"}
+                  className={gestionAsistio === false ? "bg-red-600 hover:bg-red-700" : ""}
+                  onClick={() => setGestionAsistio(false)}
+                >Faltó</Button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">¿Se pudo gestionar?</Label>
+              <div className="flex gap-3 mt-2">
+                <Button
+                  variant={gestionValue === true ? "default" : "outline"}
+                  className={gestionValue === true ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => setGestionValue(true)}
+                >Sí</Button>
+                <Button
+                  variant={gestionValue === false ? "default" : "outline"}
+                  className={gestionValue === false ? "bg-red-600 hover:bg-red-700" : ""}
+                  onClick={() => setGestionValue(false)}
+                >No</Button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Observación / Respuesta</Label>
+              <Textarea
+                value={gestionRespuesta}
+                onChange={(e) => setGestionRespuesta(e.target.value)}
+                placeholder="Notas sobre la gestión..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGestionMember(null)} disabled={isSaving}>Cancelar</Button>
+            <Button onClick={handleSaveGestion} disabled={isSaving || gestionValue === null || gestionAsistio === null}>
+              {isSaving ? "Guardando..." : "Registrar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Historial */}
+      <Dialog open={!!historialMember} onOpenChange={() => setHistorialMember(null)}>
+        <DialogContent className="max-w-2xl max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Historial de Gestiones: {historialMember?.apellidos_nombres}</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1">
+            {historial.length === 0 ? (
+              <p className="text-center text-gray-500 py-6">No hay gestiones registradas</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Semana</TableHead>
+                    <TableHead className="text-xs">Asistió</TableHead>
+                    <TableHead className="text-xs">Gestionado</TableHead>
+                    <TableHead className="text-xs">Observación</TableHead>
+                    <TableHead className="text-xs">Por</TableHead>
+                    <TableHead className="text-xs text-right">Acción</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {historial.map((g) => (
+                    <TableRow key={g.id}>
+                      <TableCell className="text-xs">{g.semana_inicio}</TableCell>
+                      <TableCell className="text-xs">
+                        <Badge className={g.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                          {g.asistio ? "Asistió" : "Faltó"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <Badge className={g.gestionado ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}>
+                          {g.gestionado ? "Sí" : "No"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs max-w-[200px] truncate">{g.respuesta || "-"}</TableCell>
+                      <TableCell className="text-xs">{g.gestionado_por_nombre || "-"}</TableCell>
+                      <TableCell className="text-xs text-right">
+                        {canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => handleEditGestion(g)}>Editar</Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Modal: Editar Gestión */}
+      <Dialog open={!!editingGestion} onOpenChange={() => setEditingGestion(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Gestión</DialogTitle>
+            <DialogDescription>Semana del {editingGestion?.semana_inicio}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-medium">¿Asistió a la célula?</Label>
+              <div className="flex gap-3 mt-2">
+                <Button
+                  variant={editAsistio === true ? "default" : "outline"}
+                  className={editAsistio === true ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => setEditAsistio(true)}
+                >Asistió</Button>
+                <Button
+                  variant={editAsistio === false ? "default" : "outline"}
+                  className={editAsistio === false ? "bg-red-600 hover:bg-red-700" : ""}
+                  onClick={() => setEditAsistio(false)}
+                >Faltó</Button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">¿Se pudo gestionar?</Label>
+              <div className="flex gap-3 mt-2">
+                <Button
+                  variant={editValue === true ? "default" : "outline"}
+                  className={editValue === true ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => setEditValue(true)}
+                >Sí</Button>
+                <Button
+                  variant={editValue === false ? "default" : "outline"}
+                  className={editValue === false ? "bg-red-600 hover:bg-red-700" : ""}
+                  onClick={() => setEditValue(false)}
+                >No</Button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Observación / Respuesta</Label>
+              <Textarea
+                value={editRespuesta}
+                onChange={(e) => setEditRespuesta(e.target.value)}
+                placeholder="Notas sobre la gestión..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingGestion(null)} disabled={isSaving}>Cancelar</Button>
+            <Button onClick={handleSaveEditGestion} disabled={isSaving}>
+              {isSaving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

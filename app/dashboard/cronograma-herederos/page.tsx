@@ -6,13 +6,8 @@ import { CronogramaServicio } from "@/components/CronogramaServicio"
 export default function CronogramaHerederosPage() {
   return (
     <PermissionsGuard moduleName="cronograma-herederos">
-      {(canEdit) => (
-        <CronogramaServicio
-          canEdit={canEdit}
-          moduloKey="herederos"
-          moduleName="cronograma-herederos"
-          title="Herederos del Reino"
-        />
+      {(canEdit, canAdmin, canLeader) => (
+        <CronogramaServicio canEdit={canEdit} moduloKey="herederos" moduleName="cronograma-herederos" title="Herederos del Reino" canLeader={canLeader} />
       )}
     </PermissionsGuard>
   )

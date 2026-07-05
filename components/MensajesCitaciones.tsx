@@ -217,6 +217,41 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
         }))
 
         await supabase.from("mensajes_citaciones_recibidos").insert(recibidosInsert)
+
+        // Enviar notificaciones por email y WhatsApp a cada destinatario
+        const { data: destUsers } = await supabase
+          .from("users")
+          .select("id, email, phone, displayName")
+          .in("id", destinatarioIds)
+
+        const asunto = tipoMensaje === "citacion" ? "Citación" : "Mensaje"
+        const cuerpo = `${asunto} de ${user.displayName} (${title}): ${detalle.trim()}${fecha ? ` - Fecha: ${fecha}` : ""}${eventoLugar ? ` - Lugar: ${eventoLugar}` : ""}`
+
+        for (const dest of (destUsers || [])) {
+          // Email
+          if (dest.email) {
+            fetch("/api/send-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ to: dest.email, subject: `${asunto} - ${title}`, html: `<p>Hola ${dest.displayName},</p><p>${cuerpo}</p><p>Ingrese al sistema para más detalles.</p>` }),
+            }).catch(() => {})
+          }
+          // WhatsApp
+          if (dest.phone) {
+            const WA_URL = process.env.NEXT_PUBLIC_WA_SERVER_URL || "http://localhost:3100"
+            fetch(`${WA_URL}/send`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ phone: dest.phone, message: cuerpo }),
+            }).catch(() => {})
+          }
+          // Push
+          fetch("/api/send-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: dest.id, title: `${asunto} - ${title}`, body: detalle.trim().slice(0, 100), url: "/dashboard" }),
+          }).catch(() => {})
+        }
       }
 
       toast.success(`Mensaje enviado a ${destinatarioIds.length} destinatario(s)`)
