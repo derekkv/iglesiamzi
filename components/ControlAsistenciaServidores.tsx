@@ -35,7 +35,7 @@ interface AsistenciaRecord {
   user_id: string
   user_name: string
   fecha: string
-  estado: "asistio" | "falto" | "justifico" | "pendiente"
+  estado: "asistio" | "falto" | "justifico" | "atrasado" | "pendiente"
 }
 
 const ESTADO_OPTIONS = [
