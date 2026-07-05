@@ -79,7 +79,7 @@ interface MiembroCelula {
 }
 
 
-export function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
+function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { user } = useAuth()
   const { checkAndExecute } = useSecurityCheck()

@@ -20,7 +20,7 @@ VALUES (
   'Células',
   'Gestión de células, miembros y asistencia semanal',
   '🏠',
-  '/dashboard/celulas',
+  '/dashboard/somos-uno',
   false,
   true,
   (SELECT id FROM module_groups WHERE name = 'somos_uno' LIMIT 1)
