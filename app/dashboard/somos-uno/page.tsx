@@ -197,6 +197,11 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const posiblesPorCelula = (celula: string) => posiblesMiembros.filter((m) => m.celula_nombre === celula)
 
   const isGestionadoEstaSemana = (m: MiembroCelula) => {
+    const g = gestionesSemana.find((g) => g.miembro_id === m.id && g.fuente === m.fuente)
+    return g?.gestionado === true
+  }
+
+  const tieneRegistroSemana = (m: MiembroCelula) => {
     return gestionesSemana.some((g) => g.miembro_id === m.id && g.fuente === m.fuente)
   }
 
@@ -212,18 +217,30 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const handleSaveGestion = async () => {
-    if (!gestionMember || gestionValue === null || gestionAsistio === null || !user) return
+    if (!gestionMember || gestionValue === null || !user) return
     setIsSaving(true)
-    const result = await registrarGestion({
-      miembroId: gestionMember.id,
-      fuente: gestionMember.fuente,
-      celulaNombre: gestionMember.celula_nombre,
-      gestionado: gestionValue,
-      respuesta: gestionRespuesta,
-      asistio: gestionAsistio,
-      userId: user.id,
-      userName: user.username,
-    })
+
+    // Si ya tiene registro de asistencia, actualizar con la gestión
+    const existente = gestionesSemana.find((g) => g.miembro_id === gestionMember.id && g.fuente === gestionMember.fuente)
+    let result
+    if (existente) {
+      result = await editarGestion(existente.id, {
+        gestionado: gestionValue,
+        respuesta: gestionRespuesta,
+        asistio: gestionAsistio ?? existente.asistio ?? false,
+      })
+    } else {
+      result = await registrarGestion({
+        miembroId: gestionMember.id,
+        fuente: gestionMember.fuente,
+        celulaNombre: gestionMember.celula_nombre,
+        gestionado: gestionValue,
+        respuesta: gestionRespuesta,
+        asistio: gestionAsistio ?? false,
+        userId: user.id,
+        userName: user.username,
+      })
+    }
     setIsSaving(false)
     if (result.success) {
       toast.success("Gestión registrada")
@@ -269,7 +286,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
 
   const handleInlineGestion = async (m: MiembroCelula, asistio: boolean, gestionado: boolean) => {
-    if (!user || isGestionadoEstaSemana(m)) return
+    if (!user || tieneRegistroSemana(m)) return
     setIsSaving(true)
     const result = await registrarGestion({
       miembroId: m.id,
@@ -309,7 +326,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           </TableHeader>
           <TableBody>
             {lista.map((m, idx) => {
-              const gestionado = isGestionadoEstaSemana(m)
+              const yaGestionado = isGestionadoEstaSemana(m)
+              const tieneRegistro = tieneRegistroSemana(m)
               const gestionSemana = gestionesSemana.find((g) => g.miembro_id === m.id && g.fuente === m.fuente)
               return (
                 <TableRow key={`${m.fuente}-${m.id}`}>
@@ -317,7 +335,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                   <TableCell className="text-xs font-medium">{m.apellidos_nombres}</TableCell>
                   <TableCell className="text-xs">{m.celular || "-"}</TableCell>
                   <TableCell className="text-xs">
-                    {gestionado ? (
+                    {tieneRegistro ? (
                       <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
                         {gestionSemana?.asistio ? "Asistió" : "Faltó"}
                       </Badge>
@@ -342,12 +360,12 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {gestionado ? (
-                      <Badge className={gestionSemana?.gestionado ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}>
-                        {gestionSemana?.gestionado ? "Sí" : "No"}
-                      </Badge>
+                    {yaGestionado ? (
+                      <Badge className="bg-blue-100 text-blue-700">Gestionado</Badge>
+                    ) : tieneRegistro ? (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300">Pendiente</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-gray-400">Pendiente</Badge>
+                      <span className="text-gray-300">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -358,8 +376,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                       <Button
                         variant="ghost" size="sm" title="Gestionar"
                         onClick={() => handleGestionar(m)}
-                        disabled={gestionado || !canEdit}
-                        className={gestionado ? "opacity-40" : "text-blue-600"}
+                        disabled={yaGestionado || !canEdit}
+                        className={yaGestionado ? "opacity-40" : "text-blue-600"}
                       >
                         <ClipboardCheck className="w-3.5 h-3.5" />
                       </Button>
@@ -635,7 +653,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGestionMember(null)} disabled={isSaving}>Cancelar</Button>
-            <Button onClick={handleSaveGestion} disabled={isSaving || gestionValue === null || gestionAsistio === null}>
+            <Button onClick={handleSaveGestion} disabled={isSaving || gestionValue === null}>
               {isSaving ? "Guardando..." : "Registrar"}
             </Button>
           </DialogFooter>

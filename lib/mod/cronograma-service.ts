@@ -46,6 +46,16 @@ export const cronogramaService = {
     return data || []
   },
 
+  async getAllGlobal(): Promise<CronogramaEntry[]> {
+    const { data, error } = await supabase
+      .from("cronograma_servicio")
+      .select("*")
+      .order("fecha", { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
   async getUpcoming(modulo: string): Promise<CronogramaEntry[]> {
     const today = new Date().toISOString().split("T")[0]
     const { data, error } = await supabase

@@ -24,14 +24,14 @@ export function CronogramaEventosGeneral({ moduloKey, title }: CronogramaEventos
   const loadEntries = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true)
-      const data = await cronogramaService.getAll(moduloKey)
+      const data = await cronogramaService.getAllGlobal()
       setEntries(data)
     } catch (error) {
       console.error("Error loading cronograma:", error)
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [moduloKey])
+  }, [])
 
   useEffect(() => { loadEntries() }, [loadEntries])
 
