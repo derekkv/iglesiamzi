@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Users, UserPlus, Lock, Eye, ClipboardCheck, History } from "lucide-react"
+import { ArrowLeft, Users, UserPlus, Lock, Eye, ClipboardCheck, History, DollarSign } from "lucide-react"
 import { toast } from "sonner"
 import {
   registrarGestion,
@@ -25,6 +25,16 @@ import {
   getLunesSemanaActual,
   type GestionCelula,
 } from "@/lib/mod/gestion-celulas-service"
+import {
+  getJuevesDelMes,
+  getMesOfrendaActual,
+  getOfrendasCelula,
+  upsertOfrenda,
+  eliminarOfrenda,
+  getHistorialOfrendas,
+  type OfrendaCelula,
+} from "@/lib/mod/ofrenda-celulas-service"
+import { Input } from "@/components/ui/input"
 
 
 const CELULAS = [
@@ -69,7 +79,7 @@ interface MiembroCelula {
 }
 
 
-function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
+export function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { user } = useAuth()
   const { checkAndExecute } = useSecurityCheck()
@@ -95,6 +105,11 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const [editRespuesta, setEditRespuesta] = useState("")
   const [editValue, setEditValue] = useState<boolean>(false)
   const [editAsistio, setEditAsistio] = useState<boolean>(false)
+
+  // Ofrendas
+  const [ofrendas, setOfrendas] = useState<OfrendaCelula[]>([])
+  const [ofrendaHistorial, setOfrendaHistorial] = useState<OfrendaCelula[]>([])
+  const [showOfrendaHistorial, setShowOfrendaHistorial] = useState(false)
 
   const loadMiembros = useCallback(async () => {
     try {
@@ -122,6 +137,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   useRealtime({ table: "censo", onChange: () => loadMiembros() })
   useRealtime({ table: "censo_mdg", onChange: () => loadMiembros() })
   useRealtime({ table: "gestion_celulas", onChange: () => { if (selectedCelula) loadGestionesSemana(selectedCelula) } })
+  useRealtime({ table: "ofrendas_celulas", onChange: () => { if (selectedCelula) loadOfrendas(selectedCelula) } })
 
 
   const loadGestionesSemana = async (celula: string) => {
@@ -130,8 +146,50 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   }
 
   useEffect(() => {
-    if (selectedCelula) loadGestionesSemana(selectedCelula)
+    if (selectedCelula) {
+      loadGestionesSemana(selectedCelula)
+      loadOfrendas(selectedCelula)
+    }
   }, [selectedCelula])
+
+  const loadOfrendas = async (celula: string) => {
+    const { mes, anio } = getMesOfrendaActual()
+    const data = await getOfrendasCelula(celula, mes, anio)
+    setOfrendas(data)
+  }
+
+  const handleSaveOfrenda = async (celula: string, fecha: string, valor: string) => {
+    if (!user || !valor) return
+    const { mes, anio } = getMesOfrendaActual()
+    const result = await upsertOfrenda({
+      celula, fecha, mes, anio,
+      valor: parseFloat(valor),
+      userId: user.id,
+      userName: user.username,
+    })
+    if (result.success) {
+      toast.success("Ofrenda guardada")
+      loadOfrendas(celula)
+    } else {
+      toast.error(result.error || "Error")
+    }
+  }
+
+  const handleDeleteOfrenda = async (id: number, celula: string) => {
+    const result = await eliminarOfrenda(id)
+    if (result.success) {
+      toast.success("Ofrenda eliminada")
+      loadOfrendas(celula)
+    } else {
+      toast.error(result.error || "Error")
+    }
+  }
+
+  const handleShowOfrendaHistorial = async (celula: string) => {
+    const data = await getHistorialOfrendas(celula)
+    setOfrendaHistorial(data)
+    setShowOfrendaHistorial(true)
+  }
 
   const miembrosActivos = miembros.filter((m) => m.celula_asiste)
   const posiblesMiembros = miembros.filter((m) => !m.celula_asiste)
@@ -391,9 +449,10 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
         ) : (
           <Tabs defaultValue="activos" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="activos"><Users className="w-4 h-4 mr-2" /> Miembros Activos ({activosPorCelula(selectedCelula).length})</TabsTrigger>
-              <TabsTrigger value="posibles"><UserPlus className="w-4 h-4 mr-2" /> Posibles Miembros ({posiblesPorCelula(selectedCelula).length})</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="activos"><Users className="w-4 h-4 mr-2" /> Activos ({activosPorCelula(selectedCelula).length})</TabsTrigger>
+              <TabsTrigger value="posibles"><UserPlus className="w-4 h-4 mr-2" /> Posibles ({posiblesPorCelula(selectedCelula).length})</TabsTrigger>
+              <TabsTrigger value="ofrenda"><DollarSign className="w-4 h-4 mr-2" /> Ofrenda</TabsTrigger>
             </TabsList>
             <TabsContent value="activos">
               <Card>
@@ -405,6 +464,88 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-base">Posibles miembros (célula asignada pero no asisten)</CardTitle></CardHeader>
                 <CardContent>{renderMiembrosTable(posiblesPorCelula(selectedCelula), "No hay posibles miembros para esta célula")}</CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="ofrenda">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Ofrenda Semanal (Jueves)</CardTitle>
+                    <Button size="sm" variant="outline" onClick={() => handleShowOfrendaHistorial(selectedCelula)}>
+                      <History className="w-3.5 h-3.5 mr-1" /> Historial
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Mes: {getMesOfrendaActual().mes}/{getMesOfrendaActual().anio} — Registre el valor recolectado cada jueves
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Jueves</TableHead>
+                          <TableHead className="text-xs">Valor ($)</TableHead>
+                          <TableHead className="text-xs">Registrado por</TableHead>
+                          <TableHead className="text-xs text-right">Acción</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getJuevesDelMes(getMesOfrendaActual().anio, getMesOfrendaActual().mes).map((jueves) => {
+                          const ofrenda = ofrendas.find((o) => o.fecha === jueves)
+                          return (
+                            <TableRow key={jueves}>
+                              <TableCell className="text-xs font-medium">{new Date(jueves + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}</TableCell>
+                              <TableCell className="text-xs">
+                                {ofrenda ? (
+                                  <span className="font-semibold text-green-700">${ofrenda.valor.toFixed(2)}</span>
+                                ) : canEdit ? (
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    className="h-7 w-24 text-xs"
+                                    onBlur={(e) => {
+                                      if (e.target.value && parseFloat(e.target.value) > 0) {
+                                        handleSaveOfrenda(selectedCelula, jueves, e.target.value)
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        const val = (e.target as HTMLInputElement).value
+                                        if (val && parseFloat(val) > 0) handleSaveOfrenda(selectedCelula, jueves, val)
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-500">{ofrenda?.registrado_por_nombre || "—"}</TableCell>
+                              <TableCell className="text-xs text-right">
+                                {ofrenda && canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500"
+                                    onClick={() => {
+                                      checkAndExecute(ofrenda.created_at, () => handleDeleteOfrenda(ofrenda.id, selectedCelula))
+                                    }}
+                                  >Eliminar</Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="mt-3 p-3 bg-green-50 rounded-lg text-center">
+                    <p className="text-sm text-gray-600">Total del mes:</p>
+                    <p className="text-xl font-bold text-green-700">${ofrendas.reduce((s, o) => s + Number(o.valor), 0).toFixed(2)}</p>
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
@@ -609,13 +750,45 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Modal: Historial Ofrendas */}
+      <Dialog open={showOfrendaHistorial} onOpenChange={setShowOfrendaHistorial}>
+        <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Historial de Ofrendas: {selectedCelula}</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1">
+            {ofrendaHistorial.length === 0 ? (
+              <p className="text-center text-gray-500 py-6">No hay ofrendas registradas</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Fecha</TableHead>
+                    <TableHead className="text-xs">Valor</TableHead>
+                    <TableHead className="text-xs">Registrado por</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ofrendaHistorial.map((o) => (
+                    <TableRow key={o.id}>
+                      <TableCell className="text-xs">{new Date(o.fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
+                      <TableCell className="text-xs font-semibold text-green-700">${Number(o.valor).toFixed(2)}</TableCell>
+                      <TableCell className="text-xs text-gray-500">{o.registrado_por_nombre || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 export default function SomosUnoPage() {
   return (
-    <PermissionsGuard moduleName="somos_uno">
+    <PermissionsGuard moduleName="celulas">
       {(canEdit) => <SomosUnoContent canEdit={canEdit} />}
     </PermissionsGuard>
   )
