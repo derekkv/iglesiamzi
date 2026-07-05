@@ -28,6 +28,21 @@ const CELULAS = [
   "Gabriela López",
 ]
 
+const CELULA_IMAGES: Record<string, string> = {
+  "Carlos y Ruth": "/celulas/CARLOS Y RUTH nombre.png",
+  "Sarita y Lady": "/celulas/SARITA Y LADY nombre.png",
+  "Jessy Mendoza": "",
+  "Líder y Angela": "/celulas/LÍDER Y ÁNGELA nombre.png",
+  "Juan Pablo y Angie": "/celulas/JUAN ÁNGEL Y ANGIE nombre.png",
+  "Alina y Anita": "/celulas/ALINA Y ANITA nombre.png",
+  "Neyda y Carmen": "/celulas/NEYDA Y CARMEN nombre.png",
+  "Yadira y Tania": "/celulas/YADIRA Y TANIA nombre.png",
+  "Luis y Ariana": "/celulas/LUIS Y ARIANNA nombre.png",
+  "Layla Salem": "",
+  "Estuardo y Catalina": "/celulas/ESTUARDO Y CATALINA nombre.png",
+  "Gabriela López": "/celulas/GABRIELA LÓPEZ nombre.png",
+}
+
 interface MiembroCelula {
   id: number
   apellidos_nombres: string
@@ -44,12 +59,10 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const [miembros, setMiembros] = useState<MiembroCelula[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<"celulas" | "nuevos">("celulas")
   const [selectedCelula, setSelectedCelula] = useState<string | null>(null)
 
   const loadMiembros = useCallback(async () => {
     try {
-      // Cargar de ambos censos los que tienen celula_nombre asignada
       const [{ data: protocolo }, { data: mdg }] = await Promise.all([
         supabase
           .from("censo")
@@ -76,29 +89,21 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   useEffect(() => { loadMiembros() }, [loadMiembros])
 
-  // Realtime en ambas tablas
   useRealtime({ table: "censo", onChange: () => loadMiembros() })
   useRealtime({ table: "censo_mdg", onChange: () => loadMiembros() })
 
   // Miembros que SÍ asisten a célula
   const miembrosActivos = miembros.filter((m) => m.celula_asiste)
-  // Miembros que NO asisten pero tienen célula asignada (nuevos por gestionar)
-  const nuevosNoAsisten = miembros.filter((m) => !m.celula_asiste)
+  // Miembros que NO asisten pero tienen célula asignada
+  const posiblesMiembros = miembros.filter((m) => !m.celula_asiste)
 
   // Agrupar por célula
-  const miembrosPorCelula = CELULAS.reduce((acc, celula) => {
-    acc[celula] = miembrosActivos.filter((m) => m.celula_nombre === celula)
-    return acc
-  }, {} as Record<string, MiembroCelula[]>)
+  const activosPorCelula = (celula: string) => miembrosActivos.filter((m) => m.celula_nombre === celula)
+  const posiblesPorCelula = (celula: string) => posiblesMiembros.filter((m) => m.celula_nombre === celula)
 
-  const nuevosPorCelula = CELULAS.reduce((acc, celula) => {
-    acc[celula] = nuevosNoAsisten.filter((m) => m.celula_nombre === celula)
-    return acc
-  }, {} as Record<string, MiembroCelula[]>)
-
-  const renderMiembrosTable = (lista: MiembroCelula[]) => {
+  const renderMiembrosTable = (lista: MiembroCelula[], emptyMsg: string) => {
     if (lista.length === 0) {
-      return <p className="text-center text-gray-500 py-4 text-sm">No hay miembros en esta célula</p>
+      return <p className="text-center text-gray-500 py-6 text-sm">{emptyMsg}</p>
     }
     return (
       <div className="overflow-x-auto">
@@ -148,12 +153,16 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="flex items-center space-x-2">
+              <Button variant="ghost" size="sm" onClick={() => selectedCelula ? setSelectedCelula(null) : router.push("/dashboard")} className="flex items-center space-x-2">
                 <ArrowLeft className="w-4 h-4" /><span>Volver</span>
               </Button>
               <div>
-                <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Somos Uno - Células</h1>
-                <p className="text-xs text-gray-500">{miembrosActivos.length} miembros activos | {nuevosNoAsisten.length} nuevos por gestionar</p>
+                <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
+                  {selectedCelula ? `Célula: ${selectedCelula}` : "Somos Uno - Células"}
+                </h1>
+                <p className="text-xs text-gray-500">
+                  {miembrosActivos.length} miembros activos | {posiblesMiembros.length} posibles miembros
+                </p>
               </div>
             </div>
             {!canEdit && (
@@ -166,90 +175,95 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setSelectedCelula(null) }}>
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="celulas">
-              <Users className="w-4 h-4 mr-2" /> Células ({miembrosActivos.length})
-            </TabsTrigger>
-            <TabsTrigger value="nuevos">
-              <UserPlus className="w-4 h-4 mr-2" /> Gestión de Nuevos Miembros ({nuevosNoAsisten.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="celulas" className="space-y-4">
-            {!selectedCelula ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {CELULAS.map((celula) => {
-                  const count = miembrosPorCelula[celula]?.length || 0
-                  return (
-                    <Card
-                      key={celula}
-                      className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all"
-                      onClick={() => setSelectedCelula(celula)}
-                    >
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center justify-between">
-                          <span>{celula}</span>
-                          <Badge variant="secondary">{count}</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-500">{count} miembro{count !== 1 ? "s" : ""} activo{count !== 1 ? "s" : ""}</p>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedCelula(null)}>
-                    <ArrowLeft className="w-4 h-4 mr-1" /> Volver
-                  </Button>
-                  <h2 className="text-xl font-semibold">Célula: {selectedCelula}</h2>
-                  <Badge variant="secondary">{miembrosPorCelula[selectedCelula]?.length || 0} miembros</Badge>
-                </div>
-                <Card>
-                  <CardContent className="pt-4">
-                    {renderMiembrosTable(miembrosPorCelula[selectedCelula] || [])}
+        {!selectedCelula ? (
+          /* Vista de tarjetas de células */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {CELULAS.map((celula) => {
+              const activos = activosPorCelula(celula).length
+              const posibles = posiblesPorCelula(celula).length
+              const image = CELULA_IMAGES[celula]
+              return (
+                <Card
+                  key={celula}
+                  className="cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all duration-200 overflow-hidden border-0 rounded-xl group p-0"
+                  onClick={() => setSelectedCelula(celula)}
+                >
+                  <div className="relative h-44 overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600">
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={celula}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Users className="w-16 h-16 text-white/40" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute bottom-3 left-4 right-4">
+                      <h3 className="text-lg font-bold text-white drop-shadow-md">{celula}</h3>
+                    </div>
+                    <div className="absolute top-3 right-3">
+                      <Badge className="bg-white/90 text-gray-800 text-xs font-semibold shadow">
+                        {activos + posibles}
+                      </Badge>
+                    </div>
+                  </div>
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-3 text-sm">
+                        <span className="text-green-600 flex items-center gap-1 font-medium">
+                          <Users className="w-3.5 h-3.5" /> {activos} activos
+                        </span>
+                        {posibles > 0 && (
+                          <span className="text-amber-600 flex items-center gap-1 font-medium">
+                            <UserPlus className="w-3.5 h-3.5" /> {posibles} posibles
+                          </span>
+                        )}
+                      </div>
+                      <Button size="sm" variant="outline" className="text-xs">Ver</Button>
+                    </div>
                   </CardContent>
                 </Card>
-              </div>
-            )}
-          </TabsContent>
+              )
+            })}
+          </div>
+        ) : (
+          /* Vista interna de una célula con 2 tabs */
+          <Tabs defaultValue="activos" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="activos">
+                <Users className="w-4 h-4 mr-2" /> Miembros Activos ({activosPorCelula(selectedCelula).length})
+              </TabsTrigger>
+              <TabsTrigger value="posibles">
+                <UserPlus className="w-4 h-4 mr-2" /> Posibles Miembros ({posiblesPorCelula(selectedCelula).length})
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="nuevos" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Gestión de Nuevos Miembros</CardTitle>
-                <p className="text-sm text-gray-500">
-                  Personas que NO asisten a célula pero tienen una asignada cerca de su casa
-                </p>
-              </CardHeader>
-              <CardContent>
-                {nuevosNoAsisten.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No hay nuevos miembros por gestionar</p>
-                ) : (
-                  <div className="space-y-6">
-                    {CELULAS.map((celula) => {
-                      const lista = nuevosPorCelula[celula]
-                      if (!lista || lista.length === 0) return null
-                      return (
-                        <div key={celula}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-sm">{celula}</h3>
-                            <Badge variant="outline" className="text-xs">{lista.length}</Badge>
-                          </div>
-                          {renderMiembrosTable(lista)}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="activos">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Miembros que asisten a esta célula</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {renderMiembrosTable(activosPorCelula(selectedCelula), "No hay miembros activos en esta célula")}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="posibles">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Posibles miembros (no asisten pero tienen esta célula asignada)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {renderMiembrosTable(posiblesPorCelula(selectedCelula), "No hay posibles miembros para esta célula")}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </main>
     </div>
   )

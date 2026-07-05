@@ -522,7 +522,6 @@ export function CensoForm({
           <div className="border-t border-orange-200 pt-4">
             <p className="text-sm font-medium text-orange-700 mb-3">Célula</p>
             {renderCheckbox("¿Asiste a una célula?", "celula_asiste")}
-            {formData.celula_asiste && (
               <div className="ml-6 mt-3 border-l-2 border-orange-300 pl-4 py-2">
                 <Label className="text-sm text-gray-700">Célula asignada</Label>
                 <Select
@@ -539,7 +538,6 @@ export function CensoForm({
                   </SelectContent>
                 </Select>
               </div>
-            )}
           </div>
         </div>
       </div>
