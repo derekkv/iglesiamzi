@@ -210,6 +210,28 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   }
 
 
+  const handleInlineGestion = async (m: MiembroCelula, asistio: boolean, gestionado: boolean) => {
+    if (!user || isGestionadoEstaSemana(m)) return
+    setIsSaving(true)
+    const result = await registrarGestion({
+      miembroId: m.id,
+      fuente: m.fuente,
+      celulaNombre: m.celula_nombre,
+      gestionado,
+      respuesta: "",
+      asistio,
+      userId: user.id,
+      userName: user.username,
+    })
+    setIsSaving(false)
+    if (result.success) {
+      toast.success("Registrado")
+      if (selectedCelula) loadGestionesSemana(selectedCelula)
+    } else {
+      toast.error(result.error || "Error")
+    }
+  }
+
   const renderMiembrosTable = (lista: MiembroCelula[], emptyMsg: string) => {
     if (lista.length === 0) {
       return <p className="text-center text-gray-500 py-6 text-sm">{emptyMsg}</p>
@@ -222,7 +244,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               <TableHead className="text-xs">#</TableHead>
               <TableHead className="text-xs">Nombre</TableHead>
               <TableHead className="text-xs">Celular</TableHead>
-              <TableHead className="text-xs">Estado Semana</TableHead>
+              <TableHead className="text-xs">Asistió</TableHead>
+              <TableHead className="text-xs">Gestionado</TableHead>
               <TableHead className="text-xs text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -237,7 +260,32 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                   <TableCell className="text-xs">{m.celular || "-"}</TableCell>
                   <TableCell className="text-xs">
                     {gestionado ? (
-                      <Badge className={gestionSemana?.gestionado ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                      <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                        {gestionSemana?.asistio ? "Asistió" : "Faltó"}
+                      </Badge>
+                    ) : canEdit ? (
+                      <select
+                        className="text-xs border rounded px-1 py-0.5 bg-white"
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const asistio = e.target.value === "si"
+                            handleInlineGestion(m, asistio, false)
+                          }
+                        }}
+                        disabled={isSaving}
+                      >
+                        <option value="">-</option>
+                        <option value="si">Asistió</option>
+                        <option value="no">Faltó</option>
+                      </select>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {gestionado ? (
+                      <Badge className={gestionSemana?.gestionado ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}>
                         {gestionSemana?.gestionado ? "Sí" : "No"}
                       </Badge>
                     ) : (
