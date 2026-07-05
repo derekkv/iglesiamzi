@@ -199,10 +199,13 @@ export async function checkUserEditPermission(
       canLeader = !!leaderRow
     }
 
+    // Si es líder del grupo, automáticamente tiene permiso de edición
+    const effectiveCanEdit = (data?.can_edit || false) || canLeader
+
     return {
       success: true,
       canView: data?.can_view || false,
-      canEdit: data?.can_edit || false,
+      canEdit: effectiveCanEdit,
       canAdmin: data?.can_admin || false,
       canLeader,
     }

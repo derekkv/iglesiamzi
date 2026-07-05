@@ -102,6 +102,8 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
   const [searchFilter, setSearchFilter] = useState("")
   const [allLeaders, setAllLeaders] = useState<Record<string, string[]>>({})
   const { user: currentUser, isLoading: authLoading } = useAuth()
+  const KEYS_ALLOWED_USERS = ["83cb032c-38ef-4b47-85f1-84d4ae7d531e", "8a799e01-11bb-4ea4-8a95-9f7033e90fb1"]
+  const canSeeKeys = !!currentUser && KEYS_ALLOWED_USERS.includes(currentUser.id)
   const { checkAndExecute } = useSecurityCheck()
   const router = useRouter()
 
@@ -318,7 +320,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
       userId: selectedUser.id,
       moduleId,
       canView: !currentValue,
-      canEdit: !currentValue ? currentEditValue : false,
+      canEdit: !currentValue ? true : false,
       grantedBy: currentUser.id,
     }
 
@@ -435,7 +437,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
           <Tabs defaultValue="users" className="space-y-6">
             <TabsList>
               <TabsTrigger value="users">Usuarios y Ministerios</TabsTrigger>
-              {canAdmin && <TabsTrigger value="keys">Clave</TabsTrigger>}
+              {canSeeKeys && <TabsTrigger value="keys">Clave</TabsTrigger>}
               {canAdmin && <TabsTrigger value="audit">Logs</TabsTrigger>}
               {canAdmin && <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>}
             </TabsList>
@@ -891,7 +893,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                                 selectedUser.id,
                                 group.id,
                                 newValue,
-                                false,
+                                newValue,
                                 currentUser.id
                               )
                               if (result.success) {
