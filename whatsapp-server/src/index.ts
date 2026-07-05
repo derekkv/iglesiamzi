@@ -6,7 +6,7 @@ const app = express()
 const PORT = process.env.WA_SERVER_PORT || 3100
 
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || "http://localhost:3001",
+  origin: process.env.ALLOWED_ORIGIN || "https://panel.iglesiaregalodedios.com",
   credentials: true,
 }))
 app.use(express.json())

@@ -78,7 +78,7 @@ export class WhatsAppService {
         auth: state,
         logger,
         version,
-        browser: ["IglesiaMZI", "Chrome", "1.0.0"],
+        browser: ["IglesiaRegaloDeDios", "Chrome", "1.0.0"],
       })
 
       // Manejar actualizaciones de conexión

@@ -1,7 +1,7 @@
 {
   "name": "iglesia-whatsapp-server",
   "version": "1.0.0",
-  "description": "Servidor WhatsApp con Baileys para iglesiamzi",
+  "description": "Servidor WhatsApp con Baileys para iglesia Regalo de Dios",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",

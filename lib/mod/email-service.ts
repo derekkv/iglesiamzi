@@ -166,7 +166,7 @@ function buildEmailHtml(params: EmailServiceParams): string {
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;">
                 <tr>
                   <td align="center">
-                    <a href="https://iglesiamzi.com/dashboard" style="display:inline-block;background-color:${color};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:14px;font-weight:600;">
+                    <a href="https://panel.iglesiaregalodedios.com/dashboard" style="display:inline-block;background-color:${color};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:14px;font-weight:600;">
                       Abrir la App para Confirmar
                     </a>
                   </td>

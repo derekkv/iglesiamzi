@@ -6,13 +6,13 @@ import { formatPhoneForWhatsApp } from "@/lib/format-phone"
 
 const VAPID_PUBLIC_KEY = "BKHW7uYkfEBfrPirumVyRqNj_eiWBLpEQuV1Q6NsGImX7wJYA4oB1q_w5iGCZ7xcoO3Jgs41VczB3a7Y2FeIoYY"
 const VAPID_PRIVATE_KEY = "kG6aW66CSKCC76Tgt-ACRBYSWVxHtgIHFK5Q3_QJO14"
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://backiglesia.mzipet.com"
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://servidor.iglesiaregalodedios.com"
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 const WA_SERVER_URL = process.env.WA_SERVER_URL || "http://localhost:3100"
 const CRON_SECRET = process.env.CRON_SECRET || "iglesia-cron-secret-2024"
 
 webpush.setVapidDetails(
-  "mailto:admin@iglesiamzi.com",
+  "mailto:admin@iglesiaregalodedios.com",
   VAPID_PUBLIC_KEY,
   VAPID_PRIVATE_KEY
 )
