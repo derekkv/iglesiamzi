@@ -25,7 +25,7 @@ export interface AttendanceData {
   columna_id: number
   cantidad: number
   created_at: string
-
+  updated_at: string | null
 }
 
 export class AttendanceService {

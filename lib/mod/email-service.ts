@@ -220,6 +220,24 @@ export const emailService = {
   },
 
   /**
+   * Enviar email genérico con subject y HTML personalizado
+   */
+  async sendRawEmail(params: { to: string; subject: string; html: string }): Promise<{ success: boolean; error?: string }> {
+    try {
+      await transporter.sendMail({
+        from: '"Iglesia Regalo de Dios" <notificaciones@iglesiaregalodedios.com>',
+        to: params.to,
+        subject: params.subject,
+        html: params.html,
+      })
+      return { success: true }
+    } catch (error: any) {
+      console.error("Error enviando email:", error.message)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
    * Verificar conexión SMTP
    */
   async verifyConnection(): Promise<boolean> {

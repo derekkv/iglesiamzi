@@ -35,8 +35,13 @@ import { useMonth } from "@/contexts/month-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
 
+interface CellData {
+  cantidad: number
+  updated_at: string | null
+}
+
 interface AttendanceDataMap {
-  [detalleId: number]: { [columnaId: number]: number }
+  [detalleId: number]: { [columnaId: number]: CellData }
 }
 
 
@@ -90,26 +95,30 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
       const dataMap: AttendanceDataMap = {}
       attendanceDataRaw.forEach((item) => {
         if (!dataMap[item.detalle_id]) dataMap[item.detalle_id] = {}
-        dataMap[item.detalle_id][item.columna_id] = item.cantidad
+        dataMap[item.detalle_id][item.columna_id] = {
+          cantidad: item.cantidad,
+          updated_at: item.created_at,
+        }
       })
       setAttendanceData(dataMap)
 
-      // Auto-registrar la fecha de hoy si no existe
+      // Auto-registrar la fecha de hoy SOLO si es domingo
       if (!silent && canEdit) {
         const today = new Date().toISOString().split("T")[0]
-        const todayExists = columnsData.some((col) => col.fecha === today)
-        if (!todayExists) {
-          const date = new Date(today + "T12:00:00")
-          const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-          const dayName = days[date.getDay()]
-          const day = String(date.getDate()).padStart(2, "0")
-          const month = String(date.getMonth() + 1).padStart(2, "0")
-          const displayName = `${dayName} ${day}/${month}`
-          try {
-            const newCol = await attendanceService.createColumn(currentMonth.id, displayName, { user_id: user!.id, user_name: user!.username }, today)
-            setColumns((prev) => [...prev, newCol])
-          } catch (e) {
-            // Silenciar si ya existe
+        const date = new Date(today + "T12:00:00")
+        const isSunday = date.getDay() === 0
+        if (isSunday) {
+          const todayExists = columnsData.some((col) => col.fecha === today)
+          if (!todayExists) {
+            const day = String(date.getDate()).padStart(2, "0")
+            const month = String(date.getMonth() + 1).padStart(2, "0")
+            const displayName = `Dom ${day}/${month}`
+            try {
+              const newCol = await attendanceService.createColumn(currentMonth.id, displayName, { user_id: user!.id, user_name: user!.username }, today)
+              setColumns((prev) => [...prev, newCol])
+            } catch (e) {
+              // Silenciar si ya existe
+            }
           }
         }
       }
@@ -141,7 +150,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
       const newData = { ...attendanceData }
       details.forEach((detail) => {
         if (!newData[detail.id]) newData[detail.id] = {}
-        newData[detail.id][newColumn.id] = 0
+        newData[detail.id][newColumn.id] = { cantidad: 0, updated_at: null }
       })
       setAttendanceData(newData)
     } catch (error) {
@@ -159,7 +168,7 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
       setShowAddDetail(false)
       const newData = { ...attendanceData }
       newData[newDetailRecord.id] = {}
-      columns.forEach((col) => { newData[newDetailRecord.id][col.id] = 0 })
+      columns.forEach((col) => { newData[newDetailRecord.id][col.id] = { cantidad: 0, updated_at: null } })
       setAttendanceData(newData)
     } catch (error) {
       console.error("Error adding detail:", error)
@@ -217,21 +226,23 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
     const cantidad = Number.parseInt(value) || 0
     const newData = { ...attendanceData }
     if (!newData[detailId]) newData[detailId] = {}
-    newData[detailId][columnId] = cantidad
+    // Mantener el timestamp original (created_at) para que el reloj no se reinicie
+    const existingTimestamp = newData[detailId][columnId]?.updated_at || new Date().toISOString()
+    newData[detailId][columnId] = { cantidad, updated_at: existingTimestamp }
     setAttendanceData(newData)
     try {
       await attendanceService.upsertAttendanceData(currentMonth!.id, detailId, columnId, cantidad)
     } catch (error) { console.error("Error saving attendance data:", error) }
   }
 
-  const calculateColumnTotal = (columnId: number) => details.reduce((t, d) => t + (attendanceData[d.id]?.[columnId] || 0), 0)
-  const calculateRowTotal = (detailId: number) => columns.reduce((t, c) => t + (attendanceData[detailId]?.[c.id] || 0), 0)
+  const calculateColumnTotal = (columnId: number) => details.reduce((t, d) => t + (attendanceData[d.id]?.[columnId]?.cantidad || 0), 0)
+  const calculateRowTotal = (detailId: number) => columns.reduce((t, c) => t + (attendanceData[detailId]?.[c.id]?.cantidad || 0), 0)
   const calculateGrandTotal = () => columns.reduce((gt, c) => gt + calculateColumnTotal(c.id), 0)
 
   const getCategoryChartData = () => details.map((d) => ({ name: d.nombre, total: calculateRowTotal(d.id) }))
   const getDateChartData = () => columns.map((column) => {
     const dataPoint: any = { name: column.nombre }
-    details.forEach((d) => { dataPoint[d.nombre] = attendanceData[d.id]?.[column.id] || 0 })
+    details.forEach((d) => { dataPoint[d.nombre] = attendanceData[d.id]?.[column.id]?.cantidad || 0 })
     return dataPoint
   })
   const getColors = () => ["#3b82f6","#ef4444","#10b981","#f59e0b","#8b5cf6","#ec4899","#14b8a6","#f97316","#6366f1","#84cc16"]
@@ -380,22 +391,24 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
                             </div>
                           </td>
                           {columns.map((column) => {
-                            const created = new Date(column.created_at)
-                            const now = new Date()
-                            const needsKey = (now.getTime() - created.getTime()) / (1000 * 60 * 60) >= 6
+                            const cellData = attendanceData[detail.id]?.[column.id]
+                            const cellUpdatedAt = cellData?.updated_at
+                            const needsKey = cellUpdatedAt
+                              ? (new Date().getTime() - new Date(cellUpdatedAt).getTime()) / (1000 * 60 * 60) >= 6
+                              : false
                             const cellKey = `${detail.id}-${column.id}`
                             return (
                               <td key={column.id} className="border border-gray-300 px-2 py-1">
                                 {canEdit && needsKey && !unlockedCells.has(cellKey) ? (
                                   <div className="text-center h-8 flex items-center justify-center cursor-pointer text-gray-500 hover:text-blue-600" onClick={() => {
-                                    checkAndExecute(column.created_at, () => {
+                                    checkAndExecute(cellUpdatedAt!, () => {
                                       setUnlockedCells(prev => new Set([...prev, cellKey]))
                                     })
                                   }}>
-                                    {attendanceData[detail.id]?.[column.id] || 0}
+                                    {cellData?.cantidad || 0}
                                   </div>
                                 ) : (
-                                  <Input type="number" min="0" value={attendanceData[detail.id]?.[column.id] || ""} onChange={(e) => handleCellChange(detail.id, column.id, e.target.value)} className="border-0 text-center h-8 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="0" disabled={!canEdit} />
+                                  <Input type="number" min="0" value={cellData?.cantidad || ""} onChange={(e) => handleCellChange(detail.id, column.id, e.target.value)} className="border-0 text-center h-8 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="0" disabled={!canEdit} />
                                 )}
                               </td>
                             )

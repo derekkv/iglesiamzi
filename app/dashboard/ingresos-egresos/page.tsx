@@ -57,6 +57,8 @@ import { storage } from "@/lib/storage";
 import { useAuth } from "@/contexts/auth-context";
 import { useSecurityCheck } from "@/contexts/security-context"
 import { todayEcuador } from "@/lib/timezone"
+import { getAlfoliMes } from "@/lib/mod/alfoli-service"
+import { supabase } from "@/lib/supabase"
 
 interface FinancialRecord {
   id: number;
@@ -115,6 +117,11 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   ubicaciones: [],
   estados: [],
 });
+
+// Totales consolidados de otros módulos
+const [totalCelulas, setTotalCelulas] = useState(0)
+const [totalAlfoli, setTotalAlfoli] = useState(0)
+const [totalDiezmosTransferencia, setTotalDiezmosTransferencia] = useState(0)
 const handleDeleteClick = (record: FinancialRecord) => {
   if (!canEdit) {
     setError("No tiene permiso de edición en este módulo");
@@ -160,6 +167,9 @@ const handleDeleteClick = (record: FinancialRecord) => {
 
         // Cargar registros financieros
         await loadFinancialRecords();
+
+        // Cargar totales consolidados de otros módulos
+        await loadConsolidatedTotals();
       } catch (error) {
         console.error("Error initializing page:", error);
       } finally {
@@ -174,6 +184,41 @@ const handleDeleteClick = (record: FinancialRecord) => {
   useRealtimeMultiple(["ingresos", "egresos"], () => {
     loadFinancialRecords()
   });
+
+  const loadConsolidatedTotals = async () => {
+    if (!currentMonth) return
+    try {
+      // Extraer mes y año del currentMonth (name es "Enero 2025", etc.)
+      const monthNum = currentMonth.month
+      const yearNum = currentMonth.year
+
+      // Total Alfolí del mes (se suma todo)
+      const alfoliRecords = await getAlfoliMes(monthNum, yearNum)
+      const alfoliTotal = alfoliRecords.reduce((sum, r) => sum + Number(r.valor), 0)
+      setTotalAlfoli(alfoliTotal)
+
+      // Total Ofrendas de Células del mes (solo las marcadas como recibidas)
+      const { data: celulasData } = await supabase
+        .from("ofrendas_celulas")
+        .select("valor")
+        .eq("mes", monthNum)
+        .eq("anio", yearNum)
+        .eq("recibido", true)
+      const celulasTotal = (celulasData || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      setTotalCelulas(celulasTotal)
+
+      // Total Diezmos solo transferencia del mes
+      const { data: diezmosData } = await supabase
+        .from("diezmos")
+        .select("valor")
+        .eq("mes_id", currentMonth.id)
+        .eq("transaccion", "transferencia")
+      const diezmosTotal = (diezmosData || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      setTotalDiezmosTransferencia(diezmosTotal)
+    } catch (error) {
+      console.error("Error loading consolidated totals:", error)
+    }
+  }
 
   const loadFinancialRecords = async () => {
     if (!currentMonth) return;
@@ -949,48 +994,53 @@ function formatDateForTable(dateString: string) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/ofrenda-celulas")}>
+            <CardContent className="p-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">
-                  ${totalIngresos.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600">Total Ingresos</p>
+                <p className="text-lg font-bold text-purple-600">${totalCelulas.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Ingreso Células</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/mes")}>
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-lg font-bold text-indigo-600">${totalAlfoli.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Ingreso Alfolí</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-lg font-bold text-teal-600">${totalDiezmosTransferencia.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Ingreso Diezmos</p>
+                <p className="text-[10px] text-gray-400">Solo transferencia</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-red-600">
-                  ${totalEgresos.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600">Total Egresos</p>
+                <p className="text-lg font-bold text-green-600">${totalIngresos.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Ingreso Módulo</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="text-center">
-                <p
-                  className={`text-2xl font-bold ${
-                    balance >= 0 ? "text-blue-600" : "text-red-600"
-                  }`}
-                >
-                  ${balance.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600">Balance</p>
+                <p className="text-lg font-bold text-blue-600">${(totalIngresos + totalCelulas + totalAlfoli + totalDiezmosTransferencia).toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Total Ingresos</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-600">
-                  {records.length}
-                </p>
-                <p className="text-sm text-gray-600">Total Registros</p>
+                <p className="text-lg font-bold text-red-600">${totalEgresos.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Total Egresos</p>
               </div>
             </CardContent>
           </Card>

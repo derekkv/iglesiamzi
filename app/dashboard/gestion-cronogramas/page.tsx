@@ -17,20 +17,27 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Lock } from "lucide-react"
 
-const MODULOS = [
-  { key: "protocolo", label: "Protocolo" },
-  { key: "discipulado", label: "Discipulado" },
-  { key: "administracion", label: "Administración" },
-  { key: "mdg", label: "Mujeres de Gracia" },
-]
+// Mapa de key → label para todos los ministerios conocidos
+const MODULO_LABELS: Record<string, string> = {
+  protocolo: "Protocolo",
+  administracion: "Administración",
+  mdg: "Mujeres de Gracia",
+  discipulado: "Discipulado",
+  alabanza: "Alabanza",
+  intercesion: "Intercesión",
+  herederos: "Herederos",
+  redil: "Redil",
+  comunicacion: "Comunicación",
+}
 
 function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { user } = useAuth()
   const [entries, setEntries] = useState<CronogramaEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("protocolo")
+  const [activeTab, setActiveTab] = useState("")
   const [filterFecha, setFilterFecha] = useState("")
+  const [modulos, setModulos] = useState<{ key: string; label: string }[]>([])
 
   const loadEntries = useCallback(async (silent = false) => {
     try {
@@ -42,6 +49,24 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
 
       if (error) throw error
       setEntries(data || [])
+
+      // Extraer módulos únicos dinámicamente
+      if (data && data.length > 0) {
+        const uniqueModulos = Array.from(new Set(data.map((e: CronogramaEntry) => e.modulo))).filter(Boolean) as string[]
+        const sorted = uniqueModulos.sort((a, b) => {
+          const order = Object.keys(MODULO_LABELS)
+          return order.indexOf(a) - order.indexOf(b)
+        })
+        const modulosList = sorted.map((key) => ({
+          key,
+          label: MODULO_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1),
+        }))
+        setModulos(modulosList)
+        // Si no hay tab activo o el activo ya no existe, seleccionar el primero
+        if (!activeTab || !sorted.includes(activeTab)) {
+          setActiveTab(sorted[0] || "")
+        }
+      }
     } catch (error) {
       console.error("Error loading:", error)
     } finally {
@@ -146,15 +171,15 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            {MODULOS.map((m) => (
+          <TabsList className={`grid w-full`} style={{ gridTemplateColumns: `repeat(${modulos.length}, minmax(0, 1fr))` }}>
+            {modulos.map((m) => (
               <TabsTrigger key={m.key} value={m.key} className="text-xs sm:text-sm">
                 {m.label}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {MODULOS.map((mod) => (
+          {modulos.map((mod) => (
             <TabsContent key={mod.key} value={mod.key} className="space-y-4 mt-4">
               {/* Filtro de fecha */}
               <div className="flex items-center gap-3">

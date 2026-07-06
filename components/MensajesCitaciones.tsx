@@ -233,13 +233,36 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
             fetch("/api/send-email", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ to: dest.email, subject: `${asunto} - ${title}`, html: `<p>Hola ${dest.displayName},</p><p>${cuerpo}</p><p>Ingrese al sistema para más detalles.</p>` }),
+              body: JSON.stringify({
+                to: dest.email,
+                subject: `✉️ ${asunto} - ${title}`,
+                html: `
+                  <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                    <div style="background:#2563eb;color:white;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+                      <h2 style="margin:0;">${asunto}</h2>
+                      <p style="margin:4px 0 0;opacity:0.85;font-size:14px;">${title}</p>
+                    </div>
+                    <div style="background:white;border:1px solid #e5e7eb;padding:24px;border-radius:0 0 12px 12px;">
+                      <p>Hola <strong>${dest.displayName}</strong>,</p>
+                      <p>Has recibido ${tipoMensaje === "invitacion" ? "una citación" : "un mensaje"} de <strong>${user.displayName}</strong> (${title}):</p>
+                      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
+                        <p style="margin:0 0 8px;"><strong>Detalle:</strong> ${detalle.trim()}</p>
+                        ${fecha ? `<p style="margin:0 0 8px;"><strong>Fecha:</strong> ${fecha}</p>` : ""}
+                        ${valor ? `<p style="margin:0 0 8px;"><strong>Valor:</strong> $${parseFloat(valor).toFixed(2)}</p>` : ""}
+                        ${eventoLugar ? `<p style="margin:0;"><strong>Evento/Lugar:</strong> ${eventoLugar}</p>` : ""}
+                      </div>
+                      <p style="text-align:center;margin-top:24px;">
+                        <a href="https://panel.iglesiaregalodedios.com/dashboard" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Abrir la App</a>
+                      </p>
+                      <p style="color:#6b7280;font-size:12px;text-align:center;margin-top:16px;">Iglesia Regalo de Dios — Este es un correo automático.</p>
+                    </div>
+                  </div>`,
+              }),
             }).catch(() => {})
           }
           // WhatsApp
           if (dest.phone) {
-            const WA_URL = process.env.NEXT_PUBLIC_WA_SERVER_URL || "http://localhost:3100"
-            fetch(`${WA_URL}/send`, {
+            fetch("/api/whatsapp/send", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ phone: dest.phone, message: cuerpo }),

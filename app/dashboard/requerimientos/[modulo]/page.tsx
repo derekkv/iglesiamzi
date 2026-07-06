@@ -15,6 +15,7 @@ const MODULO_CONFIG: Record<string, { permiso: string; titulo: string }> = {
   "intercesion": { permiso: "requerimientos-intercesion", titulo: "Requerimientos de Bienes y Servicios - Intercesión" },
   "herederos": { permiso: "requerimientos-herederos", titulo: "Requerimientos de Bienes y Servicios - Herederos del Reino" },
   "redil": { permiso: "requerimientos-redil", titulo: "Requerimientos de Bienes y Servicios - Redil" },
+  "comunicacion": { permiso: "requerimientos-comunicacion", titulo: "Requerimientos de Bienes y Servicios - Comunicación" },
 }
 
 function RequerimientosContent({ modulo, titulo, canEdit }: { modulo: string; titulo: string; canEdit: boolean }) {

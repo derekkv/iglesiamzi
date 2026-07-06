@@ -8,6 +8,7 @@ export interface DiezmoRecord {
   fecha: string
   donador: string
   valor: number
+  transaccion: "efectivo" | "transferencia"
   created_at?: string
   updated_at?: string
 }
@@ -94,11 +95,11 @@ export class DiezmosService {
   async createDiezmo(diezmo: Omit<DiezmoRecord, "id" | "created_at" | "updated_at">, audit?: AuditInfo): Promise<DiezmoRecord> {
     const { data, error } = await supabase
       .from("diezmos")
-      .insert({ mes_id: diezmo.mes_id, numero: diezmo.numero, fecha: diezmo.fecha, donador: diezmo.donador, valor: diezmo.valor })
+      .insert({ mes_id: diezmo.mes_id, numero: diezmo.numero, fecha: diezmo.fecha, donador: diezmo.donador, valor: diezmo.valor, transaccion: diezmo.transaccion })
       .select()
       .single()
     if (error) throw error
-    if (audit) auditService.log({ ...audit, module: "diezmos", action: "crear", description: `Diezmo #${data.numero} - ${data.donador} ($${data.valor})`, details: { numero: data.numero, fecha: data.fecha, donador: data.donador, valor: data.valor, mes_id: data.mes_id } })
+    if (audit) auditService.log({ ...audit, module: "diezmos", action: "crear", description: `Diezmo #${data.numero} - ${data.donador} ($${data.valor}) [${data.transaccion}]`, details: { numero: data.numero, fecha: data.fecha, donador: data.donador, valor: data.valor, transaccion: data.transaccion, mes_id: data.mes_id } })
     return data
   }
 
