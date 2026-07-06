@@ -249,7 +249,7 @@ export function CensoForm({
                 <Input
                   id="fecha_nacimiento"
                   type="text"
-                  value={(formData.fecha_nacimiento_display as string) || ""}
+                  value={((formData as any).fecha_nacimiento_display as string) || ""}
                   onChange={(e) => {
                     const raw = e.target.value
                     const updated = { ...formData, fecha_nacimiento_display: raw } as any
