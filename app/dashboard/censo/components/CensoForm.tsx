@@ -55,6 +55,17 @@ export function CensoForm({
     censoService.getConfiguraciones().then(setConfiguraciones).catch(console.error)
   }, [])
 
+  // Inicializar fecha_nacimiento_display cuando se carga el form con datos existentes
+  useEffect(() => {
+    if (formData.fecha_nacimiento && !(formData as any).fecha_nacimiento_display) {
+      const parts = formData.fecha_nacimiento.split("-")
+      if (parts.length === 3) {
+        const display = `${parts[2]}/${parts[1]}/${parts[0]}`
+        onChangeFormData({ ...formData, fecha_nacimiento_display: display } as any)
+      }
+    }
+  }, [formData.fecha_nacimiento])
+
   const setFormField = (field: keyof CensoRecord, value: any) => {
     const updated = { ...formData, [field]: value }
 
@@ -233,7 +244,39 @@ export function CensoForm({
             {renderFormField("Apellidos y Nombres *", "apellidos_nombres")}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {renderFormField("Fecha de Nacimiento", "fecha_nacimiento", "date")}
+              <div className="space-y-1.5">
+                <Label htmlFor="fecha_nacimiento" className="text-sm text-gray-700">Fecha de Nacimiento</Label>
+                <Input
+                  id="fecha_nacimiento"
+                  type="text"
+                  value={(formData.fecha_nacimiento_display as string) || ""}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    const updated = { ...formData, fecha_nacimiento_display: raw } as any
+                    // Intentar parsear: dd/mm/yyyy, dd-mm-yyyy, dd mm yyyy, dd,mm,yyyy
+                    const cleaned = raw.replace(/[/,\-]/g, " ").replace(/\s+/g, " ").trim()
+                    const parts = cleaned.split(" ")
+                    if (parts.length === 3) {
+                      const day = parseInt(parts[0], 10)
+                      const month = parseInt(parts[1], 10)
+                      const year = parseInt(parts[2], 10)
+                      if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+                        const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                        updated.fecha_nacimiento = dateStr
+                        // Calcular edad
+                        const birth = new Date(dateStr + "T12:00:00")
+                        const today = new Date()
+                        let age = today.getFullYear() - birth.getFullYear()
+                        const monthDiff = today.getMonth() - birth.getMonth()
+                        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
+                        updated.edad = age >= 0 ? age : undefined
+                      }
+                    }
+                    onChangeFormData(updated)
+                  }}
+                  placeholder="dd / mm / aaaa"
+                />
+              </div>
               {renderFormField("Edad", "edad", "number")}
             </div>
 
