@@ -320,6 +320,19 @@ export const cronogramaService = {
     }
   },
 
+  // Buscar todos los usuarios activos sin filtro de permisos
+  async searchAllActiveUsers(query: string): Promise<{ id: string; username: string; displayName: string }[]> {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, username, displayName")
+      .eq("is_active", true)
+      .or(`username.ilike.%${query}%,displayName.ilike.%${query}%`)
+      .limit(10)
+
+    if (error) return []
+    return data || []
+  },
+
   // Buscar usuarios que tengan permiso en el módulo dado
   async searchUsersWithModuleAccess(query: string, moduleName: string): Promise<{ id: string; username: string; displayName: string }[]> {
     // Primero obtenemos los user_ids con permiso al módulo

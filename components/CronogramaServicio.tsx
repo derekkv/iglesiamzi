@@ -161,6 +161,13 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
     }
   }
 
+  // IDs de usuarios que pueden asignar a cualquier persona sin filtro de permisos
+  const SUPER_ASSIGNERS = [
+    "8a799e01-11bb-4ea4-8a95-9f7033e90fb1",
+    "83cb032c-38ef-4b47-85f1-84d4ae7d531e",
+    "4eb62d12-4701-4cfc-8c3c-8dd56f9315ad",
+  ]
+
   const handleSearchUsers = async (query: string) => {
     setUserQuery(query)
     if (query.trim().length < 2) {
@@ -170,7 +177,12 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
     }
     setSearching(true)
     try {
-      const results = await cronogramaService.searchUsersWithModuleAccess(query, moduleName)
+      let results
+      if (user && SUPER_ASSIGNERS.includes(user.id)) {
+        results = await cronogramaService.searchAllActiveUsers(query)
+      } else {
+        results = await cronogramaService.searchUsersWithModuleAccess(query, moduleName)
+      }
       setUserResults(results)
       setShowResults(true)
     } catch (error) {
