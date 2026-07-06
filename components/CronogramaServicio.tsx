@@ -168,17 +168,34 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
     "4eb62d12-4701-4cfc-8c3c-8dd56f9315ad",
   ]
 
+  const isSuperAssigner = user ? SUPER_ASSIGNERS.includes(user.id) : false
+
+  const loadInitialUsers = async () => {
+    if (!isSuperAssigner) return
+    try {
+      const results = await cronogramaService.getRandomActiveUsers()
+      setUserResults(results)
+      setShowResults(true)
+    } catch (error) {
+      console.error("Error loading initial users:", error)
+    }
+  }
+
   const handleSearchUsers = async (query: string) => {
     setUserQuery(query)
     if (query.trim().length < 2) {
-      setUserResults([])
-      setShowResults(false)
+      if (isSuperAssigner) {
+        loadInitialUsers()
+      } else {
+        setUserResults([])
+        setShowResults(false)
+      }
       return
     }
     setSearching(true)
     try {
       let results
-      if (user && SUPER_ASSIGNERS.includes(user.id)) {
+      if (isSuperAssigner) {
         results = await cronogramaService.searchAllActiveUsers(query)
       } else {
         results = await cronogramaService.searchUsersWithModuleAccess(query, moduleName)
@@ -454,6 +471,7 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                     <Input
                       value={userQuery}
                       onChange={(e) => handleSearchUsers(e.target.value)}
+                      onFocus={() => { if (isSuperAssigner && userResults.length === 0 && !userQuery) loadInitialUsers() }}
                       placeholder="Buscar por nombre..."
                       className="pl-9"
                     />

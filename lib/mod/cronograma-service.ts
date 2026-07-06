@@ -320,6 +320,18 @@ export const cronogramaService = {
     }
   },
 
+  // Obtener 10 usuarios activos aleatorios (para super assigners)
+  async getRandomActiveUsers(): Promise<{ id: string; username: string; displayName: string }[]> {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, username, displayName")
+      .eq("is_active", true)
+      .limit(10)
+
+    if (error) return []
+    return data || []
+  },
+
   // Buscar todos los usuarios activos sin filtro de permisos
   async searchAllActiveUsers(query: string): Promise<{ id: string; username: string; displayName: string }[]> {
     const { data, error } = await supabase
