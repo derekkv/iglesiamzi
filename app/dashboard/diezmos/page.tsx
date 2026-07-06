@@ -25,6 +25,10 @@ import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
 
+type TipoOfrenda = "diezmo" | "primicia" | "diezmo_especial"
+const TIPO_LABELS: Record<TipoOfrenda, string> = { diezmo: "Diezmo", primicia: "Primicia", diezmo_especial: "Diezmo Especial" }
+const TIPO_COLORS: Record<TipoOfrenda, string> = { diezmo: "bg-blue-100 text-blue-800 border-blue-200", primicia: "bg-purple-100 text-purple-800 border-purple-200", diezmo_especial: "bg-rose-100 text-rose-800 border-rose-200" }
+
 
 function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
@@ -35,14 +39,17 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Form state
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<DiezmoRecord | null>(null)
   const [editingRecord, setEditingRecord] = useState<DiezmoRecord | null>(null)
-  const [form, setForm] = useState({ fecha: "", donador: "", valor: "", transaccion: "efectivo" as "efectivo" | "transferencia" })
+  const [form, setForm] = useState({ donador: "", valor: "", tipo_ofrenda: "diezmo" as TipoOfrenda, transaccion: "efectivo" as "efectivo" | "transferencia" })
 
-  // Search state
+  // Filtros
+  const [filterTipo, setFilterTipo] = useState<string>("todos")
+  const [filterTransaccion, setFilterTransaccion] = useState<string>("todos")
+
+  // Search
   const [searchResults, setSearchResults] = useState<DiezmoWithMonth[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchFilters, setSearchFilters] = useState({ donador: "", fechaDesde: "", fechaHasta: "" })
@@ -71,17 +78,16 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
       const numero = await diezmosService.getNextNumber(currentMonth.id)
       const today = new Date().toISOString().split("T")[0]
       await diezmosService.createDiezmo(
-        { mes_id: currentMonth.id, numero, fecha: today, donador: form.donador.trim(), valor: Number(form.valor), transaccion: form.transaccion },
+        { mes_id: currentMonth.id, numero, fecha: today, donador: form.donador.trim(), valor: Number(form.valor), tipo_ofrenda: form.tipo_ofrenda, transaccion: form.transaccion },
         { user_id: user!.id, user_name: user!.username }
       )
-      setForm({ fecha: "", donador: "", valor: "", transaccion: "efectivo" })
+      setForm({ donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "efectivo" })
       setShowAddDialog(false)
       await loadData(true)
     } catch (error) {
-      console.error("Error creando diezmo:", error)
+      console.error("Error creando:", error)
     } finally { setSaving(false) }
   }
-
 
   const handleEdit = async () => {
     if (!editingRecord || !form.donador.trim() || !form.valor) return
@@ -89,15 +95,15 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
     try {
       await diezmosService.updateDiezmo(
         editingRecord.id,
-        { donador: form.donador.trim(), valor: Number(form.valor), transaccion: form.transaccion },
+        { donador: form.donador.trim(), valor: Number(form.valor), tipo_ofrenda: form.tipo_ofrenda, transaccion: form.transaccion },
         { user_id: user!.id, user_name: user!.username }
       )
       setShowEditDialog(false)
       setEditingRecord(null)
-      setForm({ fecha: "", donador: "", valor: "", transaccion: "efectivo" })
+      setForm({ donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "efectivo" })
       await loadData(true)
     } catch (error) {
-      console.error("Error editando diezmo:", error)
+      console.error("Error editando:", error)
     } finally { setSaving(false) }
   }
 
@@ -106,16 +112,15 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
       await diezmosService.deleteDiezmo(record.id, { user_id: user!.id, user_name: user!.username })
       await loadData(true)
     } catch (error) {
-      console.error("Error eliminando diezmo:", error)
+      console.error("Error eliminando:", error)
     }
   }
 
   const openEdit = (record: DiezmoRecord) => {
     setEditingRecord(record)
-    setForm({ fecha: record.fecha, donador: record.donador, valor: String(record.valor), transaccion: record.transaccion || "efectivo" })
+    setForm({ donador: record.donador, valor: String(record.valor), tipo_ofrenda: record.tipo_ofrenda || "diezmo", transaccion: record.transaccion || "efectivo" })
     setShowEditDialog(true)
   }
-
 
   const handleSearch = async () => {
     try {
@@ -123,46 +128,38 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
       const results = await diezmosService.searchDiezmos(searchFilters)
       setSearchResults(results)
     } catch (error) {
-      console.error("Error buscando diezmos:", error)
+      console.error("Error buscando:", error)
     } finally { setSearchLoading(false) }
   }
 
+
+  // Filtrar registros
+  const filtered = records.filter(r => {
+    if (filterTipo !== "todos" && r.tipo_ofrenda !== filterTipo) return false
+    if (filterTransaccion !== "todos" && r.transaccion !== filterTransaccion) return false
+    return true
+  })
+
   // Totales
-  const totalTransferencia = records.filter(r => r.transaccion === "transferencia").reduce((sum, r) => sum + Number(r.valor), 0)
-  const totalEfectivo = records.filter(r => r.transaccion === "efectivo").reduce((sum, r) => sum + Number(r.valor), 0)
-  const totalGeneral = totalTransferencia + totalEfectivo
-  const totalSearchResults = searchResults.reduce((sum, r) => sum + Number(r.valor), 0)
+  const totalDiezmoTransf = records.filter(r => r.tipo_ofrenda === "diezmo" && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
+  const totalDiezmoEfectivo = records.filter(r => r.tipo_ofrenda === "diezmo" && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
+  const totalPrimicia = records.filter(r => r.tipo_ofrenda === "primicia").reduce((s, r) => s + Number(r.valor), 0)
+  const totalEspecial = records.filter(r => r.tipo_ofrenda === "diezmo_especial").reduce((s, r) => s + Number(r.valor), 0)
+  const totalGeneral = records.reduce((s, r) => s + Number(r.valor), 0)
+  const hasEspecial = records.some(r => r.tipo_ofrenda === "diezmo_especial")
+  const totalSearchResults = searchResults.reduce((s, r) => s + Number(r.valor), 0)
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return ""
     const date = new Date(dateStr + "T12:00:00")
-    const day = String(date.getDate()).padStart(2, "0")
-    const month = String(date.getMonth() + 1).padStart(2, "0")
-    const year = date.getFullYear()
-    return `${day}/${month}/${year}`
+    return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`
   }
-
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando datos de diezmos...</p>
-        </div>
-      </div>
-    )
+    return (<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>)
   }
-
   if (!currentMonth) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirigiendo...</p>
-        </div>
-      </div>
-    )
+    return (<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>)
   }
 
 
@@ -176,76 +173,61 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                 <ArrowLeft className="w-4 h-4" /><span>Volver</span>
               </Button>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Diezmos</h1>
-                <p className="text-sm text-gray-600">Mes activo: {currentMonth?.name}</p>
+                <h1 className="text-xl font-semibold text-gray-900">Diezmos y Primicias</h1>
+                <p className="text-sm text-gray-600">Mes: {currentMonth?.name}</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {!canEdit && (
-                <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1">
-                  <Lock className="w-3 h-3" /> Solo lectura
-                </Badge>
-              )}
-              {canEdit && (
-                <Button size="sm" onClick={() => { setForm({ fecha: "", donador: "", valor: "", transaccion: "efectivo" }); setShowAddDialog(true) }}>
-                  <Plus className="w-4 h-4 mr-1" /> Registrar Diezmo
-                </Button>
-              )}
+              {!canEdit && (<Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo lectura</Badge>)}
+              {canEdit && (<Button size="sm" onClick={() => { setForm({ donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "efectivo" }); setShowAddDialog(true) }}><Plus className="w-4 h-4 mr-1" /> Registrar</Button>)}
             </div>
           </div>
         </div>
       </header>
 
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="mes" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-            <TabsTrigger value="mes">Diezmos del Mes</TabsTrigger>
+            <TabsTrigger value="mes">Mes Actual</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
           </TabsList>
 
-          {/* Tab: Diezmos del mes actual */}
           <TabsContent value="mes" className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Total Diezmos (Transferencia)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">${totalTransferencia.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Total Diezmos (Efectivo)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-amber-600">${totalEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Total General</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">${totalGeneral.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-gray-500 mt-1">{records.length} registros</p>
-                </CardContent>
-              </Card>
+            <div className={`grid gap-4 ${hasEspecial ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
+              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-green-600">${totalDiezmoTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Diezmo Transf.</p></CardContent></Card>
+              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-amber-600">${totalDiezmoEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Diezmo Efectivo</p></CardContent></Card>
+              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-purple-600">${totalPrimicia.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Primicias</p></CardContent></Card>
+              {hasEspecial && (<Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-rose-600">${totalEspecial.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Diezmo Especial</p></CardContent></Card>)}
+              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-blue-600">${totalGeneral.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Total General</p></CardContent></Card>
+            </div>
+
+            {/* Filtros */}
+            <div className="flex flex-wrap gap-3">
+              <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white">
+                <option value="todos">Todos los tipos</option>
+                <option value="diezmo">Diezmo</option>
+                <option value="primicia">Primicia</option>
+                <option value="diezmo_especial">Diezmo Especial</option>
+              </select>
+              <select value={filterTransaccion} onChange={(e) => setFilterTransaccion(e.target.value)} className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white">
+                <option value="todos">Todas las transacciones</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+              {(filterTipo !== "todos" || filterTransaccion !== "todos") && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setFilterTipo("todos"); setFilterTransaccion("todos") }}>Limpiar</Button>
+              )}
+              <Badge variant="secondary" className="h-9 flex items-center">{filtered.length} registros</Badge>
             </div>
 
 
-            {/* Tabla de diezmos del mes */}
+            {/* Tabla */}
             <Card>
-              <CardHeader>
-                <CardTitle>Registros de Diezmos — {currentMonth.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {records.length === 0 ? (
+              <CardContent className="pt-6">
+                {filtered.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No hay diezmos registrados para este mes.</p>
-                    {canEdit && <p className="text-sm mt-1">Haz clic en "Registrar Diezmo" para agregar uno.</p>}
+                    <p>No hay registros{filterTipo !== "todos" || filterTransaccion !== "todos" ? " con estos filtros" : " para este mes"}.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -255,32 +237,30 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">#</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Fecha</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Donante</th>
+                          <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Tipo</th>
                           <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Transacción</th>
                           <th className="border border-gray-300 px-3 py-2 text-right font-semibold">Valor</th>
-                          {canEdit && <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Acciones</th>}
+                          {canEdit && <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Acc.</th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {records.map((record) => (
+                        {filtered.map((record) => (
                           <tr key={record.id} className="hover:bg-gray-50">
                             <td className="border border-gray-300 px-3 py-1.5 font-medium">{record.numero}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{formatDate(record.fecha)}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{record.donador}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center">
-                              <Badge variant={record.transaccion === "transferencia" ? "default" : "secondary"} className={record.transaccion === "transferencia" ? "bg-green-100 text-green-800 border-green-200 text-xs" : "bg-amber-100 text-amber-800 border-amber-200 text-xs"}>
-                                {record.transaccion === "transferencia" ? "Transferencia" : "Efectivo"}
-                              </Badge>
+                              <Badge className={`text-xs ${TIPO_COLORS[record.tipo_ofrenda || "diezmo"]}`}>{TIPO_LABELS[record.tipo_ofrenda || "diezmo"]}</Badge>
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-center">
+                              <Badge className={`text-xs ${record.transaccion === "transferencia" ? "bg-green-100 text-green-800 border-green-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>{record.transaccion === "transferencia" ? "Transferencia" : "Efectivo"}</Badge>
                             </td>
                             <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(record.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                             {canEdit && (
                               <td className="border border-gray-300 px-3 py-1.5 text-center">
                                 <div className="flex items-center justify-center gap-1">
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => checkAndExecute(record.created_at || new Date().toISOString(), () => openEdit(record))}>
-                                    <Edit2 className="w-3 h-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => checkAndExecute(record.created_at || new Date().toISOString(), () => setPendingDelete(record))}>
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => checkAndExecute(record.created_at || new Date().toISOString(), () => openEdit(record))}><Edit2 className="w-3 h-3" /></Button>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => checkAndExecute(record.created_at || new Date().toISOString(), () => setPendingDelete(record))}><Trash2 className="w-3 h-3" /></Button>
                                 </div>
                               </td>
                             )}
@@ -289,19 +269,31 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                       </tbody>
                       <tfoot>
                         <tr className="bg-green-50 font-semibold text-sm">
-                          <td colSpan={3} className="border border-gray-300 px-3 py-1.5 text-right">Total Transferencia:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Transferencia</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalTransferencia.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Diezmo Transferencia:</td>
+                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Transf.</Badge></td>
+                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalDiezmoTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
                         <tr className="bg-amber-50 font-semibold text-sm">
-                          <td colSpan={3} className="border border-gray-300 px-3 py-1.5 text-right">Total Efectivo:</td>
+                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Diezmo Efectivo:</td>
                           <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Efectivo</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalDiezmoEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
+                        <tr className="bg-purple-50 font-semibold text-sm">
+                          <td colSpan={5} className="border border-gray-300 px-3 py-1.5 text-right">Total Primicias:</td>
+                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalPrimicia.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                          {canEdit && <td className="border border-gray-300"></td>}
+                        </tr>
+                        {hasEspecial && (
+                          <tr className="bg-rose-50 font-semibold text-sm">
+                            <td colSpan={5} className="border border-gray-300 px-3 py-1.5 text-right">Total Diezmo Especial:</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right">${totalEspecial.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                            {canEdit && <td className="border border-gray-300"></td>}
+                          </tr>
+                        )}
                         <tr className="bg-blue-50 font-bold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">TOTAL GENERAL:</td>
+                          <td colSpan={5} className="border border-gray-300 px-3 py-1.5 text-right">TOTAL GENERAL:</td>
                           <td className="border border-gray-300 px-3 py-1.5 text-right">${totalGeneral.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
@@ -317,111 +309,77 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           {/* Tab: Historial */}
           <TabsContent value="historial" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Buscar Diezmos (Todos los meses)</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Buscar (Todos los meses)</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="searchDonador">Donante</Label>
-                    <Input id="searchDonador" placeholder="Buscar por nombre..." value={searchFilters.donador} onChange={(e) => setSearchFilters({ ...searchFilters, donador: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label htmlFor="searchFechaDesde">Fecha Desde</Label>
-                    <Input id="searchFechaDesde" type="date" value={searchFilters.fechaDesde} onChange={(e) => setSearchFilters({ ...searchFilters, fechaDesde: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label htmlFor="searchFechaHasta">Fecha Hasta</Label>
-                    <Input id="searchFechaHasta" type="date" value={searchFilters.fechaHasta} onChange={(e) => setSearchFilters({ ...searchFilters, fechaHasta: e.target.value })} />
-                  </div>
+                  <div><Label>Donante</Label><Input placeholder="Buscar por nombre..." value={searchFilters.donador} onChange={(e) => setSearchFilters({ ...searchFilters, donador: e.target.value })} /></div>
+                  <div><Label>Fecha Desde</Label><Input type="date" value={searchFilters.fechaDesde} onChange={(e) => setSearchFilters({ ...searchFilters, fechaDesde: e.target.value })} /></div>
+                  <div><Label>Fecha Hasta</Label><Input type="date" value={searchFilters.fechaHasta} onChange={(e) => setSearchFilters({ ...searchFilters, fechaHasta: e.target.value })} /></div>
                 </div>
-                <Button onClick={handleSearch} disabled={searchLoading} className="w-full md:w-auto">
-                  <Search className="w-4 h-4 mr-2" />
-                  {searchLoading ? "Buscando..." : "Buscar"}
-                </Button>
+                <Button onClick={handleSearch} disabled={searchLoading} className="w-full md:w-auto"><Search className="w-4 h-4 mr-2" />{searchLoading ? "Buscando..." : "Buscar"}</Button>
               </CardContent>
             </Card>
-
 
             {searchResults.length > 0 && (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-gray-600">Resultados</CardTitle></CardHeader>
-                    <CardContent><div className="text-2xl font-bold text-blue-600">{searchResults.length}</div></CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-gray-600">Total</CardTitle></CardHeader>
-                    <CardContent><div className="text-2xl font-bold text-green-600">${totalSearchResults.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</div></CardContent>
-                  </Card>
+                  <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{searchResults.length}</p><p className="text-xs text-gray-500">Resultados</p></CardContent></Card>
+                  <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-green-600">${totalSearchResults.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Total</p></CardContent></Card>
                 </div>
-                <Card>
-                  <CardHeader><CardTitle>Resultados de Búsqueda</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border border-gray-300 text-sm">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">#</th>
-                            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Mes</th>
-                            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Fecha</th>
-                            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Donante</th>
-                            <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Transacción</th>
-                            <th className="border border-gray-300 px-3 py-2 text-right font-semibold">Valor</th>
+                <Card><CardContent className="pt-6">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-300 text-sm">
+                      <thead><tr className="bg-gray-50">
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">#</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Mes</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Fecha</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Donante</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Tipo</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Transacción</th>
+                        <th className="border border-gray-300 px-3 py-2 text-right font-semibold">Valor</th>
+                      </tr></thead>
+                      <tbody>
+                        {searchResults.map((record, i) => (
+                          <tr key={record.id} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-3 py-1.5">{i + 1}</td>
+                            <td className="border border-gray-300 px-3 py-1.5">{record.mes_name}</td>
+                            <td className="border border-gray-300 px-3 py-1.5">{formatDate(record.fecha)}</td>
+                            <td className="border border-gray-300 px-3 py-1.5">{record.donador}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className={`text-xs ${TIPO_COLORS[record.tipo_ofrenda || "diezmo"]}`}>{TIPO_LABELS[record.tipo_ofrenda || "diezmo"]}</Badge></td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className={`text-xs ${record.transaccion === "transferencia" ? "bg-green-100 text-green-800 border-green-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>{record.transaccion === "transferencia" ? "Transferencia" : "Efectivo"}</Badge></td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(record.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {searchResults.map((record, index) => (
-                            <tr key={record.id} className="hover:bg-gray-50">
-                              <td className="border border-gray-300 px-3 py-1.5 font-medium">{index + 1}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{record.mes_name}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{formatDate(record.fecha)}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{record.donador}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-center">
-                                <Badge variant={record.transaccion === "transferencia" ? "default" : "secondary"} className={record.transaccion === "transferencia" ? "bg-green-100 text-green-800 border-green-200 text-xs" : "bg-amber-100 text-amber-800 border-amber-200 text-xs"}>
-                                  {record.transaccion === "transferencia" ? "Transferencia" : "Efectivo"}
-                                </Badge>
-                              </td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(record.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent></Card>
               </>
             )}
-
             {searchResults.length === 0 && !searchLoading && (
-              <Card>
-                <CardContent className="py-12">
-                  <div className="text-center text-gray-500">
-                    <Search className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                    <p>Usa los filtros para buscar diezmos en todos los meses</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="py-12 text-center text-gray-500"><Search className="w-12 h-12 mx-auto mb-4 text-gray-400" /><p>Usa los filtros para buscar</p></CardContent></Card>
             )}
           </TabsContent>
         </Tabs>
 
 
-        {/* Dialog: Agregar Diezmo */}
+        {/* Dialog: Agregar */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Registrar Diezmo</DialogTitle>
-              <DialogDescription>Ingrese los datos del diezmo</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Registrar Diezmo / Primicia</DialogTitle><DialogDescription>Ingrese los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
+              <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
+              <div><Label>Valor</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
               <div>
-                <Label htmlFor="diezmoDonante">Donante</Label>
-                <Input id="diezmoDonante" placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="diezmoValor">Valor</Label>
-                <Input id="diezmoValor" type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} />
+                <Label>Tipo</Label>
+                <Select value={form.tipo_ofrenda} onValueChange={(v) => setForm({ ...form, tipo_ofrenda: v as TipoOfrenda })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="diezmo">Diezmo</SelectItem>
+                    <SelectItem value="primicia">Primicia</SelectItem>
+                    <SelectItem value="diezmo_especial">Diezmo Especial</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Transacción</Label>
@@ -441,22 +399,23 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           </DialogContent>
         </Dialog>
 
-
-        {/* Dialog: Editar Diezmo */}
+        {/* Dialog: Editar */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Diezmo</DialogTitle>
-              <DialogDescription>Modifique los datos del diezmo</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Editar Registro</DialogTitle><DialogDescription>Modifique los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
+              <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
+              <div><Label>Valor</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
               <div>
-                <Label htmlFor="editDonante">Donante</Label>
-                <Input id="editDonante" placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="editValor">Valor</Label>
-                <Input id="editValor" type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} />
+                <Label>Tipo</Label>
+                <Select value={form.tipo_ofrenda} onValueChange={(v) => setForm({ ...form, tipo_ofrenda: v as TipoOfrenda })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="diezmo">Diezmo</SelectItem>
+                    <SelectItem value="primicia">Primicia</SelectItem>
+                    <SelectItem value="diezmo_especial">Diezmo Especial</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Transacción</Label>
@@ -476,18 +435,14 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           </DialogContent>
         </Dialog>
 
-
         {/* AlertDialog: Confirmar eliminar */}
         <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null) }}>
           <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar diezmo?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Se eliminará el diezmo #{pendingDelete?.numero} de {pendingDelete?.donador} (${pendingDelete?.valor}). Esta acción no se puede deshacer.
-              </AlertDialogDescription>
+            <AlertDialogHeader><AlertDialogTitle>¿Eliminar registro?</AlertDialogTitle>
+              <AlertDialogDescription>Se eliminará el registro #{pendingDelete?.numero} de {pendingDelete?.donador} (${pendingDelete?.valor}). Esta acción no se puede deshacer.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setPendingDelete(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => { if (pendingDelete) handleDelete(pendingDelete); setPendingDelete(null) }}>Eliminar</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -122,6 +122,8 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
 const [totalCelulas, setTotalCelulas] = useState(0)
 const [totalAlfoli, setTotalAlfoli] = useState(0)
 const [totalDiezmosTransferencia, setTotalDiezmosTransferencia] = useState(0)
+const [totalPrimicias, setTotalPrimicias] = useState(0)
+const [totalDiezmoEspecial, setTotalDiezmoEspecial] = useState(0)
 const handleDeleteClick = (record: FinancialRecord) => {
   if (!canEdit) {
     setError("No tiene permiso de edición en este módulo");
@@ -207,14 +209,22 @@ const handleDeleteClick = (record: FinancialRecord) => {
       const celulasTotal = (celulasData || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalCelulas(celulasTotal)
 
-      // Total Diezmos solo transferencia del mes
+      // Total Diezmos solo transferencia del mes (tipo_ofrenda = diezmo o null para compatibilidad)
       const { data: diezmosData } = await supabase
         .from("diezmos")
-        .select("valor")
+        .select("valor, tipo_ofrenda")
         .eq("mes_id", currentMonth.id)
         .eq("transaccion", "transferencia")
-      const diezmosTotal = (diezmosData || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      const diezmosTotal = (diezmosData || []).filter((r: any) => !r.tipo_ofrenda || r.tipo_ofrenda === "diezmo").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalDiezmosTransferencia(diezmosTotal)
+
+      // Total Primicias (transferencia) del mes
+      const primiciasTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "primicia").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      setTotalPrimicias(primiciasTotal)
+
+      // Total Diezmo Especial (transferencia) del mes
+      const especialTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "diezmo_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      setTotalDiezmoEspecial(especialTotal)
     } catch (error) {
       console.error("Error loading consolidated totals:", error)
     }
@@ -994,7 +1004,7 @@ function formatDateForTable(dateString: string) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/ofrenda-celulas")}>
             <CardContent className="p-4">
               <div className="text-center">
@@ -1015,11 +1025,31 @@ function formatDateForTable(dateString: string) {
             <CardContent className="p-4">
               <div className="text-center">
                 <p className="text-lg font-bold text-teal-600">${totalDiezmosTransferencia.toLocaleString()}</p>
-                <p className="text-xs text-gray-600">Ingreso Diezmos</p>
-                <p className="text-[10px] text-gray-400">Solo transferencia</p>
+                <p className="text-xs text-gray-600">Diezmos</p>
+                <p className="text-[10px] text-gray-400">Transferencia</p>
               </div>
             </CardContent>
           </Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-lg font-bold text-fuchsia-600">${totalPrimicias.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Primicias</p>
+                <p className="text-[10px] text-gray-400">Transferencia</p>
+              </div>
+            </CardContent>
+          </Card>
+          {totalDiezmoEspecial > 0 && (
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-rose-600">${totalDiezmoEspecial.toLocaleString()}</p>
+                  <p className="text-xs text-gray-600">Diezmo Especial</p>
+                  <p className="text-[10px] text-gray-400">Transferencia</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
@@ -1031,7 +1061,7 @@ function formatDateForTable(dateString: string) {
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
-                <p className="text-lg font-bold text-blue-600">${(totalIngresos + totalCelulas + totalAlfoli + totalDiezmosTransferencia).toLocaleString()}</p>
+                <p className="text-lg font-bold text-blue-600">${(totalIngresos + totalCelulas + totalAlfoli + totalDiezmosTransferencia + totalPrimicias + totalDiezmoEspecial).toLocaleString()}</p>
                 <p className="text-xs text-gray-600">Total Ingresos</p>
               </div>
             </CardContent>
