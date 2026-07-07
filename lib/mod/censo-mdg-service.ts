@@ -9,7 +9,7 @@ export type { CensoRecord, CatalogOption, HijoData, ConfiguracionesGlobales }
  * Limpia el objeto de datos antes de enviarlo a Supabase
  */
 function cleanRecordForInsert(record: Partial<CensoRecord>): Record<string, any> {
-  const { id, created_at, updated_at, fecha_nacimiento_display, ...rest } = record as any
+  const { id, created_at, updated_at, fecha_nacimiento_display, fecha_bautizo_display, fecha_matrimonio_display, ...rest } = record as any
   const cleaned: Record<string, any> = {}
 
   for (const [key, value] of Object.entries(rest)) {
