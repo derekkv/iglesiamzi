@@ -24,6 +24,7 @@ import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
+import { todayEcuador } from "@/lib/timezone"
 
 type TipoOfrenda = "diezmo" | "primicia" | "ofrenda_especial"
 const TIPO_LABELS: Record<TipoOfrenda, string> = { diezmo: "Diezmo", primicia: "Primicia", ofrenda_especial: "Ofrenda Especial" }
@@ -43,7 +44,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<DiezmoRecord | null>(null)
   const [editingRecord, setEditingRecord] = useState<DiezmoRecord | null>(null)
-  const [form, setForm] = useState({ donador: "", valor: "", tipo_ofrenda: "diezmo" as TipoOfrenda, transaccion: "transferencia" as "efectivo" | "transferencia" })
+  const [form, setForm] = useState({ fecha: todayEcuador(), donador: "", valor: "", tipo_ofrenda: "diezmo" as TipoOfrenda, transaccion: "transferencia" as "efectivo" | "transferencia" })
 
   // Filtros
   const [filterTipo, setFilterTipo] = useState<string>("todos")
@@ -72,16 +73,15 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   useRealtime({ table: "diezmos", onChange: () => loadData(true) })
 
   const handleCreate = async () => {
-    if (!form.donador.trim() || !form.valor || !currentMonth) return
+    if (!form.donador.trim() || !form.valor || !form.fecha || !currentMonth) return
     setSaving(true)
     try {
       const numero = await diezmosService.getNextNumber(currentMonth.id)
-      const today = new Date().toISOString().split("T")[0]
       await diezmosService.createDiezmo(
-        { mes_id: currentMonth.id, numero, fecha: today, donador: form.donador.trim(), valor: Number(form.valor), tipo_ofrenda: form.tipo_ofrenda, transaccion: form.transaccion },
+        { mes_id: currentMonth.id, numero, fecha: form.fecha, donador: form.donador.trim(), valor: Number(form.valor), tipo_ofrenda: form.tipo_ofrenda, transaccion: form.transaccion },
         { user_id: user!.id, user_name: user!.username }
       )
-      setForm({ donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "transferencia" })
+      setForm({ fecha: todayEcuador(), donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "transferencia" })
       setShowAddDialog(false)
       await loadData(true)
     } catch (error) {
@@ -90,17 +90,17 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const handleEdit = async () => {
-    if (!editingRecord || !form.donador.trim() || !form.valor) return
+    if (!editingRecord || !form.donador.trim() || !form.valor || !form.fecha) return
     setSaving(true)
     try {
       await diezmosService.updateDiezmo(
         editingRecord.id,
-        { donador: form.donador.trim(), valor: Number(form.valor), tipo_ofrenda: form.tipo_ofrenda, transaccion: form.transaccion },
+        { fecha: form.fecha, donador: form.donador.trim(), valor: Number(form.valor), tipo_ofrenda: form.tipo_ofrenda, transaccion: form.transaccion },
         { user_id: user!.id, user_name: user!.username }
       )
       setShowEditDialog(false)
       setEditingRecord(null)
-      setForm({ donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "transferencia" })
+      setForm({ fecha: todayEcuador(), donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "transferencia" })
       await loadData(true)
     } catch (error) {
       console.error("Error editando:", error)
@@ -118,7 +118,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
 
   const openEdit = (record: DiezmoRecord) => {
     setEditingRecord(record)
-    setForm({ donador: record.donador, valor: String(record.valor), tipo_ofrenda: record.tipo_ofrenda || "diezmo", transaccion: record.transaccion || "efectivo" })
+    setForm({ fecha: record.fecha, donador: record.donador, valor: String(record.valor), tipo_ofrenda: record.tipo_ofrenda || "diezmo", transaccion: record.transaccion || "transferencia" })
     setShowEditDialog(true)
   }
 
@@ -180,7 +180,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
             </div>
             <div className="flex items-center space-x-2">
               {!canEdit && (<Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo lectura</Badge>)}
-              {canEdit && (<Button size="sm" onClick={() => { setForm({ donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "efectivo" }); setShowAddDialog(true) }}><Plus className="w-4 h-4 mr-1" /> Registrar</Button>)}
+              {canEdit && (<Button size="sm" onClick={() => { setForm({ fecha: todayEcuador(), donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "transferencia" }); setShowAddDialog(true) }}><Plus className="w-4 h-4 mr-1" /> Registrar</Button>)}
             </div>
           </div>
         </div>
@@ -383,6 +383,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent>
             <DialogHeader><DialogTitle>Registrar Diezmo / Primicia</DialogTitle><DialogDescription>Ingrese los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
+              <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></div>
               <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
               <div><Label>Valor</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
               <div>
@@ -419,6 +420,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent>
             <DialogHeader><DialogTitle>Editar Registro</DialogTitle><DialogDescription>Modifique los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
+              <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></div>
               <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
               <div><Label>Valor</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
               <div>
