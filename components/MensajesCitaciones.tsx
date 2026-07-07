@@ -207,8 +207,10 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
         destinatarioIds = (allUsers || []).map((u: any) => u.id)
       }
 
-      // Excluir al remitente
-      destinatarioIds = destinatarioIds.filter((id) => id !== user.id)
+      // Excluir al remitente (solo cuando es envío masivo, no cuando es a uno mismo)
+      if (destTipo !== "usuario") {
+        destinatarioIds = destinatarioIds.filter((id) => id !== user.id)
+      }
 
       if (destinatarioIds.length > 0) {
         const recibidosInsert = destinatarioIds.map((uid) => ({
