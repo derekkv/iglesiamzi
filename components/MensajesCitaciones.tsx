@@ -225,13 +225,30 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
           .in("id", destinatarioIds)
 
         const asunto = tipoMensaje === "invitacion" ? "Citación" : "Mensaje"
-        const cuerpo = `${asunto} de ${user.displayName} (${title}): ${detalle.trim()}${fecha ? ` - Fecha: ${fecha}` : ""}${eventoLugar ? ` - Lugar: ${eventoLugar}` : ""}`
+        const fechaFormateada = fecha ? new Date(fecha + "T12:00:00").toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : ""
+
+        // Mensaje WhatsApp detallado
+        const whatsappMsg = [
+          `📩 *${asunto} — ${title}*`,
+          ``,
+          `De: *${user.displayName}*`,
+          `Tipo: ${tipoMensaje === "invitacion" ? "Invitación / Citación" : "Mensaje"}`,
+          ``,
+          `📝 *Detalle:*`,
+          detalle.trim(),
+          fecha ? `\n📅 *Fecha:* ${fechaFormateada}` : "",
+          eventoLugar ? `📍 *Evento/Lugar:* ${eventoLugar}` : "",
+          valor ? `💰 *Valor:* $${parseFloat(valor).toFixed(2)}` : "",
+          ``,
+          `👉 Ingresa a la app para más detalles:`,
+          `https://panel.iglesiaregalodedios.com/dashboard`,
+        ].filter(Boolean).join("\n")
 
         // Insertar en buzón interno para cada destinatario
         const buzonInserts = destinatarioIds.map((uid) => ({
           user_id: uid,
-          titulo: `${asunto} - ${title}`,
-          mensaje: `${user.displayName}: ${detalle.trim()}${fecha ? ` | Fecha: ${fecha}` : ""}${eventoLugar ? ` | Lugar: ${eventoLugar}` : ""}${valor ? ` | Valor: $${parseFloat(valor).toFixed(2)}` : ""}`,
+          titulo: `📩 ${asunto} - ${title}`,
+          mensaje: `De: ${user.displayName}\n${detalle.trim()}${fecha ? `\nFecha: ${fechaFormateada}` : ""}${eventoLugar ? `\nLugar: ${eventoLugar}` : ""}${valor ? `\nValor: $${parseFloat(valor).toFixed(2)}` : ""}`,
           tipo: "info" as const,
           leido: false,
           referencia_tipo: "mensaje_citacion",
@@ -247,26 +264,49 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 to: dest.email,
-                subject: `✉️ ${asunto} - ${title}`,
+                subject: `📩 ${asunto} - ${title} | Iglesia Regalo de Dios`,
                 html: `
-                  <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-                    <div style="background:#2563eb;color:white;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
-                      <h2 style="margin:0;">${asunto}</h2>
-                      <p style="margin:4px 0 0;opacity:0.85;font-size:14px;">${title}</p>
-                    </div>
-                    <div style="background:white;border:1px solid #e5e7eb;padding:24px;border-radius:0 0 12px 12px;">
-                      <p>Hola <strong>${dest.displayName}</strong>,</p>
-                      <p>Has recibido ${tipoMensaje === "invitacion" ? "una citación" : "un mensaje"} de <strong>${user.displayName}</strong> (${title}):</p>
-                      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
-                        <p style="margin:0 0 8px;"><strong>Detalle:</strong> ${detalle.trim()}</p>
-                        ${fecha ? `<p style="margin:0 0 8px;"><strong>Fecha:</strong> ${fecha}</p>` : ""}
-                        ${valor ? `<p style="margin:0 0 8px;"><strong>Valor:</strong> $${parseFloat(valor).toFixed(2)}</p>` : ""}
-                        ${eventoLugar ? `<p style="margin:0;"><strong>Evento/Lugar:</strong> ${eventoLugar}</p>` : ""}
+                  <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#f3f4f6;padding:32px 16px;">
+                    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+                      <div style="background:${tipoMensaje === "invitacion" ? "#7c3aed" : "#2563eb"};padding:28px 32px;text-align:center;">
+                        <div style="font-size:36px;margin-bottom:8px;">${tipoMensaje === "invitacion" ? "📋" : "✉️"}</div>
+                        <h1 style="color:white;margin:0;font-size:22px;font-weight:700;">${asunto}</h1>
+                        <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Ministerio de ${title}</p>
                       </div>
-                      <p style="text-align:center;margin-top:24px;">
-                        <a href="https://panel.iglesiaregalodedios.com/dashboard" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Abrir la App</a>
-                      </p>
-                      <p style="color:#6b7280;font-size:12px;text-align:center;margin-top:16px;">Iglesia Regalo de Dios — Este es un correo automático.</p>
+                      <div style="padding:32px;">
+                        <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                          Hola <strong>${dest.displayName}</strong>, has recibido ${tipoMensaje === "invitacion" ? "una citación" : "un mensaje"} de <strong>${user.displayName}</strong>:
+                        </p>
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:0 0 24px;">
+                          <table width="100%" cellpadding="0" cellspacing="0">
+                            <tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                              <span style="color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">📝 Detalle</span><br>
+                              <span style="color:#111827;font-size:15px;font-weight:500;line-height:1.5;">${detalle.trim()}</span>
+                            </td></tr>
+                            ${fecha ? `<tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                              <span style="color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">📅 Fecha</span><br>
+                              <span style="color:#111827;font-size:15px;font-weight:600;">${fechaFormateada}</span>
+                            </td></tr>` : ""}
+                            ${eventoLugar ? `<tr><td style="padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                              <span style="color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">📍 Evento / Lugar</span><br>
+                              <span style="color:#111827;font-size:15px;font-weight:600;">${eventoLugar}</span>
+                            </td></tr>` : ""}
+                            ${valor ? `<tr><td style="padding:8px 0;">
+                              <span style="color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">💰 Valor</span><br>
+                              <span style="color:#111827;font-size:15px;font-weight:600;">$${parseFloat(valor).toFixed(2)}</span>
+                            </td></tr>` : ""}
+                          </table>
+                        </div>
+                        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+                          <a href="https://panel.iglesiaregalodedios.com/dashboard" style="display:inline-block;background:${tipoMensaje === "invitacion" ? "#7c3aed" : "#2563eb"};color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+                            Abrir la App
+                          </a>
+                        </td></tr></table>
+                        <p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:20px;">
+                          Enviado por ${user.displayName} desde el módulo de ${title}<br>
+                          Iglesia Regalo de Dios — Este es un correo automático.
+                        </p>
+                      </div>
                     </div>
                   </div>`,
               }),
@@ -277,14 +317,19 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
             fetch("/api/whatsapp/send", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ phone: dest.phone, message: cuerpo }),
+              body: JSON.stringify({ phone: dest.phone, message: whatsappMsg }),
             }).catch(() => {})
           }
           // Push
           fetch("/api/send-notification", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: dest.id, title: `${asunto} - ${title}`, body: detalle.trim().slice(0, 100), url: "/dashboard" }),
+            body: JSON.stringify({
+              userId: dest.id,
+              title: `📩 ${asunto} - ${title}`,
+              body: `${user.displayName}: ${detalle.trim().slice(0, 80)}${fecha ? ` | ${fechaFormateada}` : ""}`,
+              url: "/dashboard",
+            }),
           }).catch(() => {})
         }
       }
