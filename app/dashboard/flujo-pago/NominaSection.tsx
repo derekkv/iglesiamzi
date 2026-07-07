@@ -172,6 +172,10 @@ export function NominaSection() {
   const totalNomina = records.reduce((s, r) => s + Number(r.valor_a_pagar || 0), 0)
   const pendientes1ra = records.filter((r) => !r.primera_quincena_pagada)
   const pendientes2da = records.filter((r) => !r.segunda_quincena_pagada)
+  const falta1ra = pendientes1ra.reduce((s, r) => s + (Number(r.valor_a_pagar || 0) / 2), 0)
+  const falta2da = pendientes2da.reduce((s, r) => s + (Number(r.valor_a_pagar || 0) / 2), 0)
+  const pagado1ra = records.filter(r => r.primera_quincena_pagada).reduce((s, r) => s + Number(r.primera_quincena_valor || 0), 0)
+  const pagado2da = records.filter(r => r.segunda_quincena_pagada).reduce((s, r) => s + Number(r.segunda_quincena_valor || 0), 0)
 
   const renderForm = () => (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -228,7 +232,14 @@ export function NominaSection() {
       {/* Primera Quincena */}
       <div className="border rounded-lg p-4 space-y-3 bg-blue-50/50">
         <div className="flex items-center space-x-2">
-          <Checkbox id="pq_pagada" checked={formData.primera_quincena_pagada} onCheckedChange={(c) => setFormData({ ...formData, primera_quincena_pagada: c as boolean })} />
+          <Checkbox id="pq_pagada" checked={formData.primera_quincena_pagada} onCheckedChange={(c) => {
+            const checked = c as boolean
+            const updates: any = { ...formData, primera_quincena_pagada: checked }
+            if (checked && !formData.primera_quincena_valor) {
+              updates.primera_quincena_valor = (Math.max(0, (parseFloat(formData.valor_sueldo) || 0) - (parseFloat(formData.descuento_valor) || 0)) / 2).toFixed(2)
+            }
+            setFormData(updates)
+          }} />
           <Label htmlFor="pq_pagada" className="font-medium cursor-pointer">Primera Quincena Pagada</Label>
         </div>
         {formData.primera_quincena_pagada && (
@@ -243,7 +254,14 @@ export function NominaSection() {
       {/* Segunda Quincena */}
       <div className="border rounded-lg p-4 space-y-3 bg-green-50/50">
         <div className="flex items-center space-x-2">
-          <Checkbox id="sq_pagada" checked={formData.segunda_quincena_pagada} onCheckedChange={(c) => setFormData({ ...formData, segunda_quincena_pagada: c as boolean })} />
+          <Checkbox id="sq_pagada" checked={formData.segunda_quincena_pagada} onCheckedChange={(c) => {
+            const checked = c as boolean
+            const updates: any = { ...formData, segunda_quincena_pagada: checked }
+            if (checked && !formData.segunda_quincena_valor) {
+              updates.segunda_quincena_valor = (Math.max(0, (parseFloat(formData.valor_sueldo) || 0) - (parseFloat(formData.descuento_valor) || 0)) / 2).toFixed(2)
+            }
+            setFormData(updates)
+          }} />
           <Label htmlFor="sq_pagada" className="font-medium cursor-pointer">Segunda Quincena Pagada</Label>
         </div>
         {formData.segunda_quincena_pagada && (
@@ -268,10 +286,12 @@ export function NominaSection() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100"><p className="text-xs text-amber-600">Total a Pagar</p><p className="text-lg font-bold text-amber-800">${totalNomina.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p></div>
-            <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100"><p className="text-xs text-blue-600">Pendientes 1ra Q.</p><p className="text-lg font-bold text-blue-800">{pendientes1ra.length}</p></div>
-            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100"><p className="text-xs text-green-600">Pendientes 2da Q.</p><p className="text-lg font-bold text-green-800">{pendientes2da.length}</p></div>
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100"><p className="text-xs text-green-600">Pagado 1ra Q.</p><p className="text-lg font-bold text-green-800">${pagado1ra.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p></div>
+            <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-200"><p className="text-xs text-amber-700">Falta 1ra Q.</p><p className="text-lg font-bold text-amber-700">${falta1ra.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-[10px] text-amber-500">{pendientes1ra.length} pendiente{pendientes1ra.length !== 1 ? "s" : ""}</p></div>
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100"><p className="text-xs text-green-600">Pagado 2da Q.</p><p className="text-lg font-bold text-green-800">${pagado2da.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p></div>
+            <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-200"><p className="text-xs text-amber-700">Falta 2da Q.</p><p className="text-lg font-bold text-amber-700">${falta2da.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-[10px] text-amber-500">{pendientes2da.length} pendiente{pendientes2da.length !== 1 ? "s" : ""}</p></div>
           </div>
           {records.length > 0 ? (
             <div className="overflow-x-auto">
@@ -297,8 +317,8 @@ export function NominaSection() {
                       <td className="p-2 text-right">${Number(r.valor_sueldo || 0).toFixed(2)}</td>
                       <td className="p-2 text-right text-red-600">{(r.descuento_valor || 0) > 0 ? `-$${Number(r.descuento_valor).toFixed(2)}` : "-"}</td>
                       <td className="p-2 text-right font-medium text-green-700">${Number(r.valor_a_pagar || 0).toFixed(2)}</td>
-                      <td className="p-2 text-center">{r.primera_quincena_pagada ? <Badge className="bg-green-100 text-green-800 text-xs">${(r.primera_quincena_valor || 0).toFixed(0)}</Badge> : <Badge variant="secondary" className="text-xs">Pend.</Badge>}</td>
-                      <td className="p-2 text-center">{r.segunda_quincena_pagada ? <Badge className="bg-green-100 text-green-800 text-xs">${(r.segunda_quincena_valor || 0).toFixed(0)}</Badge> : <Badge variant="secondary" className="text-xs">Pend.</Badge>}</td>
+                      <td className="p-2 text-center">{r.primera_quincena_pagada ? <Badge className="bg-green-100 text-green-800 text-xs">${(r.primera_quincena_valor || 0).toFixed(2)}</Badge> : <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</Badge>}</td>
+                      <td className="p-2 text-center">{r.segunda_quincena_pagada ? <Badge className="bg-green-100 text-green-800 text-xs">${(r.segunda_quincena_valor || 0).toFixed(2)}</Badge> : <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</Badge>}</td>
                       <td className="p-2 text-center"><div className="flex justify-center gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(r)}><Edit2 className="h-3 w-3" /></Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(r.id)}><Trash2 className="h-3 w-3 text-red-500" /></Button>
