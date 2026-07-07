@@ -227,6 +227,18 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
         const asunto = tipoMensaje === "invitacion" ? "Citación" : "Mensaje"
         const cuerpo = `${asunto} de ${user.displayName} (${title}): ${detalle.trim()}${fecha ? ` - Fecha: ${fecha}` : ""}${eventoLugar ? ` - Lugar: ${eventoLugar}` : ""}`
 
+        // Insertar en buzón interno para cada destinatario
+        const buzonInserts = destinatarioIds.map((uid) => ({
+          user_id: uid,
+          titulo: `${asunto} - ${title}`,
+          mensaje: `${user.displayName}: ${detalle.trim()}${fecha ? ` | Fecha: ${fecha}` : ""}${eventoLugar ? ` | Lugar: ${eventoLugar}` : ""}${valor ? ` | Valor: $${parseFloat(valor).toFixed(2)}` : ""}`,
+          tipo: "info" as const,
+          leido: false,
+          referencia_tipo: "mensaje_citacion",
+          referencia_id: msg.id,
+        }))
+        await supabase.from("buzon_mensajes").insert(buzonInserts)
+
         for (const dest of (destUsers || [])) {
           // Email
           if (dest.email) {

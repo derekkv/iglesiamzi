@@ -8,7 +8,7 @@ export interface DiezmoRecord {
   fecha: string
   donador: string
   valor: number
-  tipo_ofrenda: "diezmo" | "primicia" | "diezmo_especial"
+  tipo_ofrenda: "diezmo" | "primicia" | "ofrenda_especial"
   transaccion: "efectivo" | "transferencia"
   created_at?: string
   updated_at?: string

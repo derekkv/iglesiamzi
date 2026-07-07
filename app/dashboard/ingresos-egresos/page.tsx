@@ -222,8 +222,8 @@ const handleDeleteClick = (record: FinancialRecord) => {
       const primiciasTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "primicia").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalPrimicias(primiciasTotal)
 
-      // Total Diezmo Especial (transferencia) del mes
-      const especialTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "diezmo_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      // Total Ofrenda Especial (transferencia) del mes
+      const especialTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "ofrenda_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalDiezmoEspecial(especialTotal)
     } catch (error) {
       console.error("Error loading consolidated totals:", error)
@@ -1039,17 +1039,15 @@ function formatDateForTable(dateString: string) {
               </div>
             </CardContent>
           </Card>
-          {totalDiezmoEspecial > 0 && (
-            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <p className="text-lg font-bold text-rose-600">${totalDiezmoEspecial.toLocaleString()}</p>
-                  <p className="text-xs text-gray-600">Diezmo Especial</p>
-                  <p className="text-[10px] text-gray-400">Transferencia</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-lg font-bold text-rose-600">${totalDiezmoEspecial.toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Ofrenda Especial</p>
+                <p className="text-[10px] text-gray-400">Transferencia</p>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
