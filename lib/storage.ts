@@ -127,6 +127,7 @@ async addIngreso(mesId: string, ingreso: any, audit?: AuditInfo) {
     detalle: ingreso.detalle,
     observacion: ingreso.observacion,
     estado: ingreso.estado,
+    metodo_pago: ingreso.metodo_pago || "N/A",
   });
   if (error) throw new Error(`Supabase addIngreso error: ${error.message}`);
   if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "crear", description: `Ingreso: ${ingreso.detalle} - $${ingreso.monto}`, details: { tipo: "Ingreso", monto: ingreso.monto, fecha: ingreso.fecha, ministerio: ingreso.ministerio, categoria: ingreso.categoria_principal, detalle: ingreso.detalle, observacion: ingreso.observacion, estado: ingreso.estado } })
@@ -195,6 +196,7 @@ async addEgreso(mesId: string, ingreso: any, audit?: AuditInfo) {
     detalle: ingreso.detalle,
     observacion: ingreso.observacion,
     estado: ingreso.estado,
+    metodo_pago: ingreso.metodo_pago || "N/A",
   });
 
   if (error) throw new Error(`Supabase addEgreso error: ${error.message}`);
