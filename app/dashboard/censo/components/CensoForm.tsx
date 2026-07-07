@@ -119,6 +119,15 @@ export function CensoForm({
       updated.miembro_activo = false
     }
 
+    // Nuevo creyente → automáticamente marcar miembro
+    if (field === "nuevo_creyente" && value) {
+      updated.miembro = true
+    }
+    // Si desmarca nuevo_creyente, permitir desmarcar miembro
+    if (field === "nuevo_creyente" && !value) {
+      // No forzar desmarcar miembro, solo liberar el bloqueo
+    }
+
     onChangeFormData(updated)
   }
 
@@ -537,7 +546,17 @@ export function CensoForm({
           <div className="border-t border-orange-200 pt-4">
             <p className="text-sm font-medium text-orange-700 mb-3">Membresía</p>
             <div className="space-y-1">
-              {renderCheckbox("Miembro", "miembro")}
+              <div className="flex items-center space-x-2 py-1">
+                <Checkbox
+                  id="miembro"
+                  checked={(formData.miembro as boolean) || false}
+                  onCheckedChange={(checked) => setFormField("miembro", checked as boolean)}
+                  disabled={!!formData.nuevo_creyente}
+                />
+                <Label htmlFor="miembro" className="cursor-pointer text-sm font-normal text-gray-700">
+                  Miembro {formData.nuevo_creyente && <span className="text-xs text-gray-400">(activado por nuevo creyente)</span>}
+                </Label>
+              </div>
               {renderCheckbox("Miembro Activo", "miembro_activo")}
             </div>
           </div>

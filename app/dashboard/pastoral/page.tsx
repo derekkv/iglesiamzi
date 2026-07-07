@@ -381,7 +381,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
 export default function PastoralPage() {
   return (
-    <PermissionsGuard moduleName="pastoral">
+    <PermissionsGuard moduleName="resumen-pastoral">
       {(canEdit) => <PastoralContent canEdit={canEdit} />}
     </PermissionsGuard>
   )

@@ -118,6 +118,9 @@ const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
   estados: [],
 });
 
+// Grupos de módulos (para ministerio)
+const [gruposMinisterio, setGruposMinisterio] = useState<string[]>([])
+
 // Totales consolidados de otros módulos
 const [totalCelulas, setTotalCelulas] = useState(0)
 const [totalAlfoli, setTotalAlfoli] = useState(0)
@@ -164,6 +167,13 @@ const handleDeleteClick = (record: FinancialRecord) => {
         // Cargar configuración global
         const config = await getGlobalConfig();
         setGlobalConfig(config);
+
+        // Cargar grupos de módulos para ministerio
+        const { data: grupos } = await supabase
+          .from("module_groups")
+          .select("display_name")
+          .order("sort_order", { ascending: true })
+        if (grupos) setGruposMinisterio(grupos.map((g: any) => g.display_name))
 
         // Cargar configuraciones del mes actual
 
@@ -659,126 +669,49 @@ function formatDateForTable(dateString: string) {
                     Configurar
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="w-[calc(100%-1rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Configurar Opciones</DialogTitle>
                     <DialogDescription>
-                      Gestione las opciones disponibles para los campos de
-                      selección
+                      Gestione las categorías principales disponibles
                     </DialogDescription>
                   </DialogHeader>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-3">
-                      <Label className="text-base font-medium">
-                        Ministerios
-                      </Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Nuevo ministerio"
-                          value={newMinisterio}
-                          onChange={(e) => setNewMinisterio(e.target.value)}
-                          className="text-sm"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddConfiguration("ministerio")}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {globalConfig.ministerios.map((ministerio) => (
-                          <div
-                            key={ministerio}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
-                          >
-                            <span>{ministerio}</span>
-                            <button
-                              onClick={() =>
-                                removeConfiguration("ministerio", ministerio)
-                              }
-                              className="text-red-500 hover:text-red-700 ml-2"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">
+                      Categorías Principales
+                    </Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        placeholder="Nueva categoría"
+                        value={newCategoria}
+                        onChange={(e) => setNewCategoria(e.target.value)}
+                        className="text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddConfiguration("categoria")}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
                     </div>
-
-                    <div className="space-y-3">
-                      <Label className="text-base font-medium">
-                        Categorías Principales
-                      </Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Nueva categoría"
-                          value={newCategoria}
-                          onChange={(e) => setNewCategoria(e.target.value)}
-                          className="text-sm"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddConfiguration("categoria")}
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {globalConfig.categorias_principales.map((categoria) => (
+                        <div
+                          key={categoria}
+                          className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
                         >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {globalConfig.categorias_principales.map((categoria) => (
-                          <div
-                            key={categoria}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+                          <span>{categoria}</span>
+                          <button
+                            onClick={() =>
+                              removeConfiguration("categoria", categoria)
+                            }
+                            className="text-red-500 hover:text-red-700 ml-2"
                           >
-                            <span>{categoria}</span>
-                            <button
-                              onClick={() =>
-                                removeConfiguration("categoria", categoria)
-                              }
-                              className="text-red-500 hover:text-red-700 ml-2"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label className="text-base font-medium">Detalles</Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Nuevo detalle"
-                          value={newDetalle}
-                          onChange={(e) => setNewDetalle(e.target.value)}
-                          className="text-sm"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddConfiguration("detalle")}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {globalConfig.detalles.map((detalle) => (
-                          <div
-                            key={detalle}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
-                          >
-                            <span>{detalle}</span>
-                            <button
-                              onClick={() =>
-                                removeConfiguration("detalle", detalle)
-                              }
-                              className="text-red-500 hover:text-red-700 ml-2"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                            ×
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -842,7 +775,7 @@ function formatDateForTable(dateString: string) {
                             <SelectValue placeholder="Seleccione ministerio" />
                           </SelectTrigger>
                           <SelectContent>
-                            {globalConfig.ministerios.map((ministerio) => (
+                            {gruposMinisterio.map((ministerio) => (
                               <SelectItem key={ministerio} value={ministerio}>
                                 {ministerio}
                               </SelectItem>
@@ -878,23 +811,13 @@ function formatDateForTable(dateString: string) {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="detalle">Detalle *</Label>
-                        <Select
+                        <Input
+                          id="detalle"
                           value={formData.detalle}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, detalle: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione detalle" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {globalConfig.detalles.map((detalle) => (
-                              <SelectItem key={detalle} value={detalle}>
-                                {detalle}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(e) => setFormData({ ...formData, detalle: e.target.value.slice(0, 160) })}
+                          placeholder="Descripción (máx. 160 caracteres)"
+                          maxLength={160}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="monto">Valor *</Label>
@@ -917,7 +840,7 @@ function formatDateForTable(dateString: string) {
                     </div>
 
                     <div>
-                      <Label htmlFor="observacion">Observación</Label>
+                      <Label htmlFor="observacion">Centro de Gasto</Label>
                       <Textarea
                         id="observacion"
                         value={formData.observacion}
@@ -927,7 +850,7 @@ function formatDateForTable(dateString: string) {
                             observacion: e.target.value,
                           })
                         }
-                        placeholder="Observaciones adicionales (opcional)"
+                        placeholder="Centro de gasto (opcional)"
                       />
                     </div>
 
@@ -1105,7 +1028,7 @@ function formatDateForTable(dateString: string) {
             <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t">
               <div className="flex-1 min-w-[180px]">
                 <Input
-                  placeholder="Buscar por observación, ministerio..."
+                  placeholder="Buscar por centro de gasto, ministerio..."
                   value={filterText}
                   onChange={(e) => setFilterText(e.target.value)}
                   className="h-9"
@@ -1185,7 +1108,7 @@ function formatDateForTable(dateString: string) {
                       <th className="text-left p-3 font-medium">Valor</th>
                       <th className="text-left p-3 font-medium">Método de Pago</th>
                       <th className="text-left p-3 font-medium">Estado</th>
-                      <th className="text-left p-3 font-medium">Observación</th>
+                      <th className="text-left p-3 font-medium">Centro de Gasto</th>
                       <th className="text-left p-3 font-medium">Acciones</th>
                     </tr>
                   </thead>
@@ -1378,7 +1301,7 @@ function formatDateForTable(dateString: string) {
                     <SelectValue placeholder="Seleccione ministerio" />
                   </SelectTrigger>
                   <SelectContent>
-                    {globalConfig.ministerios.map((ministerio) => (
+                    {gruposMinisterio.map((ministerio) => (
                       <SelectItem key={ministerio} value={ministerio}>
                         {ministerio}
                       </SelectItem>
@@ -1411,23 +1334,13 @@ function formatDateForTable(dateString: string) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-detalle">Detalle *</Label>
-                <Select
+                <Input
+                  id="edit-detalle"
                   value={formData.detalle}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, detalle: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione detalle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {globalConfig.detalles.map((detalle) => (
-                      <SelectItem key={detalle} value={detalle}>
-                        {detalle}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, detalle: e.target.value.slice(0, 160) })}
+                  placeholder="Descripción (máx. 160 caracteres)"
+                  maxLength={160}
+                />
               </div>
               <div>
                 <Label htmlFor="edit-monto">Valor *</Label>
@@ -1450,14 +1363,14 @@ function formatDateForTable(dateString: string) {
             </div>
 
             <div>
-              <Label htmlFor="edit-observacion">Observación</Label>
+              <Label htmlFor="edit-observacion">Centro de Gasto</Label>
               <Textarea
                 id="edit-observacion"
                 value={formData.observacion}
                 onChange={(e) =>
                   setFormData({ ...formData, observacion: e.target.value })
                 }
-                placeholder="Observaciones adicionales (opcional)"
+                placeholder="Centro de gasto (opcional)"
               />
             </div>
 

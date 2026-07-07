@@ -28,6 +28,9 @@ const MODULO_LABELS: Record<string, string> = {
   herederos: "Herederos",
   redil: "Redil",
   comunicacion: "Comunicación",
+  jovenes: "Jóvenes",
+  hombres: "Hombres",
+  pastoral: "Pastoral",
 }
 
 function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
