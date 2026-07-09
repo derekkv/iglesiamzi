@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import {
   ArrowLeft, Cake, Send, Search, CheckCircle2, XCircle, Loader2,
-  Phone, Mail, Bell, PartyPopper, Calendar,
+  Phone, Mail, Bell, PartyPopper, Calendar, Download,
 } from "lucide-react"
 import {
   getCumpleanerosMes,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/mod/cumpleanos-service"
 import { authFetch } from "@/lib/auth-fetch"
 import { currentMonthEcuador, currentYearEcuador } from "@/lib/timezone"
+import { generateCumpleanosPDF } from "@/lib/generate-cumpleanos-pdf"
 
 const MESES_NOMBRES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -53,6 +54,24 @@ function CumpleanosContent({ canEdit }: { canEdit: boolean }) {
       toast.error("Error al cargar cumpleañeros")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDownloadPDF = async (nombre: string) => {
+    try {
+      const pdfBytes = await generateCumpleanosPDF(nombre)
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `Cumpleaños - ${nombre}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Error generando PDF:", error)
+      toast.error("Error al generar el PDF de cumpleaños")
     }
   }
 
@@ -289,19 +308,29 @@ function CumpleanosContent({ canEdit }: { canEdit: boolean }) {
                         </TableCell>
                         {canEdit && (
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => enviarFelicitacion(c)}
-                              disabled={sendingId === c.id}
-                              className="text-pink-600 border-pink-200 hover:bg-pink-50"
-                            >
-                              {sendingId === c.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <><Send className="w-4 h-4 mr-1" />Enviar</>
-                              )}
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadPDF(c.apellidos_nombres)}
+                                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                              >
+                                <Download className="w-4 h-4 mr-1" />PDF
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => enviarFelicitacion(c)}
+                                disabled={sendingId === c.id}
+                                className="text-pink-600 border-pink-200 hover:bg-pink-50"
+                              >
+                                {sendingId === c.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <><Send className="w-4 h-4 mr-1" />Enviar</>
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>

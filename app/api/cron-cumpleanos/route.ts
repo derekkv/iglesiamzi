@@ -5,6 +5,7 @@ import { formatPhoneForWhatsApp } from "@/lib/format-phone"
 import { verifyApiAuth } from "@/lib/api-auth"
 import * as fs from "fs"
 import * as path from "path"
+import { getBirthdayImage } from "@/lib/pdf-to-image"
 
 const VAPID_PUBLIC_KEY = "BKHW7uYkfEBfrPirumVyRqNj_eiWBLpEQuV1Q6NsGImX7wJYA4oB1q_w5iGCZ7xcoO3Jgs41VczB3a7Y2FeIoYY"
 const VAPID_PRIVATE_KEY = "kG6aW66CSKCC76Tgt-ACRBYSWVxHtgIHFK5Q3_QJO14"
@@ -22,17 +23,18 @@ webpush.setVapidDetails(
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 // Archivos de media para WhatsApp
-const BIRTHDAY_IMAGE_PATH = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
 const BIRTHDAY_AUDIO_PATH = path.join(process.cwd(), "public", "Cumpleaños Feliz  Happy Birthday  Queremos que Partan la Torta.mp3")
 
 function generarMensajeCumple(nombre: string, edad: number): string {
-  return `🎂🎉 ¡Feliz Cumpleaños, ${nombre}! 🎉🎂\n\n` +
-    `Que Dios te bendiga abundantemente en este día tan especial. ` +
-    `Celebramos tu vida y los ${edad} años que cumples hoy.\n\n` +
-    `"Porque yo sé los pensamientos que tengo acerca de vosotros, dice Jehová, ` +
-    `pensamientos de paz, y no de mal, para daros el fin que esperáis."\n` +
-    `— Jeremías 29:11\n\n` +
-    `Con mucho cariño,\nIglesia Regalo de Dios 🙏✨`
+  return `🎉🎂 *¡Feliz cumpleaños, hermano/a ${nombre}!* 🎂🎉\n\n` +
+    `En este día damos gracias a Dios por tu vida y por el privilegio de celebrar un año más de las bendiciones que Él te ha concedido.\n\n` +
+    `Oramos para que el Señor continúe fortaleciéndote, llenándote de sabiduría, salud, paz y gozo. ` +
+    `Que Su presencia te acompañe cada día y que este nuevo año esté lleno de victorias, ` +
+    `crecimiento espiritual y del cumplimiento de los propósitos que Dios tiene para tu vida.\n\n` +
+    `*"Este es el día que hizo el Señor; nos gozaremos y alegraremos en él."* (Salmo 118:24)\n\n` +
+    `¡Que Dios te bendiga abundantemente! Recibe un fuerte abrazo y nuestros mejores deseos en este día tan especial.\n\n` +
+    `Con cariño y en el amor de Cristo,\n` +
+    `*Iglesia Regalo de Dios* ❤️🙏`
 }
 
 function generarHTMLEmail(nombre: string, edad: number): string {
@@ -51,23 +53,26 @@ function generarHTMLEmail(nombre: string, edad: number): string {
         Querido/a <strong>${nombre}</strong>,
       </p>
       <p style="font-size: 16px; color: #374151; line-height: 1.6;">
-        En este día tan especial, toda la familia de la <strong>Iglesia Regalo de Dios</strong> 
-        se une para celebrar tu vida y tus <strong>${edad} años</strong>. 
-        Que el Señor derrame sobre ti abundantes bendiciones, salud, paz y alegría.
+        En este día damos gracias a Dios por tu vida y por el privilegio de celebrar un año más 
+        de las bendiciones que Él te ha concedido.
+      </p>
+      <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+        Oramos para que el Señor continúe fortaleciéndote, llenándote de sabiduría, salud, paz y gozo. 
+        Que Su presencia te acompañe cada día y que este nuevo año esté lleno de victorias, 
+        crecimiento espiritual y del cumplimiento de los propósitos que Dios tiene para tu vida.
       </p>
       <div style="background: #fdf2f8; border-left: 4px solid #ec4899; padding: 16px 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
         <p style="font-style: italic; color: #9d174d; margin: 0; font-size: 15px;">
-          "Porque yo sé los pensamientos que tengo acerca de vosotros, dice Jehová, 
-          pensamientos de paz, y no de mal, para daros el fin que esperáis."
+          "Este es el día que hizo el Señor; nos gozaremos y alegraremos en él."
         </p>
-        <p style="color: #be185d; margin: 8px 0 0; font-weight: bold; font-size: 14px;">— Jeremías 29:11</p>
+        <p style="color: #be185d; margin: 8px 0 0; font-weight: bold; font-size: 14px;">— Salmo 118:24</p>
       </div>
       <p style="font-size: 16px; color: #374151; line-height: 1.6;">
-        ¡Que Dios te conceda muchos años más de vida para seguir siendo luz en este mundo! 🌟
+        ¡Que Dios te bendiga abundantemente! Recibe un fuerte abrazo y nuestros mejores deseos en este día tan especial.
       </p>
       <p style="font-size: 15px; color: #6b7280; margin-top: 24px;">
-        Con mucho cariño,<br>
-        <strong>Iglesia Regalo de Dios</strong> ⛪
+        Con cariño y en el amor de Cristo,<br>
+        <strong>Iglesia Regalo de Dios</strong> ❤️🙏
       </p>
     </div>
     <div style="background: #fdf2f8; padding: 16px; text-align: center; border-top: 1px solid #fce7f3;">
@@ -110,25 +115,24 @@ async function sendPush(userId: string, title: string, body: string): Promise<bo
   }
 }
 
-// Enviar WhatsApp con imagen
+// Enviar WhatsApp con imagen de cumpleaños
 async function sendWhatsAppImage(phone: string, caption: string): Promise<boolean> {
   try {
     const formatted = formatPhoneForWhatsApp(phone)
 
-    // Leer el archivo de imagen/PDF
-    if (!fs.existsSync(BIRTHDAY_IMAGE_PATH)) {
-      console.warn("Archivo de imagen de cumpleaños no encontrado:", BIRTHDAY_IMAGE_PATH)
+    const imageBuffer = await getBirthdayImage()
+    if (!imageBuffer) {
+      console.warn("No se pudo obtener imagen de cumpleaños")
       return false
     }
 
-    const fileBuffer = fs.readFileSync(BIRTHDAY_IMAGE_PATH)
-    const blob = new Blob([fileBuffer], { type: "application/pdf" })
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/png" })
 
     const formData = new FormData()
     formData.append("phone", formatted)
-    formData.append("file", blob, "Feliz Cumpleaños.pdf")
+    formData.append("file", blob, "Feliz Cumpleaños.png")
     formData.append("caption", caption)
-    formData.append("mediaType", "document")
+    formData.append("mediaType", "image")
 
     const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
       method: "POST",
@@ -170,7 +174,7 @@ async function sendWhatsAppAudio(phone: string): Promise<boolean> {
   }
 }
 
-// Enviar email de cumpleaños
+// Enviar email de cumpleaños con imagen adjunta
 async function sendBirthdayEmail(to: string, nombre: string, edad: number): Promise<boolean> {
   try {
     const nodemailer = require("nodemailer")
@@ -184,11 +188,23 @@ async function sendBirthdayEmail(to: string, nombre: string, edad: number): Prom
       },
     })
 
+    // Adjuntar imagen convertida del PDF
+    const attachments: any[] = []
+    const imageBuffer = await getBirthdayImage()
+    if (imageBuffer) {
+      attachments.push({
+        filename: `Feliz Cumpleaños - ${nombre}.png`,
+        content: imageBuffer,
+        cid: "cumpleanos-imagen",
+      })
+    }
+
     await transporter.sendMail({
       from: `"Iglesia Regalo de Dios" <${process.env.SMTP_USER || "notificaciones@iglesiaregalodedios.com"}>`,
       to,
       subject: `🎂 ¡Feliz Cumpleaños, ${nombre}! — Iglesia Regalo de Dios`,
       html: generarHTMLEmail(nombre, edad),
+      attachments,
     })
     return true
   } catch (err) {

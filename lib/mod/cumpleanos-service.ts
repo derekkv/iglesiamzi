@@ -154,14 +154,15 @@ export async function getHistorialEnvios(anio: number, mes?: number): Promise<Cu
  * Genera el mensaje de felicitación de cumpleaños.
  */
 export function generarMensajeCumple(nombre: string, edad: number): string {
-  return `🎂🎉 ¡Feliz Cumpleaños, ${nombre}! 🎉🎂\n\n` +
-    `Que Dios te bendiga abundantemente en este día tan especial. ` +
-    `Celebramos tu vida y los ${edad} años que cumples hoy.\n\n` +
-    `"Porque yo sé los pensamientos que tengo acerca de vosotros, dice Jehová, ` +
-    `pensamientos de paz, y no de mal, para daros el fin que esperáis."\n` +
-    `— Jeremías 29:11\n\n` +
-    `Con mucho cariño,\n` +
-    `Iglesia Regalo de Dios 🙏✨`
+  return `🎉🎂 *¡Feliz cumpleaños, hermano/a ${nombre}!* 🎂🎉\n\n` +
+    `En este día damos gracias a Dios por tu vida y por el privilegio de celebrar un año más de las bendiciones que Él te ha concedido.\n\n` +
+    `Oramos para que el Señor continúe fortaleciéndote, llenándote de sabiduría, salud, paz y gozo. ` +
+    `Que Su presencia te acompañe cada día y que este nuevo año esté lleno de victorias, ` +
+    `crecimiento espiritual y del cumplimiento de los propósitos que Dios tiene para tu vida.\n\n` +
+    `*"Este es el día que hizo el Señor; nos gozaremos y alegraremos en él."* (Salmo 118:24)\n\n` +
+    `¡Que Dios te bendiga abundantemente! Recibe un fuerte abrazo y nuestros mejores deseos en este día tan especial.\n\n` +
+    `Con cariño y en el amor de Cristo,\n` +
+    `*Iglesia Regalo de Dios* ❤️🙏`
 }
 
 /**

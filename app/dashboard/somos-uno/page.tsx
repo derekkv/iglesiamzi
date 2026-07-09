@@ -46,14 +46,14 @@ const CELULAS = [
 const CELULA_IMAGES: Record<string, string> = {
   "Carlos y Ruth": "/celulas/CARLOS Y RUTH nombre.png",
   "Sarita y Lady": "/celulas/SARITA Y LADY nombre.png",
-  "Jessy Mendoza": "",
+  "Jessy Mendoza": "/celulas/Jessica Mendoza.PNG",
   "Líder y Angela": "/celulas/LÍDER Y ÁNGELA nombre.png",
   "Juan Pablo y Angie": "/celulas/JUAN ÁNGEL Y ANGIE nombre.png",
   "Alina y Anita": "/celulas/ALINA Y ANITA nombre.png",
   "Neyda y Carmen": "/celulas/NEYDA Y CARMEN nombre.png",
   "Yadira y Tania": "/celulas/YADIRA Y TANIA nombre.png",
   "Luis y Ariana": "/celulas/LUIS Y ARIANNA nombre.png",
-  "Layla Salem": "",
+  "Layla Salem": "/celulas/Laila Salem .PNG",
   "Estuardo y Catalina": "/celulas/ESTUARDO Y CATALINA nombre.png",
   "Gabriela López": "/celulas/GABRIELA LÓPEZ nombre.png",
 }
