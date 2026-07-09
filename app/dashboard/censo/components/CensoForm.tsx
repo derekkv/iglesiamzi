@@ -566,7 +566,7 @@ export function CensoForm({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="oficio_matrimonio" className="text-sm text-gray-700">Oficio de la Ceremonia</Label>
+                    <Label htmlFor="oficio_matrimonio" className="text-sm text-gray-700">Quién ofició la ceremonia</Label>
                     <Input
                       id="oficio_matrimonio"
                       type="text"

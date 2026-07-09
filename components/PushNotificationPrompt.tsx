@@ -26,6 +26,10 @@ export function PushNotificationPrompt() {
     if (!user) return
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
 
+    // No intentar push si no hay SW controlando (dev mode sin PWA)
+    // El SW solo está disponible en producción donde next-pwa lo registra
+    if (!navigator.serviceWorker.controller) return
+
     // Solo mostrar si no ha decidido aún (o si falló antes, reintentar)
     const dismissed = localStorage.getItem("push_prompt_dismissed")
     if (dismissed === "subscribed" || dismissed === "denied") return
@@ -54,6 +58,7 @@ export function PushNotificationPrompt() {
     setSubscribing(true)
     try {
       const registration = await navigator.serviceWorker.ready
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -75,7 +80,8 @@ export function PushNotificationPrompt() {
       })
 
       if (!res.ok) {
-        throw new Error("Error guardando suscripción en servidor")
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || "Error guardando suscripción en servidor")
       }
 
       localStorage.setItem("push_prompt_dismissed", "subscribed")
@@ -89,12 +95,14 @@ export function PushNotificationPrompt() {
   }
 
   const handleAccept = async () => {
+    setSubscribing(true)
     try {
       const permission = await Notification.requestPermission()
       if (permission === "granted") {
         await subscribeUser()
       } else {
         setShowPrompt(false)
+        setSubscribing(false)
         localStorage.setItem("push_prompt_dismissed", "denied")
       }
     } catch (error) {

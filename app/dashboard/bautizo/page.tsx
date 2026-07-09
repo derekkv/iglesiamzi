@@ -17,13 +17,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   ArrowLeft, Search, FileText, XCircle, AlertTriangle, Save, Loader2,
-  CheckCircle2, Files,
+  CheckCircle2, Files, Plus, Pencil, Trash2,
 } from "lucide-react"
 import { supabase } from "@/lib/secure-db"
 import { toast } from "sonner"
 import { generateBautizoPDF } from "@/lib/generate-bautizo-pdf"
 import { PDFDocument } from "pdf-lib"
-
 
 
 interface BautizoCenso {
@@ -33,7 +32,7 @@ interface BautizoCenso {
   fecha_bautizo: string | null
   celular: string | null
   created_at: string
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
 }
 
 interface PdfGenerado {
@@ -48,6 +47,12 @@ const REQUIRED_FIELDS = [
   { key: "fecha_bautizo", label: "Fecha del Bautizo" },
 ]
 
+const MANUAL_FIELDS = [
+  { key: "apellidos_nombres", label: "Nombre Completo", required: true },
+  { key: "cedula", label: "Cédula", required: true },
+  { key: "fecha_bautizo", label: "Fecha del Bautizo", required: false, type: "date" },
+  { key: "celular", label: "Celular", required: false },
+]
 
 
 function BautizoContent({ canEdit }: { canEdit: boolean }) {
@@ -64,6 +69,15 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
   const [editForm, setEditForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [missingFields, setMissingFields] = useState<string[]>([])
+
+  // Modal de entrada manual
+  const [showManualModal, setShowManualModal] = useState(false)
+  const [manualForm, setManualForm] = useState<Record<string, string>>({})
+  const [savingManual, setSavingManual] = useState(false)
+  const [editingManualId, setEditingManualId] = useState<number | null>(null)
+
+  // Modal de confirmación de borrado
+  const [deletingRecord, setDeletingRecord] = useState<BautizoCenso | null>(null)
 
   // Modal de generación masiva
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -82,7 +96,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
   const loadBautizos = async (silent = false) => {
     try {
       if (!silent) setIsLoading(true)
-      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+      const [{ data: protocolo }, { data: mdg }, { data: manual }] = await Promise.all([
         supabase
           .from("censo")
           .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
@@ -93,15 +107,21 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
           .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
           .eq("bautizo_irdd", true)
           .order("fecha_bautizo", { ascending: false }),
+        supabase
+          .from("bautizos_manual")
+          .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
+          .order("created_at", { ascending: false }),
       ])
 
       const all: BautizoCenso[] = [
         ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
         ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+        ...(manual || []).map((r: any) => ({ ...r, fuente: "manual" as const })),
       ]
 
       const seen = new Set<string>()
       const filtered = all.filter((r) => {
+        if (r.fuente === "manual") return true
         if (seen.has(r.cedula)) return false
         seen.add(r.cedula)
         return true
@@ -143,7 +163,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     } catch {}
   }
 
-  useRealtimeMultiple(["censo", "censo_mdg"], () => loadBautizos(true))
+  useRealtimeMultiple(["censo", "censo_mdg", "bautizos_manual"], () => loadBautizos(true))
 
 
   const handleSearch = async () => {
@@ -151,7 +171,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     try {
       setIsLoading(true)
       const q = searchQuery.trim()
-      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+      const [{ data: protocolo }, { data: mdg }, { data: manual }] = await Promise.all([
         supabase.from("censo")
           .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
           .eq("bautizo_irdd", true)
@@ -160,13 +180,17 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
           .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
           .eq("bautizo_irdd", true)
           .or(`apellidos_nombres.ilike.%${q}%,cedula.ilike.%${q}%`),
+        supabase.from("bautizos_manual")
+          .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
+          .or(`apellidos_nombres.ilike.%${q}%,cedula.ilike.%${q}%`),
       ])
       const all: BautizoCenso[] = [
         ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
         ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+        ...(manual || []).map((r: any) => ({ ...r, fuente: "manual" as const })),
       ]
       const seen = new Set<string>()
-      const filtered = all.filter((r) => { if (seen.has(r.cedula)) return false; seen.add(r.cedula); return true })
+      const filtered = all.filter((r) => { if (r.fuente === "manual") return true; if (seen.has(r.cedula)) return false; seen.add(r.cedula); return true })
       filtered.sort((a, b) => { if (!a.fecha_bautizo) return 1; if (!b.fecha_bautizo) return -1; return b.fecha_bautizo.localeCompare(a.fecha_bautizo) })
       setRecords(filtered)
     } catch (error) { console.error("Error buscando:", error) }
@@ -224,13 +248,12 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
-
   async function handleSaveEdit() {
     if (!editingRecord || !canEdit) return
     const doSave = async () => {
       setSaving(true)
       try {
-        const tabla = editingRecord.fuente === "protocolo" ? "censo" : "censo_mdg"
+        const tabla = editingRecord.fuente === "protocolo" ? "censo" : editingRecord.fuente === "mdg" ? "censo_mdg" : "bautizos_manual"
         const updateData: Record<string, any> = {}
         for (const f of REQUIRED_FIELDS) { if (editForm[f.key]?.trim()) updateData[f.key] = editForm[f.key].trim() }
         updateData.updated_at = new Date().toISOString()
@@ -247,6 +270,74 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     }
     checkAndExecute(editingRecord.created_at, doSave)
   }
+
+  // === MANUAL ENTRY ===
+  function openManualModal(record?: BautizoCenso) {
+    if (record && record.fuente === "manual") {
+      setEditingManualId(record.id)
+      const form: Record<string, string> = {}
+      for (const f of MANUAL_FIELDS) { form[f.key] = (record[f.key as keyof BautizoCenso] as string) || "" }
+      setManualForm(form)
+    } else {
+      setEditingManualId(null)
+      setManualForm({})
+    }
+    setShowManualModal(true)
+  }
+
+  async function handleSaveManual() {
+    if (!manualForm.apellidos_nombres?.trim() || !manualForm.cedula?.trim()) {
+      toast.error("Nombre y cédula son obligatorios"); return
+    }
+    const doSave = async () => {
+      setSavingManual(true)
+      try {
+        const payload: Record<string, any> = {}
+        for (const f of MANUAL_FIELDS) { if (manualForm[f.key]?.trim()) payload[f.key] = manualForm[f.key].trim() }
+        payload.updated_at = new Date().toISOString()
+
+        if (editingManualId) {
+          const { error } = await supabase.from("bautizos_manual").update(payload).eq("id", editingManualId)
+          if (error) throw error
+          toast.success("Registro actualizado")
+        } else {
+          const { error } = await supabase.from("bautizos_manual").insert(payload)
+          if (error) throw error
+          toast.success("Bautizo registrado")
+        }
+        setShowManualModal(false)
+        setManualForm({})
+        setEditingManualId(null)
+        await loadBautizos(true)
+      } catch (error) { console.error("Error:", error); toast.error("Error al guardar") }
+      finally { setSavingManual(false) }
+    }
+    const createdAt = editingManualId
+      ? records.find((r) => r.fuente === "manual" && r.id === editingManualId)?.created_at || new Date().toISOString()
+      : new Date().toISOString()
+    checkAndExecute(createdAt, doSave)
+  }
+
+  // === DELETE MANUAL ===
+  function handleDeleteClick(record: BautizoCenso) {
+    if (record.fuente !== "manual") return
+    setDeletingRecord(record)
+  }
+
+  async function confirmDelete() {
+    if (!deletingRecord || deletingRecord.fuente !== "manual") return
+    const doDelete = async () => {
+      try {
+        const { error } = await supabase.from("bautizos_manual").delete().eq("id", deletingRecord.id)
+        if (error) throw error
+        toast.success("Registro eliminado")
+        setDeletingRecord(null)
+        await loadBautizos(true)
+      } catch (error) { console.error("Error eliminando:", error); toast.error("Error al eliminar") }
+    }
+    checkAndExecute(deletingRecord.created_at, doDelete)
+  }
+
 
   // === GENERACIÓN MASIVA ===
   function openBulkModal() {
@@ -320,6 +411,15 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     finally { setGeneratingBulk(false) }
   }
 
+  function getFuenteBadge(fuente: string) {
+    switch (fuente) {
+      case "protocolo": return <Badge variant="outline" className="text-xs">Protocolo</Badge>
+      case "mdg": return <Badge variant="outline" className="text-xs">MDG</Badge>
+      case "manual": return <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">Manual</Badge>
+      default: return <Badge variant="outline" className="text-xs">{fuente}</Badge>
+    }
+  }
+
 
   if (isLoading) {
     return (
@@ -346,15 +446,18 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
               <h1 className="text-xl font-semibold text-gray-900">Registro de Bautizos</h1>
             </div>
             <div className="flex items-center gap-2">
+              {canEdit && (
+                <Button size="sm" variant="ghost" onClick={() => openManualModal()}
+                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 opacity-60 hover:opacity-100 transition-opacity">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              )}
               <Button size="sm" onClick={openBulkModal}>
                 <Files className="w-4 h-4 mr-1" />Generar PDFs
               </Button>
               <Badge variant="outline" className="text-blue-600 border-blue-200">
                 {records.length} bautizados
               </Badge>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                Censo Protocolo + MDG
-              </span>
             </div>
           </div>
         </div>
@@ -378,7 +481,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
         <Card>
           <CardHeader>
             <CardTitle>Bautizos Registrados</CardTitle>
-            <CardDescription>Personas bautizadas en la Iglesia IRDD (censo Protocolo y MDG)</CardDescription>
+            <CardDescription>Personas bautizadas en la Iglesia IRDD (Protocolo, MDG y Manual)</CardDescription>
           </CardHeader>
           <CardContent>
             {records.length > 0 ? (
@@ -391,8 +494,8 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Nombre</th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-28">Fecha Bautizo</th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Celular</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-20">Fuente</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-14">PDF</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-24">Fuente</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-28">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -407,16 +510,26 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
                           <td className="border border-gray-300 px-3 py-2 font-medium">{record.apellidos_nombres}</td>
                           <td className="border border-gray-300 px-3 py-2">{formatDateForTable(record.fecha_bautizo)}</td>
                           <td className="border border-gray-300 px-3 py-2">{record.celular || "-"}</td>
-                          <td className="border border-gray-300 px-3 py-2">
-                            <Badge variant="outline" className="text-xs">{record.fuente === "protocolo" ? "Protocolo" : "MDG"}</Badge>
-                          </td>
+                          <td className="border border-gray-300 px-3 py-2">{getFuenteBadge(record.fuente)}</td>
                           <td className="border border-gray-300 px-3 py-2 text-center">
                             <div className="flex items-center justify-center gap-1">
                               <Button size="sm" variant="ghost" onClick={() => handlePdfClick(record)}
                                 className={hasAllData ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-red-500 hover:text-red-600 hover:bg-red-50"}>
-                                {hasAllData ? <FileText className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                                {hasAllData ? <FileText className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                               </Button>
-                              {generado && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                              {generado && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                              {canEdit && record.fuente === "manual" && (
+                                <>
+                                  <Button size="sm" variant="ghost" onClick={() => openManualModal(record)}
+                                    className="text-blue-500 hover:text-blue-700 hover:bg-blue-50">
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleDeleteClick(record)}
+                                    className="text-red-400 hover:text-red-600 hover:bg-red-50">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -428,7 +541,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <p>No hay bautizos registrados.</p>
-                <p className="text-sm mt-1">Se registran desde el Censo marcando "Se bautizó en la IRDD".</p>
+                <p className="text-sm mt-1">Se registran desde el Censo o manualmente con el botón +.</p>
               </div>
             )}
           </CardContent>
@@ -478,6 +591,62 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
         </DialogContent>
       </Dialog>
 
+      {/* Modal de entrada manual */}
+      <Dialog open={showManualModal} onOpenChange={(open) => { if (!open) { setShowManualModal(false); setManualForm({}); setEditingManualId(null) } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-purple-500" />
+              {editingManualId ? "Editar Bautizo Manual" : "Agregar Bautizo Manual"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingManualId ? "Modifique los datos del registro." : "Ingrese los datos del bautizo manualmente."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {MANUAL_FIELDS.map((field) => (
+              <div key={field.key} className="space-y-1.5">
+                <Label className="text-sm text-gray-700">
+                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                </Label>
+                <Input
+                  type={field.type || "text"}
+                  value={manualForm[field.key] || ""}
+                  onChange={(e) => setManualForm({ ...manualForm, [field.key]: e.target.value })}
+                  placeholder={`Ingrese ${field.label.toLowerCase()}`}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowManualModal(false); setManualForm({}); setEditingManualId(null) }}>Cancelar</Button>
+            <Button onClick={handleSaveManual} disabled={savingManual}>
+              {savingManual ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : <><Save className="w-4 h-4 mr-2" />{editingManualId ? "Actualizar" : "Guardar"}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación de borrado */}
+      <Dialog open={!!deletingRecord} onOpenChange={(open) => { if (!open) setDeletingRecord(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Eliminar Registro
+            </DialogTitle>
+            <DialogDescription>
+              ¿Está seguro que desea eliminar el registro de <strong>{deletingRecord?.apellidos_nombres}</strong>? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingRecord(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Modal de generación masiva */}
       <Dialog open={showBulkModal} onOpenChange={setShowBulkModal}>
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
@@ -492,7 +661,6 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
           </DialogHeader>
 
           <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
-            {/* Opciones */}
             <div className="flex items-center justify-between border-b pb-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <Checkbox checked={excludeGenerated} onCheckedChange={toggleExcludeGenerated} />
@@ -504,7 +672,6 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
               </div>
             </div>
 
-            {/* Advertencia de incompletos */}
             {incompleteCount > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm font-medium text-amber-800 flex items-center gap-1">
@@ -514,11 +681,8 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
               </div>
             )}
 
-            <div className="text-xs text-gray-500">
-              {bulkSelected.size} seleccionados
-            </div>
+            <div className="text-xs text-gray-500">{bulkSelected.size} seleccionados</div>
 
-            {/* Lista con checkboxes */}
             <div className="flex-1 overflow-y-auto border rounded-lg divide-y max-h-[40vh]">
               {records.map((record) => {
                 const key = `${record.fuente}-${record.id}`
@@ -540,7 +704,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
                     <div className="flex items-center gap-1">
                       {generado && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
                       {!hasData && <XCircle className="w-3.5 h-3.5 text-red-400" />}
-                      <Badge variant="outline" className="text-[10px]">{record.fuente === "protocolo" ? "P" : "M"}</Badge>
+                      {getFuenteBadge(record.fuente)}
                     </div>
                   </label>
                 )

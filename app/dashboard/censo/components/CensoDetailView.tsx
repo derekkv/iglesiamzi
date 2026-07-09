@@ -171,7 +171,7 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
                   <div className="ml-4 space-y-1">
                     <p><strong>Fecha:</strong> {record.fecha_matrimonio || "-"}</p>
                     <p><strong>Hora:</strong> {(record as any).hora_matrimonio || "-"}</p>
-                    <p><strong>Oficio de la Ceremonia:</strong> {(record as any).oficio_matrimonio || "-"}</p>
+                    <p><strong>Quién ofició la ceremonia:</strong> {(record as any).oficio_matrimonio || "-"}</p>
                     <p><strong>Padrino 1:</strong> {(record as any).padrino1_matrimonio || "-"}</p>
                     <p><strong>Padrino 2:</strong> {(record as any).padrino2_matrimonio || "-"}</p>
                   </div>

@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   ArrowLeft, Search, FileText, XCircle, AlertTriangle, Save, Loader2,
-  Download, CheckCircle2, Files,
+  Download, CheckCircle2, Files, Plus, Pencil, Trash2,
 } from "lucide-react"
 import { supabase } from "@/lib/secure-db"
 import { toast } from "sonner"
 import { generateMatrimonioPDF } from "@/lib/generate-matrimonio-pdf"
+import { generateMatrimonioPDFv2 } from "@/lib/generate-matrimonio-pdf-v2"
 import { PDFDocument } from "pdf-lib"
 
 
@@ -38,7 +39,7 @@ interface MatrimonioCenso {
   padrino2_matrimonio: string | null
   celular: string | null
   created_at: string
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
 }
 
 interface PdfGenerado {
@@ -52,10 +53,23 @@ interface PdfGenerado {
 const REQUIRED_FIELDS = [
   { key: "fecha_matrimonio", label: "Fecha del Matrimonio" },
   { key: "hora_matrimonio", label: "Hora de la Ceremonia" },
-  { key: "oficio_matrimonio", label: "Oficio de la Ceremonia" },
+  { key: "oficio_matrimonio", label: "Quién ofició la ceremonia" },
   { key: "conyuge", label: "Nombre del Cónyuge" },
   { key: "padrino1_matrimonio", label: "Padrino 1" },
   { key: "padrino2_matrimonio", label: "Padrino 2" },
+]
+
+const MANUAL_FIELDS = [
+  { key: "apellidos_nombres", label: "Nombre Completo", required: true },
+  { key: "cedula", label: "Cédula", required: true },
+  { key: "conyuge", label: "Nombre del Cónyuge", required: false },
+  { key: "cedula_conyugue", label: "Cédula del Cónyuge", required: false },
+  { key: "fecha_matrimonio", label: "Fecha del Matrimonio", required: false, type: "date" },
+  { key: "hora_matrimonio", label: "Hora de la Ceremonia", required: false, placeholder: "HH:MM" },
+  { key: "oficio_matrimonio", label: "Quién ofició la ceremonia", required: false },
+  { key: "padrino1_matrimonio", label: "Padrino 1", required: false },
+  { key: "padrino2_matrimonio", label: "Padrino 2", required: false },
+  { key: "celular", label: "Celular", required: false },
 ]
 
 
@@ -68,11 +82,20 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Modal de edición para campos faltantes
+  // Modal de edición para campos faltantes / edición completa
   const [editingRecord, setEditingRecord] = useState<MatrimonioCenso | null>(null)
   const [editForm, setEditForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [missingFields, setMissingFields] = useState<string[]>([])
+
+  // Modal de entrada manual
+  const [showManualModal, setShowManualModal] = useState(false)
+  const [manualForm, setManualForm] = useState<Record<string, string>>({})
+  const [savingManual, setSavingManual] = useState(false)
+  const [editingManualId, setEditingManualId] = useState<number | null>(null)
+
+  // Modal de confirmación de borrado
+  const [deletingRecord, setDeletingRecord] = useState<MatrimonioCenso | null>(null)
 
   // Modal de generación masiva
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -83,6 +106,9 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
   // Historial de PDFs generados
   const [pdfGenerados, setPdfGenerados] = useState<PdfGenerado[]>([])
 
+  // Versión de plantilla PDF
+  const [pdfVersion, setPdfVersion] = useState<"v1" | "v2">("v1")
+
   useEffect(() => {
     loadMatrimonios()
     loadPdfGenerados()
@@ -91,7 +117,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
   const loadMatrimonios = async (silent = false) => {
     try {
       if (!silent) setIsLoading(true)
-      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+      const [{ data: protocolo }, { data: mdg }, { data: manual }] = await Promise.all([
         supabase
           .from("censo")
           .select("id, cedula, apellidos_nombres, conyuge, cedula_conyugue, fecha_matrimonio, hora_matrimonio, oficio_matrimonio, padrino1_matrimonio, padrino2_matrimonio, celular, created_at")
@@ -102,15 +128,22 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
           .select("id, cedula, apellidos_nombres, conyuge, cedula_conyugue, fecha_matrimonio, hora_matrimonio, oficio_matrimonio, padrino1_matrimonio, padrino2_matrimonio, celular, created_at")
           .eq("matrimonio_irdd", true)
           .order("fecha_matrimonio", { ascending: false }),
+        supabase
+          .from("matrimonios_manual")
+          .select("id, cedula, apellidos_nombres, conyuge, cedula_conyugue, fecha_matrimonio, hora_matrimonio, oficio_matrimonio, padrino1_matrimonio, padrino2_matrimonio, celular, created_at")
+          .order("created_at", { ascending: false }),
       ])
 
       const all: MatrimonioCenso[] = [
         ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
         ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+        ...(manual || []).map((r: any) => ({ ...r, fuente: "manual" as const })),
       ]
 
+      // Deduplicar por cédula (manuales no se deducan entre sí, solo contra censo)
       const seen = new Set<string>()
       const filtered = all.filter((record) => {
+        if (record.fuente === "manual") return true
         if (seen.has(record.cedula)) return false
         if (record.cedula_conyugue) seen.add(record.cedula_conyugue)
         seen.add(record.cedula)
@@ -153,7 +186,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     } catch {}
   }
 
-  useRealtimeMultiple(["censo", "censo_mdg"], () => loadMatrimonios(true))
+  useRealtimeMultiple(["censo", "censo_mdg", "matrimonios_manual"], () => loadMatrimonios(true))
 
 
   const handleSearch = async () => {
@@ -161,7 +194,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     try {
       setIsLoading(true)
       const q = searchQuery.trim()
-      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+      const [{ data: protocolo }, { data: mdg }, { data: manual }] = await Promise.all([
         supabase.from("censo")
           .select("id, cedula, apellidos_nombres, conyuge, cedula_conyugue, fecha_matrimonio, hora_matrimonio, oficio_matrimonio, padrino1_matrimonio, padrino2_matrimonio, celular, created_at")
           .eq("matrimonio_irdd", true)
@@ -170,13 +203,17 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
           .select("id, cedula, apellidos_nombres, conyuge, cedula_conyugue, fecha_matrimonio, hora_matrimonio, oficio_matrimonio, padrino1_matrimonio, padrino2_matrimonio, celular, created_at")
           .eq("matrimonio_irdd", true)
           .or(`apellidos_nombres.ilike.%${q}%,conyuge.ilike.%${q}%,cedula.ilike.%${q}%`),
+        supabase.from("matrimonios_manual")
+          .select("id, cedula, apellidos_nombres, conyuge, cedula_conyugue, fecha_matrimonio, hora_matrimonio, oficio_matrimonio, padrino1_matrimonio, padrino2_matrimonio, celular, created_at")
+          .or(`apellidos_nombres.ilike.%${q}%,conyuge.ilike.%${q}%,cedula.ilike.%${q}%`),
       ])
       const all: MatrimonioCenso[] = [
         ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
         ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+        ...(manual || []).map((r: any) => ({ ...r, fuente: "manual" as const })),
       ]
       const seen = new Set<string>()
-      const filtered = all.filter((r) => { if (seen.has(r.cedula)) return false; if (r.cedula_conyugue) seen.add(r.cedula_conyugue); seen.add(r.cedula); return true })
+      const filtered = all.filter((r) => { if (r.fuente === "manual") return true; if (seen.has(r.cedula)) return false; if (r.cedula_conyugue) seen.add(r.cedula_conyugue); seen.add(r.cedula); return true })
       filtered.sort((a, b) => { if (!a.fecha_matrimonio) return 1; if (!b.fecha_matrimonio) return -1; return b.fecha_matrimonio.localeCompare(a.fecha_matrimonio) })
       setRecords(filtered)
     } catch (error) { console.error("Error buscando:", error) }
@@ -190,7 +227,10 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
   }
 
   function getMissingFields(record: MatrimonioCenso): string[] {
-    return REQUIRED_FIELDS.filter((f) => !record[f.key as keyof MatrimonioCenso]).map((f) => f.key)
+    const fields = pdfVersion === "v2"
+      ? REQUIRED_FIELDS.filter((f) => ["conyuge", "oficio_matrimonio", "fecha_matrimonio"].includes(f.key))
+      : REQUIRED_FIELDS
+    return fields.filter((f) => !record[f.key as keyof MatrimonioCenso]).map((f) => f.key)
   }
 
   function isGenerado(record: MatrimonioCenso): boolean {
@@ -212,13 +252,23 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
 
   async function downloadPDF(record: MatrimonioCenso) {
     try {
-      const pdfBytes = await generateMatrimonioPDF({
-        nombre: record.apellidos_nombres, cedula: record.cedula,
-        conyuge: record.conyuge || "", cedula_conyugue: record.cedula_conyugue || "",
-        fecha: record.fecha_matrimonio || "", hora: record.hora_matrimonio || "",
-        oficio: record.oficio_matrimonio || "", padrino1: record.padrino1_matrimonio || "",
-        padrino2: record.padrino2_matrimonio || "",
-      })
+      let pdfBytes: Uint8Array
+      if (pdfVersion === "v2") {
+        pdfBytes = await generateMatrimonioPDFv2({
+          nombre: record.apellidos_nombres,
+          conyuge: record.conyuge || "",
+          oficio: record.oficio_matrimonio || "",
+          fecha: record.fecha_matrimonio || "",
+        })
+      } else {
+        pdfBytes = await generateMatrimonioPDF({
+          nombre: record.apellidos_nombres, cedula: record.cedula,
+          conyuge: record.conyuge || "", cedula_conyugue: record.cedula_conyugue || "",
+          fecha: record.fecha_matrimonio || "", hora: record.hora_matrimonio || "",
+          oficio: record.oficio_matrimonio || "", padrino1: record.padrino1_matrimonio || "",
+          padrino2: record.padrino2_matrimonio || "",
+        })
+      }
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -236,7 +286,6 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
-
   async function handleSaveEdit() {
     if (!editingRecord || !canEdit) return
     if (editForm.hora_matrimonio && !/^\d{1,2}:\d{2}$/.test(editForm.hora_matrimonio)) {
@@ -250,7 +299,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     const doSave = async () => {
       setSaving(true)
       try {
-        const tabla = editingRecord.fuente === "protocolo" ? "censo" : "censo_mdg"
+        const tabla = editingRecord.fuente === "protocolo" ? "censo" : editingRecord.fuente === "mdg" ? "censo_mdg" : "matrimonios_manual"
         const updateData: Record<string, any> = {}
         for (const f of REQUIRED_FIELDS) { if (editForm[f.key]?.trim()) updateData[f.key] = editForm[f.key].trim() }
         updateData.updated_at = new Date().toISOString()
@@ -268,9 +317,87 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     checkAndExecute(editingRecord.created_at, doSave)
   }
 
+  // === MANUAL ENTRY ===
+  function openManualModal(record?: MatrimonioCenso) {
+    if (record && record.fuente === "manual") {
+      // Edit mode
+      setEditingManualId(record.id)
+      const form: Record<string, string> = {}
+      for (const f of MANUAL_FIELDS) { form[f.key] = (record[f.key as keyof MatrimonioCenso] as string) || "" }
+      setManualForm(form)
+    } else {
+      // Create mode
+      setEditingManualId(null)
+      setManualForm({})
+    }
+    setShowManualModal(true)
+  }
+
+  async function handleSaveManual() {
+    if (!manualForm.apellidos_nombres?.trim() || !manualForm.cedula?.trim()) {
+      toast.error("Nombre y cédula son obligatorios"); return
+    }
+    if (manualForm.hora_matrimonio && !/^\d{1,2}:\d{2}$/.test(manualForm.hora_matrimonio)) {
+      toast.error("Formato de hora inválido. Use HH:MM"); return
+    }
+    if (manualForm.hora_matrimonio) {
+      const [h, m] = manualForm.hora_matrimonio.split(":").map(Number)
+      if (h < 0 || h > 23 || m < 0 || m > 59) { toast.error("Hora inválida"); return }
+      manualForm.hora_matrimonio = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+    }
+    const doSave = async () => {
+      setSavingManual(true)
+      try {
+        const payload: Record<string, any> = {}
+        for (const f of MANUAL_FIELDS) { if (manualForm[f.key]?.trim()) payload[f.key] = manualForm[f.key].trim() }
+        payload.updated_at = new Date().toISOString()
+
+        if (editingManualId) {
+          const { error } = await supabase.from("matrimonios_manual").update(payload).eq("id", editingManualId)
+          if (error) throw error
+          toast.success("Registro actualizado")
+        } else {
+          const { error } = await supabase.from("matrimonios_manual").insert(payload)
+          if (error) throw error
+          toast.success("Matrimonio registrado")
+        }
+        setShowManualModal(false)
+        setManualForm({})
+        setEditingManualId(null)
+        await loadMatrimonios(true)
+      } catch (error) { console.error("Error:", error); toast.error("Error al guardar") }
+      finally { setSavingManual(false) }
+    }
+    // Use current time for new entries so security check passes immediately
+    const createdAt = editingManualId
+      ? records.find((r) => r.fuente === "manual" && r.id === editingManualId)?.created_at || new Date().toISOString()
+      : new Date().toISOString()
+    checkAndExecute(createdAt, doSave)
+  }
+
+  // === DELETE MANUAL ===
+  function handleDeleteClick(record: MatrimonioCenso) {
+    if (record.fuente !== "manual") return
+    setDeletingRecord(record)
+  }
+
+  async function confirmDelete() {
+    if (!deletingRecord || deletingRecord.fuente !== "manual") return
+    const doDelete = async () => {
+      try {
+        const { error } = await supabase.from("matrimonios_manual").delete().eq("id", deletingRecord.id)
+        if (error) throw error
+        toast.success("Registro eliminado")
+        setDeletingRecord(null)
+        await loadMatrimonios(true)
+      } catch (error) { console.error("Error eliminando:", error); toast.error("Error al eliminar") }
+    }
+    checkAndExecute(deletingRecord.created_at, doDelete)
+  }
+
+
   // === GENERACIÓN MASIVA ===
   function openBulkModal() {
-    // Incluir todos, seleccionar por defecto solo los que tienen datos completos
     const initial = new Set<string>()
     for (const r of records) {
       const missing = getMissingFields(r)
@@ -313,16 +440,25 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
     setGeneratingBulk(true)
     try {
       const selectedRecords = records.filter((r) => bulkSelected.has(`${r.fuente}-${r.id}`))
-      // Crear PDF combinado
       const mergedDoc = await PDFDocument.create()
       for (const record of selectedRecords) {
-        const pdfBytes = await generateMatrimonioPDF({
-          nombre: record.apellidos_nombres, cedula: record.cedula,
-          conyuge: record.conyuge || "", cedula_conyugue: record.cedula_conyugue || "",
-          fecha: record.fecha_matrimonio || "", hora: record.hora_matrimonio || "",
-          oficio: record.oficio_matrimonio || "", padrino1: record.padrino1_matrimonio || "",
-          padrino2: record.padrino2_matrimonio || "",
-        })
+        let pdfBytes: Uint8Array
+        if (pdfVersion === "v2") {
+          pdfBytes = await generateMatrimonioPDFv2({
+            nombre: record.apellidos_nombres,
+            conyuge: record.conyuge || "",
+            oficio: record.oficio_matrimonio || "",
+            fecha: record.fecha_matrimonio || "",
+          })
+        } else {
+          pdfBytes = await generateMatrimonioPDF({
+            nombre: record.apellidos_nombres, cedula: record.cedula,
+            conyuge: record.conyuge || "", cedula_conyugue: record.cedula_conyugue || "",
+            fecha: record.fecha_matrimonio || "", hora: record.hora_matrimonio || "",
+            oficio: record.oficio_matrimonio || "", padrino1: record.padrino1_matrimonio || "",
+            padrino2: record.padrino2_matrimonio || "",
+          })
+        }
         const singleDoc = await PDFDocument.load(pdfBytes)
         const [page] = await mergedDoc.copyPages(singleDoc, [0])
         mergedDoc.addPage(page)
@@ -342,6 +478,15 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
       setShowBulkModal(false)
     } catch (error) { console.error("Error generando PDFs:", error); toast.error("Error al generar") }
     finally { setGeneratingBulk(false) }
+  }
+
+  function getFuenteBadge(fuente: string) {
+    switch (fuente) {
+      case "protocolo": return <Badge variant="outline" className="text-xs">Protocolo</Badge>
+      case "mdg": return <Badge variant="outline" className="text-xs">MDG</Badge>
+      case "manual": return <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">Manual</Badge>
+      default: return <Badge variant="outline" className="text-xs">{fuente}</Badge>
+    }
   }
 
 
@@ -370,6 +515,26 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
               <h1 className="text-xl font-semibold text-gray-900">Registro de Matrimonios</h1>
             </div>
             <div className="flex items-center gap-2">
+              {canEdit && (
+                <Button size="sm" variant="ghost" onClick={() => openManualModal()}
+                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 opacity-60 hover:opacity-100 transition-opacity">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              )}
+              <div className="flex items-center border rounded-lg overflow-hidden text-sm">
+                <button
+                  onClick={() => setPdfVersion("v1")}
+                  className={`px-2.5 py-1.5 transition-colors ${pdfVersion === "v1" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Completo
+                </button>
+                <button
+                  onClick={() => setPdfVersion("v2")}
+                  className={`px-2.5 py-1.5 transition-colors ${pdfVersion === "v2" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Simple
+                </button>
+              </div>
               <Button size="sm" onClick={openBulkModal}>
                 <Files className="w-4 h-4 mr-1" />Generar PDFs
               </Button>
@@ -399,7 +564,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
         <Card>
           <CardHeader>
             <CardTitle>Matrimonios Registrados</CardTitle>
-            <CardDescription>Parejas casadas en la Iglesia IRDD (censo Protocolo y MDG)</CardDescription>
+            <CardDescription>Parejas casadas en la Iglesia IRDD (Protocolo, MDG y Manual)</CardDescription>
           </CardHeader>
           <CardContent>
             {records.length > 0 ? (
@@ -412,8 +577,8 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Cónyuge</th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-28">Fecha</th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-16">Hora</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-20">Fuente</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-14">PDF</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold w-24">Fuente</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-28">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -428,16 +593,26 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
                           <td className="border border-gray-300 px-3 py-2">{record.conyuge || "-"}</td>
                           <td className="border border-gray-300 px-3 py-2">{formatDateForTable(record.fecha_matrimonio)}</td>
                           <td className="border border-gray-300 px-3 py-2">{record.hora_matrimonio || "-"}</td>
-                          <td className="border border-gray-300 px-3 py-2">
-                            <Badge variant="outline" className="text-xs">{record.fuente === "protocolo" ? "Protocolo" : "MDG"}</Badge>
-                          </td>
+                          <td className="border border-gray-300 px-3 py-2">{getFuenteBadge(record.fuente)}</td>
                           <td className="border border-gray-300 px-3 py-2 text-center">
                             <div className="flex items-center justify-center gap-1">
                               <Button size="sm" variant="ghost" onClick={() => handlePdfClick(record)}
                                 className={hasAllData ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-red-500 hover:text-red-600 hover:bg-red-50"}>
-                                {hasAllData ? <FileText className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                                {hasAllData ? <FileText className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                               </Button>
-                              {generado && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                              {generado && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                              {canEdit && record.fuente === "manual" && (
+                                <>
+                                  <Button size="sm" variant="ghost" onClick={() => openManualModal(record)}
+                                    className="text-blue-500 hover:text-blue-700 hover:bg-blue-50">
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleDeleteClick(record)}
+                                    className="text-red-400 hover:text-red-600 hover:bg-red-50">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -449,14 +624,13 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <p>No hay matrimonios registrados.</p>
-                <p className="text-sm mt-1">Se registran desde el Censo marcando "Matrimonio en la Iglesia IRDD".</p>
+                <p className="text-sm mt-1">Se registran desde el Censo o manualmente con el botón +.</p>
               </div>
             )}
           </CardContent>
         </Card>
-
-
       </main>
+
 
       {/* Modal de edición de campos faltantes */}
       <Dialog open={!!editingRecord} onOpenChange={(open) => { if (!open) setEditingRecord(null) }}>
@@ -500,6 +674,61 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
         </DialogContent>
       </Dialog>
 
+      {/* Modal de entrada manual */}
+      <Dialog open={showManualModal} onOpenChange={(open) => { if (!open) { setShowManualModal(false); setManualForm({}); setEditingManualId(null) } }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-purple-500" />
+              {editingManualId ? "Editar Matrimonio Manual" : "Agregar Matrimonio Manual"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingManualId ? "Modifique los datos del registro." : "Ingrese los datos del matrimonio manualmente."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {MANUAL_FIELDS.map((field) => (
+              <div key={field.key} className="space-y-1.5">
+                <Label className="text-sm text-gray-700">
+                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                </Label>
+                <Input
+                  type={field.type || "text"}
+                  value={manualForm[field.key] || ""}
+                  onChange={(e) => setManualForm({ ...manualForm, [field.key]: e.target.value })}
+                  placeholder={field.placeholder || `Ingrese ${field.label.toLowerCase()}`}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowManualModal(false); setManualForm({}); setEditingManualId(null) }}>Cancelar</Button>
+            <Button onClick={handleSaveManual} disabled={savingManual}>
+              {savingManual ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : <><Save className="w-4 h-4 mr-2" />{editingManualId ? "Actualizar" : "Guardar"}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación de borrado */}
+      <Dialog open={!!deletingRecord} onOpenChange={(open) => { if (!open) setDeletingRecord(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Eliminar Registro
+            </DialogTitle>
+            <DialogDescription>
+              ¿Está seguro que desea eliminar el registro de <strong>{deletingRecord?.apellidos_nombres}</strong>? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingRecord(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Modal de generación masiva */}
       <Dialog open={showBulkModal} onOpenChange={setShowBulkModal}>
@@ -515,7 +744,6 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
           </DialogHeader>
 
           <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
-            {/* Opciones */}
             <div className="flex items-center justify-between border-b pb-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <Checkbox checked={excludeGenerated} onCheckedChange={toggleExcludeGenerated} />
@@ -527,28 +755,38 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
               </div>
             </div>
 
-            {/* Advertencia de incompletos */}
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-600">Plantilla:</span>
+              <div className="flex items-center border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setPdfVersion("v1")}
+                  className={`px-2.5 py-1 transition-colors ${pdfVersion === "v1" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Completo
+                </button>
+                <button
+                  onClick={() => setPdfVersion("v2")}
+                  className={`px-2.5 py-1 transition-colors ${pdfVersion === "v2" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Simple
+                </button>
+              </div>
+              <span className="text-xs text-gray-400">
+                {pdfVersion === "v1" ? "(todos los datos)" : "(solo nombres, ofició y fecha)"}
+              </span>
+            </div>
+
             {incompleteCount > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm font-medium text-amber-800 flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4" />
-                  {incompleteCount} matrimonio{incompleteCount !== 1 ? "s" : ""} con datos incompletos:
+                  {incompleteCount} matrimonio{incompleteCount !== 1 ? "s" : ""} con datos incompletos
                 </p>
-                <ul className="mt-1 text-xs text-amber-700 list-disc pl-5 max-h-20 overflow-y-auto">
-                  {records.filter((r) => getMissingFields(r).length > 0).map((r) => (
-                    <li key={`${r.fuente}-${r.id}`}>
-                      <strong>{r.apellidos_nombres}</strong> — Falta: {getMissingFields(r).map((k) => REQUIRED_FIELDS.find((f) => f.key === k)?.label).join(", ")}
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
 
-            <div className="text-xs text-gray-500">
-              {bulkSelected.size} seleccionados
-            </div>
+            <div className="text-xs text-gray-500">{bulkSelected.size} seleccionados</div>
 
-            {/* Lista con checkboxes */}
             <div className="flex-1 overflow-y-auto border rounded-lg divide-y max-h-[40vh]">
               {records.map((record) => {
                 const key = `${record.fuente}-${record.id}`
@@ -573,7 +811,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
                       </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Badge variant="outline" className="text-xs">{record.fuente === "protocolo" ? "P" : "M"}</Badge>
+                      {getFuenteBadge(record.fuente)}
                       {generado && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
                       {!hasData && <XCircle className="w-3.5 h-3.5 text-red-400" />}
                     </div>
