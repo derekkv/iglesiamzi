@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Bell, CheckCheck, FileText, ThumbsUp, ThumbsDown, Pause, Info } from "lucide-react"
 import { useNotificaciones, type BuzonMensaje } from "@/hooks/use-notificaciones"
 import { Button } from "@/components/ui/button"
@@ -54,11 +55,31 @@ function formatTimeAgo(dateStr: string): string {
   return date.toLocaleDateString("es")
 }
 
+/**
+ * Determina la ruta de navegación según el tipo de notificación.
+ */
+function getRouteForNotification(msg: BuzonMensaje): string | null {
+  switch (msg.referencia_tipo) {
+    case "cronograma":
+      return "/dashboard"
+    case "requerimiento":
+      // Si es notificación de respuesta (aprobado/negado/suspenso) va a requerimientos del usuario
+      // Si es tipo "requerimiento" (nueva solicitud) va al admin
+      if (msg.tipo === "requerimiento") {
+        return "/dashboard/requerimientos-admin"
+      }
+      return "/dashboard"
+    default:
+      return null
+  }
+}
+
 export function BuzonNotificaciones() {
   const { user } = useAuth()
   const { mensajes, noLeidos, loading, marcarLeido, marcarTodosLeidos } = useNotificaciones()
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // Cerrar panel al hacer clic fuera
   useEffect(() => {
@@ -139,6 +160,11 @@ export function BuzonNotificaciones() {
                     className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${getBgByTipo(msg.tipo, msg.leido)}`}
                     onClick={() => {
                       if (!msg.leido) marcarLeido(msg.id)
+                      const route = getRouteForNotification(msg)
+                      if (route) {
+                        setIsOpen(false)
+                        router.push(route)
+                      }
                     }}
                   >
                     <div className="flex items-start gap-3">

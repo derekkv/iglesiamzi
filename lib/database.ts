@@ -1,4 +1,4 @@
-import { supabase } from "./supabase"
+import { supabase } from "@/lib/secure-db"
 
 export interface Mes {
   id: string

@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json() as { valid?: boolean; user?: AuthUser }
         if (data.valid && data.user) {
           setUser(data.user)
+          // Asegurar que la cookie esté sincronizada (para middleware)
+          document.cookie = `authToken=${token}; path=/; max-age=86400; SameSite=Lax`
         } else {
           // Token inválido o expirado
           clearSession()
@@ -78,6 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function clearSession() {
     localStorage.removeItem("authToken")
     localStorage.removeItem("authUser")
+    // Eliminar cookie de auth (para middleware)
+    document.cookie = "authToken=; path=/; max-age=0; SameSite=Lax"
     setUser(null)
   }
 
@@ -85,6 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
     localStorage.setItem("authToken", token)
     localStorage.setItem("authUser", JSON.stringify(userData))
+    // Setear cookie de auth (para middleware) — expira en 24h como el JWT
+    document.cookie = `authToken=${token}; path=/; max-age=86400; SameSite=Lax`
   }
 
   const logout = () => {

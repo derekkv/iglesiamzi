@@ -1,5 +1,6 @@
-import { supabase } from "../supabase"
+import { supabase } from "@/lib/secure-db"
 import { todayEcuador } from "../timezone"
+import { getInternalHeaders } from "../auth-fetch"
 
 export interface GestionAtrasado {
   id: number
@@ -171,9 +172,9 @@ export async function notificarLiderAtraso(params: {
       try {
         await fetch("/api/send-notification", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getInternalHeaders(),
           body: JSON.stringify({
-            userId: leader.id,
+            user_id: leader.id,
             title: `Atraso en ${params.modulo}`,
             body: `${params.userName} llegó atrasado/a. Gestione la situación.`,
             url: "/dashboard",
@@ -186,7 +187,7 @@ export async function notificarLiderAtraso(params: {
         try {
           await fetch("/api/send-email", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getInternalHeaders(),
             body: JSON.stringify({
               to: leader.email,
               subject: `Alerta de Atraso - ${params.modulo}`,
@@ -200,7 +201,7 @@ export async function notificarLiderAtraso(params: {
       if (leader.phone) {
         try {
           const WA_URL = process.env.NEXT_PUBLIC_WA_SERVER_URL || process.env.WA_SERVER_URL || "http://localhost:3100"
-          await fetch(`${WA_URL}/send`, {
+          await fetch(`${WA_URL}/api/whatsapp/send`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

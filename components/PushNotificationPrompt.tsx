@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { pushService, VAPID_PUBLIC_KEY } from "@/lib/mod/push-service"
+import { VAPID_PUBLIC_KEY } from "@/lib/mod/push-service"
 import { Button } from "@/components/ui/button"
 import { Bell, X } from "lucide-react"
 
@@ -26,9 +26,14 @@ export function PushNotificationPrompt() {
     if (!user) return
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
 
-    // Solo mostrar si no ha decidido aún
+    // Solo mostrar si no ha decidido aún (o si falló antes, reintentar)
     const dismissed = localStorage.getItem("push_prompt_dismissed")
-    if (dismissed) return
+    if (dismissed === "subscribed" || dismissed === "denied") return
+
+    // Si hubo un error previo, limpiar para reintentar
+    if (dismissed === "error") {
+      localStorage.removeItem("push_prompt_dismissed")
+    }
 
     // Chequear si ya tiene permiso
     if (Notification.permission === "granted") {
@@ -55,12 +60,23 @@ export function PushNotificationPrompt() {
       })
 
       const sub = subscription.toJSON()
-      await pushService.saveSubscription({
-        user_id: user.id,
-        endpoint: sub.endpoint!,
-        p256dh: sub.keys!.p256dh!,
-        auth: sub.keys!.auth!,
+
+      // Guardar vía API route (usa service key, bypasses RLS)
+      const res = await fetch("/api/push-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: localStorage.getItem("authToken"),
+          user_id: user.id,
+          endpoint: sub.endpoint,
+          p256dh: sub.keys?.p256dh,
+          auth: sub.keys?.auth,
+        }),
       })
+
+      if (!res.ok) {
+        throw new Error("Error guardando suscripción en servidor")
+      }
 
       localStorage.setItem("push_prompt_dismissed", "subscribed")
     } catch (error) {

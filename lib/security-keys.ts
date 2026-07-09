@@ -1,6 +1,6 @@
 "use server"
 
-import { supabase } from "./supabase"
+import { supabaseServer as supabase } from "./supabase-server"
 
 export interface SecurityKey {
   id: string

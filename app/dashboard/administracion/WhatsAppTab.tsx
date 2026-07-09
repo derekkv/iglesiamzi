@@ -35,6 +35,7 @@ import {
 } from "lucide-react"
 import { getAllUsers } from "@/lib/admin"
 import { formatPhoneForWhatsApp, formatPhoneDisplay } from "@/lib/format-phone"
+import { authFetch } from "@/lib/auth-fetch"
 
 interface WAStatus {
   connected: boolean
@@ -96,7 +97,7 @@ export function WhatsAppTab() {
   // Polling del estado
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/whatsapp/status")
+      const res = await authFetch("/api/whatsapp/status")
       if (res.status === 503) {
         setServerOnline(false)
         return
@@ -121,7 +122,7 @@ export function WhatsAppTab() {
   const fetchQR = async () => {
     setIsLoadingQR(true)
     try {
-      const res = await fetch("/api/whatsapp/qr")
+      const res = await authFetch("/api/whatsapp/qr")
       if (res.ok) {
         const data: { available: boolean; qr: string | null } = await res.json()
         if (data.available && data.qr) {
@@ -220,7 +221,7 @@ export function WhatsAppTab() {
   const handleConnect = async () => {
     setIsConnecting(true)
     try {
-      const res = await fetch("/api/whatsapp/connect", { method: "POST" })
+      const res = await authFetch("/api/whatsapp/connect", { method: "POST" })
       const data: { success: boolean; error?: string } = await res.json()
       if (data.success) {
         toast.success("Iniciando conexión. Escanee el código QR.")
@@ -238,7 +239,7 @@ export function WhatsAppTab() {
 
   const handleDisconnect = async () => {
     try {
-      const res = await fetch("/api/whatsapp/disconnect", { method: "POST" })
+      const res = await authFetch("/api/whatsapp/disconnect", { method: "POST" })
       const data: { success: boolean } = await res.json()
       if (data.success) {
         toast.success("Desconectado")
@@ -253,7 +254,7 @@ export function WhatsAppTab() {
   const handleLogout = async () => {
     if (!confirm("¿Cerrar sesión de WhatsApp? Necesitará escanear el QR nuevamente.")) return
     try {
-      const res = await fetch("/api/whatsapp/logout", { method: "POST" })
+      const res = await authFetch("/api/whatsapp/logout", { method: "POST" })
       const data: { success: boolean } = await res.json()
       if (data.success) {
         toast.success("Sesión cerrada. Escanee QR para reconectar.")
@@ -281,7 +282,7 @@ export function WhatsAppTab() {
 
     setIsSending(true)
     try {
-      const res = await fetch("/api/whatsapp/send", {
+      const res = await authFetch("/api/whatsapp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: formattedPhone, message: message.trim() }),
@@ -321,7 +322,7 @@ export function WhatsAppTab() {
     setBulkResults([])
 
     try {
-      const res = await fetch("/api/whatsapp/send-bulk", {
+      const res = await authFetch("/api/whatsapp/send-bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phones, message: bulkMessage.trim() }),

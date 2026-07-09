@@ -1,16 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import bcrypt from "bcryptjs"
-import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/auth-context"
+import { authFetch } from "@/lib/auth-fetch"
 
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -47,13 +45,10 @@ export function ChangePasswordModal({ userId }: { userId: string }) {
   async function loadUserData() {
     setLoadingData(true)
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("username, displayName, email, phone, cedula")
-        .eq("id", userId)
-        .single()
+      const res = await authFetch("/api/user-profile")
+      if (!res.ok) throw new Error("Error cargando datos")
 
-      if (error) throw error
+      const { user: data } = await res.json()
       if (data) {
         setUsername(data.username || "")
         setDisplayName(data.displayName || "")
@@ -63,6 +58,7 @@ export function ChangePasswordModal({ userId }: { userId: string }) {
       }
     } catch (error) {
       console.error("Error cargando datos:", error)
+      toast.error("Error cargando datos del perfil")
     } finally {
       setLoadingData(false)
     }
@@ -75,17 +71,21 @@ export function ChangePasswordModal({ userId }: { userId: string }) {
 
     setLoading(true)
     try {
-      const { error } = await supabase
-        .from("users")
-        .update({
+      const res = await authFetch("/api/user-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           displayName: displayName.trim(),
           email: email.trim() || null,
           phone: phone.trim() || null,
           cedula: cedula.trim() || null,
-        })
-        .eq("id", userId)
+        }),
+      })
 
-      if (error) throw error
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Error actualizando perfil")
+      }
 
       // Actualizar el contexto de auth con el nuevo displayName
       if (user) {
@@ -99,9 +99,9 @@ export function ChangePasswordModal({ userId }: { userId: string }) {
       }
 
       toast.success("Datos actualizados correctamente")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error actualizando perfil:", error)
-      toast.error("Error al actualizar datos")
+      toast.error(error.message || "Error al actualizar datos")
     } finally {
       setLoading(false)
     }
@@ -120,40 +120,26 @@ export function ChangePasswordModal({ userId }: { userId: string }) {
 
     setLoading(true)
     try {
-      const { data: userData, error: selErr } = await supabase
-        .from("users")
-        .select("password_hash")
-        .eq("id", userId)
-        .single()
+      const res = await authFetch("/api/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: currentPass,
+          newPassword: newPass,
+        }),
+      })
 
-      if (selErr || !userData) {
-        toast.error("Error cargando usuario")
-        setLoading(false)
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast.error(data.error || "Error cambiando contraseña")
         return
       }
 
-      const isValid = await bcrypt.compare(currentPass, userData.password_hash)
-      if (!isValid) {
-        toast.error("Contraseña actual incorrecta")
-        setLoading(false)
-        return
-      }
-
-      const newHash = await bcrypt.hash(newPass, 10)
-
-      const { error: updErr } = await supabase
-        .from("users")
-        .update({ password_hash: newHash })
-        .eq("id", userId)
-
-      if (updErr) {
-        toast.error("Error actualizando contraseña")
-      } else {
-        toast.success("Contraseña actualizada correctamente")
-        setCurrentPass("")
-        setNewPass("")
-        setConfirmPass("")
-      }
+      toast.success("Contraseña actualizada correctamente")
+      setCurrentPass("")
+      setNewPass("")
+      setConfirmPass("")
     } catch (err) {
       console.error(err)
       toast.error("Ocurrió un error")

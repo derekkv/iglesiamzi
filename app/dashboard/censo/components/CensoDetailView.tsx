@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { CensoRecord, HijoData } from "@/lib/mod/censo-service"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 
 interface AuditEntry {
   timestamp: string

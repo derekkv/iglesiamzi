@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { emailService, type EmailServiceParams } from "@/lib/mod/email-service"
+import { verifyApiAuth } from "@/lib/api-auth"
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticación
+    const auth = await verifyApiAuth(request)
+    if (!auth.authenticated) {
+      return NextResponse.json({ success: false, error: auth.error || "No autorizado" }, { status: 401 })
+    }
+
     const body = await request.json()
 
     // Modo genérico: enviar con subject + html directamente

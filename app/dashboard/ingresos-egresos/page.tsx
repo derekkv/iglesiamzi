@@ -58,7 +58,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSecurityCheck } from "@/contexts/security-context"
 import { todayEcuador } from "@/lib/timezone"
 import { getAlfoliMes } from "@/lib/mod/alfoli-service"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 
 interface FinancialRecord {
   id: number;

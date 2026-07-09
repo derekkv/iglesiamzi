@@ -1,4 +1,4 @@
-import { supabase } from "../supabase"
+import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "./audit-service"
 
 export interface AttendanceDetail {

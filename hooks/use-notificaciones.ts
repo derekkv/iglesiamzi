@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 import { useAuth } from "@/contexts/auth-context"
 import { useRealtime } from "./use-realtime"
+import { authFetch } from "@/lib/auth-fetch"
 
 export interface BuzonMensaje {
   id: number
@@ -131,7 +132,7 @@ export function useNotificaciones() {
 
     // Enviar push notification también
     try {
-      await fetch("/api/send-notification", {
+      await authFetch("/api/send-notification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -181,7 +182,7 @@ export function useNotificaciones() {
         .eq("system_modules.name", "administracion")
 
       if (fallbackPerms) {
-        const uniqueIds = [...new Set(fallbackPerms.map((p) => p.user_id))]
+        const uniqueIds = [...new Set(fallbackPerms.map((p) => p.user_id))] as string[]
         for (const uid of uniqueIds) {
           await enviarNotificacion({ userId: uid, titulo, mensaje, tipo, referenciaTipo, referenciaId })
         }
@@ -190,7 +191,7 @@ export function useNotificaciones() {
     }
 
     // Deduplicar user_ids (un usuario puede tener permisos en varios módulos del grupo)
-    const uniqueUserIds = [...new Set(adminPerms.map((p) => p.user_id))]
+    const uniqueUserIds = [...new Set(adminPerms.map((p) => p.user_id))] as string[]
 
     // Enviar a cada admin
     for (const uid of uniqueUserIds) {

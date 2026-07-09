@@ -1,4 +1,4 @@
-import { supabase } from "../supabase"
+import { supabase } from "@/lib/secure-db"
 import { nowEcuador } from "../timezone"
 
 export interface GestionCelula {

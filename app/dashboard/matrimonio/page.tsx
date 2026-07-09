@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Search } from "lucide-react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 
 interface MatrimonioCenso {
   id: number

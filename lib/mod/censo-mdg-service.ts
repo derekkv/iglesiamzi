@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 import type { CensoRecord, CatalogOption, HijoData, ConfiguracionesGlobales } from "@/lib/mod/censo-service"
 

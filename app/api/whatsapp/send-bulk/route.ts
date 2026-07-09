@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyApiAuth } from "@/lib/api-auth"
 
 const WA_SERVER_URL = process.env.WA_SERVER_URL || "http://localhost:3100"
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticación
+    const auth = await verifyApiAuth(request)
+    if (!auth.authenticated) {
+      return NextResponse.json({ success: false, error: auth.error || "No autorizado" }, { status: 401 })
+    }
+
     const body = await request.json() as { phones?: string[]; message?: string }
     const { phones, message } = body
 

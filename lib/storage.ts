@@ -1,5 +1,5 @@
 import { GlobalConfig } from "./globalConfig";
-import { supabase } from "./supabase";
+import { supabase } from "@/lib/secure-db";
 import { auditService, type AuditInfo } from "./mod/audit-service";
 
 interface StorageAdapter {

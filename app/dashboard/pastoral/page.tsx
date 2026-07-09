@@ -11,7 +11,7 @@ import { ArrowLeft } from "lucide-react"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 import { getTodosLosAtrasados, type GestionAtrasado } from "@/lib/mod/gestion-atrasados-service"
 
 interface ColumnData {

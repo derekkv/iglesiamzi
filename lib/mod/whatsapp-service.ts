@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 
 export interface WhatsAppMessage {
   id: string

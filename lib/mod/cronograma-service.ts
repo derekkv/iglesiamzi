@@ -1,5 +1,6 @@
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
+import { getInternalHeaders } from "@/lib/auth-fetch"
 
 export interface CronogramaEntry {
   id?: number
@@ -157,7 +158,7 @@ export const cronogramaService = {
     try {
       fetch("/api/send-notification", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getInternalHeaders(),
         body: JSON.stringify({
           user_id: entry.user_id,
           title: "📋 Nuevo servicio asignado",
@@ -178,7 +179,7 @@ export const cronogramaService = {
       if (userData?.email) {
         fetch("/api/send-email", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getInternalHeaders(),
           body: JSON.stringify({
             to: userData.email,
             type: "asignacion",
@@ -204,7 +205,7 @@ export const cronogramaService = {
 
         fetch("/api/whatsapp/send", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getInternalHeaders(),
           body: JSON.stringify({ phone: userData.phone, message: waMessage }),
         }).then(() => {
           supabase.from("cronograma_servicio").update({ whatsapp_asignacion_enviado: true }).eq("id", data.id).then(() => {})

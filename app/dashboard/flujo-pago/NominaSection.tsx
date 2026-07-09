@@ -12,8 +12,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { Plus, Trash2, Edit2, Settings } from "lucide-react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 import { useMonth } from "@/contexts/month-context"
+import { authFetch } from "@/lib/auth-fetch"
 import { useAuth } from "@/contexts/auth-context"
 import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 import { useRealtime } from "@/hooks/use-realtime"
@@ -100,11 +101,11 @@ export function NominaSection() {
     const esBanco = metodo === "Banco"
     if (telefono) {
       const msg = esBanco ? [`💰 *Pago de Nómina — IRDD*`,``,`Hola *${nombre}*,`,``,`Tu *${label}* ha sido depositada.`,`💵 *Valor:* $${valor.toFixed(2)}`,`🏦 *Método:* Transferencia bancaria`,``,`Revisa tu cuenta bancaria. ¡Dios te bendiga! 🙏`,`— Administración`].join("\n") : [`💰 *Pago de Nómina — IRDD*`,``,`Hola *${nombre}*,`,``,`Tu *${label}* fue cancelada en efectivo.`,`💵 *Valor:* $${valor.toFixed(2)}`,``,`Queda registrado. ¡Dios te bendiga! 🙏`,`— Administración`].join("\n")
-      fetch("/api/whatsapp/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: telefono, message: msg }) }).catch(() => {})
+      authFetch("/api/whatsapp/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: telefono, message: msg }) }).catch(() => {})
     }
     if (email) {
       const contenido = esBanco ? `<p>Tu <strong>${label}</strong> ha sido depositada en tu cuenta bancaria. Revisa tu estado de cuenta.</p>` : `<p>Tu <strong>${label}</strong> fue cancelada en efectivo. Queda registrado.</p>`
-      fetch("/api/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: email, subject: `💰 Tu ${label} fue cancelada — IRDD`, html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:#059669;color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;"><h2 style="margin:0;">💰 Pago de Nómina</h2></div><div style="background:white;border:1px solid #e5e7eb;padding:24px;border-radius:0 0 12px 12px;"><p>Hola <strong>${nombre}</strong>,</p>${contenido}<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;text-align:center;"><p style="margin:0;font-size:12px;color:#6b7280;">VALOR</p><p style="font-size:24px;font-weight:700;color:#059669;margin:4px 0;">$${valor.toFixed(2)}</p><p style="margin:0;font-size:13px;color:#6b7280;">${quincena === "primera" ? "1ra" : "2da"} Quincena · ${metodo}</p></div><p style="color:#9ca3af;font-size:12px;text-align:center;">Administración — Iglesia Regalo de Dios</p></div></div>` }) }).catch(() => {})
+      authFetch("/api/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: email, subject: `💰 Tu ${label} fue cancelada — IRDD`, html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:#059669;color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;"><h2 style="margin:0;">💰 Pago de Nómina</h2></div><div style="background:white;border:1px solid #e5e7eb;padding:24px;border-radius:0 0 12px 12px;"><p>Hola <strong>${nombre}</strong>,</p>${contenido}<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0;text-align:center;"><p style="margin:0;font-size:12px;color:#6b7280;">VALOR</p><p style="font-size:24px;font-weight:700;color:#059669;margin:4px 0;">$${valor.toFixed(2)}</p><p style="margin:0;font-size:13px;color:#6b7280;">${quincena === "primera" ? "1ra" : "2da"} Quincena · ${metodo}</p></div><p style="color:#9ca3af;font-size:12px;text-align:center;">Administración — Iglesia Regalo de Dios</p></div></div>` }) }).catch(() => {})
     }
   }
 

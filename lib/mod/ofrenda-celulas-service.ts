@@ -1,4 +1,4 @@
-import { supabase } from "../supabase"
+import { supabase } from "@/lib/secure-db"
 import { nowEcuador, currentMonthEcuador, currentYearEcuador } from "../timezone"
 
 export interface OfrendaCelula {

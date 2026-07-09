@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import webpush from "web-push"
 import { createClient } from "@supabase/supabase-js"
+import { verifyApiAuth } from "@/lib/api-auth"
 
 const VAPID_PUBLIC_KEY = "BKHW7uYkfEBfrPirumVyRqNj_eiWBLpEQuV1Q6NsGImX7wJYA4oB1q_w5iGCZ7xcoO3Jgs41VczB3a7Y2FeIoYY"
 const VAPID_PRIVATE_KEY = "kG6aW66CSKCC76Tgt-ACRBYSWVxHtgIHFK5Q3_QJO14"
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://servidor.iglesiaregalodedios.com"
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgyOTU5NTM1LCJleHAiOjE5NDA2Mzk1MzV9.s_Np7AI-RtfyXZm279OO7mByV-CnNzWoNI8qcX8E0v8"
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 
 webpush.setVapidDetails(
   "mailto:admin@iglesiaregalodedios.com",
@@ -13,11 +14,18 @@ webpush.setVapidDetails(
   VAPID_PRIVATE_KEY
 )
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as { user_id: string; title: string; body?: string; url?: string }
+
+    // Verificar autenticación
+    const auth = await verifyApiAuth(request)
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error || "No autorizado" }, { status: 401 })
+    }
+
     const { user_id, title, body: notifBody, url } = body
 
     if (!user_id || !title) {

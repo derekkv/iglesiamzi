@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/secure-db"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useAuth } from "@/contexts/auth-context"
+import { authFetch } from "@/lib/auth-fetch"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -196,7 +197,7 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
           .eq("can_view", true)
           .eq("system_modules.name", moduleName)
 
-        destinatarioIds = [...new Set((perms || []).map((p: any) => p.user_id))]
+        destinatarioIds = [...new Set((perms || []).map((p: any) => p.user_id))] as string[]
       } else {
         // Todos los usuarios activos
         const { data: allUsers } = await supabase
@@ -261,7 +262,7 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
         for (const dest of (destUsers || [])) {
           // Email
           if (dest.email) {
-            fetch("/api/send-email", {
+            authFetch("/api/send-email", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -316,18 +317,18 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
           }
           // WhatsApp
           if (dest.phone) {
-            fetch("/api/whatsapp/send", {
+            authFetch("/api/whatsapp/send", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ phone: dest.phone, message: whatsappMsg }),
             }).catch(() => {})
           }
           // Push
-          fetch("/api/send-notification", {
+          authFetch("/api/send-notification", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              userId: dest.id,
+              user_id: dest.id,
               title: `📩 ${asunto} - ${title}`,
               body: `${user.displayName}: ${detalle.trim().slice(0, 80)}${fecha ? ` | ${fechaFormateada}` : ""}`,
               url: "/dashboard",
