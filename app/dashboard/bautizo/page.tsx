@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useRealtime } from "@/hooks/use-realtime"
+import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Search } from "lucide-react"
 import { supabase } from "@/lib/secure-db"
 
@@ -19,6 +19,7 @@ interface BautizoCenso {
   fecha_bautizo: string
   celular: string
   created_at: string
+  fuente: "protocolo" | "mdg"
 }
 
 function BautizoContent({ canEdit }: { canEdit: boolean }) {
@@ -36,14 +37,41 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
   const loadBautizos = async (silent = false) => {
     try {
       if (!silent) setIsLoading(true)
-      const { data, error } = await supabase
-        .from("censo")
-        .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
-        .eq("bautizo_irdd", true)
-        .order("fecha_bautizo", { ascending: false })
 
-      if (error) throw error
-      setRecords(data || [])
+      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+        supabase
+          .from("censo")
+          .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
+          .eq("bautizo_irdd", true)
+          .order("fecha_bautizo", { ascending: false }),
+        supabase
+          .from("censo_mdg")
+          .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
+          .eq("bautizo_irdd", true)
+          .order("fecha_bautizo", { ascending: false }),
+      ])
+
+      const all: BautizoCenso[] = [
+        ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
+        ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+      ]
+
+      // Deduplicar por cédula
+      const seen = new Set<string>()
+      const filtered = all.filter((r) => {
+        if (seen.has(r.cedula)) return false
+        seen.add(r.cedula)
+        return true
+      })
+
+      // Ordenar por fecha descendente
+      filtered.sort((a, b) => {
+        if (!a.fecha_bautizo) return 1
+        if (!b.fecha_bautizo) return -1
+        return b.fecha_bautizo.localeCompare(a.fecha_bautizo)
+      })
+
+      setRecords(filtered)
     } catch (error) {
       console.error("Error cargando bautizos:", error)
     } finally {
@@ -51,25 +79,49 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
-  // Realtime: refrescar cuando cambia el censo
-  useRealtime({ table: "censo", onChange: () => loadBautizos(true) })
+  useRealtimeMultiple(["censo", "censo_mdg"], () => loadBautizos(true))
 
   const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadBautizos()
+      return
+    }
     try {
       setIsLoading(true)
-      let query = supabase
-        .from("censo")
-        .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
-        .eq("bautizo_irdd", true)
+      const q = searchQuery.trim()
 
-      if (searchQuery.trim()) {
-        query = query.or(`apellidos_nombres.ilike.%${searchQuery}%,cedula.ilike.%${searchQuery}%`)
-      }
+      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+        supabase
+          .from("censo")
+          .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
+          .eq("bautizo_irdd", true)
+          .or(`apellidos_nombres.ilike.%${q}%,cedula.ilike.%${q}%`),
+        supabase
+          .from("censo_mdg")
+          .select("id, cedula, apellidos_nombres, fecha_bautizo, celular, created_at")
+          .eq("bautizo_irdd", true)
+          .or(`apellidos_nombres.ilike.%${q}%,cedula.ilike.%${q}%`),
+      ])
 
-      const { data, error } = await query.order("fecha_bautizo", { ascending: false })
+      const all: BautizoCenso[] = [
+        ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
+        ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+      ]
 
-      if (error) throw error
-      setRecords(data || [])
+      const seen = new Set<string>()
+      const filtered = all.filter((r) => {
+        if (seen.has(r.cedula)) return false
+        seen.add(r.cedula)
+        return true
+      })
+
+      filtered.sort((a, b) => {
+        if (!a.fecha_bautizo) return 1
+        if (!b.fecha_bautizo) return -1
+        return b.fecha_bautizo.localeCompare(a.fecha_bautizo)
+      })
+
+      setRecords(filtered)
     } catch (error) {
       console.error("Error buscando:", error)
     } finally {
@@ -114,9 +166,14 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
               </Button>
               <h1 className="text-xl font-semibold text-gray-900">Registro de Bautizos</h1>
             </div>
-            <span className="flex items-center gap-1 text-sm text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
-              Datos desde Censo
-            </span>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                {records.length} bautizados
+              </Badge>
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                Censo Protocolo + MDG
+              </span>
+            </div>
           </div>
         </div>
       </header>
@@ -144,21 +201,11 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
           </CardContent>
         </Card>
 
-        {/* Estadísticas */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Bautizados en IRDD</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{records.length}</div>
-          </CardContent>
-        </Card>
-
         {/* Tabla */}
         <Card>
           <CardHeader>
             <CardTitle>Bautizos Registrados</CardTitle>
-            <CardDescription>Personas bautizadas en la Iglesia IRDD (registradas desde el censo)</CardDescription>
+            <CardDescription>Personas bautizadas en la Iglesia IRDD (censo Protocolo y MDG)</CardDescription>
           </CardHeader>
           <CardContent>
             {records.length > 0 ? (
@@ -171,16 +218,22 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
                       <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Nombre</th>
                       <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Fecha Bautizo</th>
                       <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Celular</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Fuente</th>
                     </tr>
                   </thead>
                   <tbody>
                     {records.map((record, index) => (
-                      <tr key={record.id} className="hover:bg-gray-50">
+                      <tr key={`${record.fuente}-${record.id}`} className="hover:bg-gray-50">
                         <td className="border border-gray-300 px-4 py-3">{index + 1}</td>
                         <td className="border border-gray-300 px-4 py-3">{record.cedula}</td>
-                        <td className="border border-gray-300 px-4 py-3">{record.apellidos_nombres}</td>
+                        <td className="border border-gray-300 px-4 py-3 font-medium">{record.apellidos_nombres}</td>
                         <td className="border border-gray-300 px-4 py-3">{formatDateForTable(record.fecha_bautizo)}</td>
                         <td className="border border-gray-300 px-4 py-3">{record.celular || "-"}</td>
+                        <td className="border border-gray-300 px-4 py-3">
+                          <Badge variant="outline" className="text-xs">
+                            {record.fuente === "protocolo" ? "Protocolo" : "MDG"}
+                          </Badge>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -189,7 +242,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <p>No hay bautizos registrados.</p>
-                <p className="text-sm mt-1">Los bautizos se registran desde el módulo de Censo marcando "Se bautizó en la IRDD".</p>
+                <p className="text-sm mt-1">Se registran desde el Censo marcando "Se bautizó en la IRDD".</p>
               </div>
             )}
           </CardContent>
@@ -202,7 +255,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
 export default function BautizoPage() {
   return (
     <PermissionsGuard moduleName="bautizo">
-      {(canEdit) => <BautizoContent canEdit={canEdit} />}
+      {(canEdit) => <BautizoContent canEdit={!!canEdit} />}
     </PermissionsGuard>
   )
 }

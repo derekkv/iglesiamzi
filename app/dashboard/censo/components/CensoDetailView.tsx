@@ -168,7 +168,13 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
               <div className="border-t pt-2 mt-2">
                 <p><strong>¿Matrimonio en IRDD?:</strong> {record.matrimonio_irdd ? "Sí" : "No"}</p>
                 {record.matrimonio_irdd && (
-                  <p className="ml-4"><strong>Fecha:</strong> {record.fecha_matrimonio || "-"}</p>
+                  <div className="ml-4 space-y-1">
+                    <p><strong>Fecha:</strong> {record.fecha_matrimonio || "-"}</p>
+                    <p><strong>Hora:</strong> {(record as any).hora_matrimonio || "-"}</p>
+                    <p><strong>Oficio de la Ceremonia:</strong> {(record as any).oficio_matrimonio || "-"}</p>
+                    <p><strong>Padrino 1:</strong> {(record as any).padrino1_matrimonio || "-"}</p>
+                    <p><strong>Padrino 2:</strong> {(record as any).padrino2_matrimonio || "-"}</p>
+                  </div>
                 )}
               </div>
 

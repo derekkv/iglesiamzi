@@ -514,29 +514,87 @@ export function CensoForm({
             {renderCheckbox("¿Matrimonio en la Iglesia IRDD?", "matrimonio_irdd")}
             {formData.matrimonio_irdd && (
               <div className="ml-6 mt-3 border-l-2 border-orange-300 pl-4 py-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="fecha_matrimonio" className="text-sm text-gray-700">Fecha del Matrimonio</Label>
-                  <Input
-                    id="fecha_matrimonio"
-                    type="text"
-                    value={((formData as any).fecha_matrimonio_display as string) || ""}
-                    onChange={(e) => {
-                      const raw = e.target.value
-                      const updated = { ...formData, fecha_matrimonio_display: raw } as any
-                      const cleaned = raw.replace(/[/,\-]/g, " ").replace(/\s+/g, " ").trim()
-                      const parts = cleaned.split(" ")
-                      if (parts.length === 3) {
-                        const day = parseInt(parts[0], 10)
-                        const month = parseInt(parts[1], 10)
-                        const year = parseInt(parts[2], 10)
-                        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-                          updated.fecha_matrimonio = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fecha_matrimonio" className="text-sm text-gray-700">Fecha del Matrimonio</Label>
+                    <Input
+                      id="fecha_matrimonio"
+                      type="text"
+                      value={((formData as any).fecha_matrimonio_display as string) || ""}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        const updated = { ...formData, fecha_matrimonio_display: raw } as any
+                        const cleaned = raw.replace(/[/,\-]/g, " ").replace(/\s+/g, " ").trim()
+                        const parts = cleaned.split(" ")
+                        if (parts.length === 3) {
+                          const day = parseInt(parts[0], 10)
+                          const month = parseInt(parts[1], 10)
+                          const year = parseInt(parts[2], 10)
+                          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+                            updated.fecha_matrimonio = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                          }
                         }
-                      }
-                      onChangeFormData(updated)
-                    }}
-                    placeholder="dd / mm / aaaa"
-                  />
+                        onChangeFormData(updated)
+                      }}
+                      placeholder="dd / mm / aaaa"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="hora_matrimonio" className="text-sm text-gray-700">Hora de la Ceremonia</Label>
+                    <Input
+                      id="hora_matrimonio"
+                      type="text"
+                      value={(formData as any).hora_matrimonio || ""}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        setFormField("hora_matrimonio", raw)
+                      }}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim()
+                        if (val && !/^\d{1,2}:\d{2}$/.test(val)) {
+                          alert("Formato de hora inválido. Use el formato HH:MM (ej: 10:30, 15:00)")
+                        } else if (val) {
+                          const [h, m] = val.split(":").map(Number)
+                          if (h < 0 || h > 23 || m < 0 || m > 59) {
+                            alert("Hora inválida. Las horas van de 00 a 23 y los minutos de 00 a 59")
+                          } else {
+                            setFormField("hora_matrimonio", `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+                          }
+                        }
+                      }}
+                      placeholder="HH:MM (ej: 10:30)"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="oficio_matrimonio" className="text-sm text-gray-700">Oficio de la Ceremonia</Label>
+                    <Input
+                      id="oficio_matrimonio"
+                      type="text"
+                      value={(formData as any).oficio_matrimonio || ""}
+                      onChange={(e) => setFormField("oficio_matrimonio", e.target.value)}
+                      placeholder="Nombre de quien oficia"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="padrino1_matrimonio" className="text-sm text-gray-700">Padrino 1</Label>
+                    <Input
+                      id="padrino1_matrimonio"
+                      type="text"
+                      value={(formData as any).padrino1_matrimonio || ""}
+                      onChange={(e) => setFormField("padrino1_matrimonio", e.target.value)}
+                      placeholder="Nombre del padrino"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="padrino2_matrimonio" className="text-sm text-gray-700">Padrino 2</Label>
+                    <Input
+                      id="padrino2_matrimonio"
+                      type="text"
+                      value={(formData as any).padrino2_matrimonio || ""}
+                      onChange={(e) => setFormField("padrino2_matrimonio", e.target.value)}
+                      placeholder="Nombre del padrino"
+                    />
+                  </div>
                 </div>
               </div>
             )}

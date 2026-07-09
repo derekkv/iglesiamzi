@@ -202,6 +202,12 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: false,
   },
 
+  // === MATRIMONIOS PDF ===
+  matrimonios_pdf_generados: {
+    modules: ["matrimonio"],
+    requireEditForWrite: false,
+  },
+
   // === AUDITORÍA (solo lectura + insert, nunca delete/update) ===
   audit_logs: {
     modules: "any",

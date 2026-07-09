@@ -53,6 +53,10 @@ export interface CensoRecord {
   // Matrimonio IRDD
   matrimonio_irdd?: boolean
   fecha_matrimonio?: string
+  hora_matrimonio?: string
+  oficio_matrimonio?: string
+  padrino1_matrimonio?: string
+  padrino2_matrimonio?: string
   // Membresía
   miembro?: boolean
   miembro_activo?: boolean
