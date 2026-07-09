@@ -120,19 +120,20 @@ async function sendWhatsAppImage(phone: string, caption: string): Promise<boolea
   try {
     const formatted = formatPhoneForWhatsApp(phone)
 
-    const imageBuffer = await getBirthdayImage()
-    if (!imageBuffer) {
+    const media = await getBirthdayImage()
+    if (!media) {
       console.warn("No se pudo obtener imagen de cumpleaños")
       return false
     }
 
-    const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/png" })
+    const blob = new Blob([new Uint8Array(media.buffer)], { type: media.type })
+    const mediaType = media.type === "image/png" ? "image" : "document"
 
     const formData = new FormData()
     formData.append("phone", formatted)
-    formData.append("file", blob, "Feliz Cumpleaños.png")
+    formData.append("file", blob, media.filename)
     formData.append("caption", caption)
-    formData.append("mediaType", "image")
+    formData.append("mediaType", mediaType)
 
     const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
       method: "POST",
@@ -190,11 +191,11 @@ async function sendBirthdayEmail(to: string, nombre: string, edad: number): Prom
 
     // Adjuntar imagen convertida del PDF
     const attachments: any[] = []
-    const imageBuffer = await getBirthdayImage()
-    if (imageBuffer) {
+    const media = await getBirthdayImage()
+    if (media) {
       attachments.push({
-        filename: `Feliz Cumpleaños - ${nombre}.png`,
-        content: imageBuffer,
+        filename: `Feliz Cumpleaños - ${nombre}.${media.type === "image/png" ? "png" : "pdf"}`,
+        content: media.buffer,
         cid: "cumpleanos-imagen",
       })
     }

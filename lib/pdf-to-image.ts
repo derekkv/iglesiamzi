@@ -1,67 +1,37 @@
 import * as fs from "fs"
 import * as path from "path"
-import { createCanvas } from "@napi-rs/canvas"
 
 /**
- * Convierte la primera página de un PDF a imagen PNG usando pdfjs-dist + @napi-rs/canvas.
- * Retorna un Buffer con el PNG.
+ * Obtiene la imagen de cumpleaños como Buffer.
+ * Busca primero un PNG pre-convertido. Si no existe, usa el PDF directamente.
+ * 
+ * IMPORTANTE: Para que funcione como imagen en WhatsApp, debes tener
+ * el archivo "plantilla-cumpleanos.png" en public/.
+ * Si solo tienes el PDF, se enviará como documento.
  */
-export async function pdfToImage(pdfPath: string, scale: number = 2.0): Promise<Buffer> {
-  // Importar pdfjs-dist dinámicamente (es ESM-only en v4)
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs")
 
-  const pdfData = fs.readFileSync(pdfPath)
-  const uint8Array = new Uint8Array(pdfData)
+const BIRTHDAY_PNG_PATH = path.join(process.cwd(), "public", "plantilla-cumpleanos.png")
+const BIRTHDAY_PDF_PATH = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
 
-  const loadingTask = pdfjsLib.getDocument({ data: uint8Array })
-  const pdfDoc = await loadingTask.promise
+let cachedImage: { buffer: Buffer; type: "image/png" | "application/pdf"; filename: string } | null = null
 
-  const page = await pdfDoc.getPage(1)
-  const viewport = page.getViewport({ scale })
+export async function getBirthdayImage(): Promise<{ buffer: Buffer; type: "image/png" | "application/pdf"; filename: string } | null> {
+  if (cachedImage) return cachedImage
 
-  const width = Math.floor(viewport.width)
-  const height = Math.floor(viewport.height)
-
-  const canvas = createCanvas(width, height)
-  const ctx = canvas.getContext("2d")
-
-  // Fondo blanco
-  ctx.fillStyle = "white"
-  ctx.fillRect(0, 0, width, height)
-
-  // Renderizar la página del PDF en el canvas
-  const renderContext = {
-    canvasContext: ctx as any,
-    viewport,
+  // Preferir PNG si existe
+  if (fs.existsSync(BIRTHDAY_PNG_PATH)) {
+    const buffer = fs.readFileSync(BIRTHDAY_PNG_PATH)
+    cachedImage = { buffer, type: "image/png", filename: "Feliz Cumpleaños.png" }
+    return cachedImage
   }
 
-  await page.render(renderContext).promise
-
-  // Convertir a PNG buffer
-  const pngBuffer = canvas.toBuffer("image/png")
-  return Buffer.from(pngBuffer)
-}
-
-/**
- * Convierte el PDF de cumpleaños a imagen PNG.
- * Cachea el resultado para no reconvertir cada vez.
- */
-let cachedBirthdayImage: Buffer | null = null
-
-export async function getBirthdayImage(): Promise<Buffer | null> {
-  if (cachedBirthdayImage) return cachedBirthdayImage
-
-  const pdfPath = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
-  if (!fs.existsSync(pdfPath)) {
-    console.warn("PDF de cumpleaños no encontrado:", pdfPath)
-    return null
+  // Fallback al PDF
+  if (fs.existsSync(BIRTHDAY_PDF_PATH)) {
+    const buffer = fs.readFileSync(BIRTHDAY_PDF_PATH)
+    cachedImage = { buffer, type: "application/pdf", filename: "Feliz Cumpleaños.pdf" }
+    return cachedImage
   }
 
-  try {
-    cachedBirthdayImage = await pdfToImage(pdfPath, 2.5)
-    return cachedBirthdayImage
-  } catch (err) {
-    console.error("Error convirtiendo PDF a imagen:", err)
-    return null
-  }
+  console.warn("No se encontró archivo de imagen de cumpleaños en public/")
+  return null
 }

@@ -9,9 +9,6 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: [
-    "@napi-rs/canvas"
-  ],
 };
 
 export default withPWA(nextConfig);
