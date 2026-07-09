@@ -15,7 +15,7 @@ app.use(express.json())
 // Multer: almacenar archivos en memoria (Buffer)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 64 * 1024 * 1024 }, // 64MB max
+  limits: { fileSize: 150 * 1024 * 1024 }, // 150MB max
 })
 
 const waService = new WhatsAppService()

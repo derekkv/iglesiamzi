@@ -49,6 +49,15 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   configuraciones_globales: {
     modules: ["administracion"],
   },
+  configuraciones_mes: {
+    modules: "any",
+    requireEditForWrite: true,
+  },
+  acceso_restringido: {
+    modules: "any",
+    requireEditForWrite: true,
+    requireAdminForDelete: true,
+  },
   meses: {
     modules: "any",
     requireEditForWrite: true,
@@ -56,6 +65,14 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === FINANCIERO (muy sensible) ===
   nomina: {
+    modules: ["flujo_pago"],
+    requireAdminForDelete: true,
+  },
+  payment_tables: {
+    modules: ["flujo_pago"],
+    requireAdminForDelete: true,
+  },
+  payment_rows: {
     modules: ["flujo_pago"],
     requireAdminForDelete: true,
   },
@@ -70,6 +87,9 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   diezmos: {
     modules: ["diezmos"],
     requireAdminForDelete: true,
+  },
+  alfoli: {
+    modules: ["administracion", "control_mensual"],
   },
   ofrendas_celulas: {
     modules: ["ofrenda-celulas"],
@@ -108,10 +128,10 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === DATOS PERSONALES ===
   censo: {
-    modules: ["censo", "bautizo", "matrimonio", "celulas"],
+    modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion"],
   },
   censo_mdg: {
-    modules: ["censo-mdg"],
+    modules: ["censo-mdg", "cumpleanos-comunicacion"],
   },
   censo_catalogos: {
     modules: ["censo", "censo-mdg"],
@@ -174,6 +194,12 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "requerimientos-herederos", "requerimientos-redil", "requerimientos-comunicacion",
       "requerimientos-jovenes", "requerimientos-hombres", "requerimientos-pastoral",
     ],
+  },
+
+  // === CUMPLEAÑOS ===
+  cumpleanos_enviados: {
+    modules: ["cumpleanos-comunicacion"],
+    requireEditForWrite: false,
   },
 
   // === AUDITORÍA (solo lectura + insert, nunca delete/update) ===
