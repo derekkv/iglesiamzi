@@ -9,9 +9,11 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@types/multer": "^2.2.0",
     "@whiskeysockets/baileys": "^6.7.16",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "multer": "^2.2.0",
     "pino": "^9.6.0",
     "qrcode": "^1.5.4"
   },

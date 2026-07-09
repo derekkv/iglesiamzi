@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
     const accessCheck = checkTableAccess(table, modules, operation, canEditTable, canAdminTable)
 
     if (!accessCheck.allowed) {
+      console.log(`[/api/db] 403 DENIED — user: ${userId}, table: ${table}, action: ${action}, reason: ${accessCheck.reason}, modules: [${modules.join(", ")}]`)
       return NextResponse.json(
         { error: `Acceso denegado: ${accessCheck.reason}` },
         { status: 403 }

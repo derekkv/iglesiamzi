@@ -32,6 +32,11 @@ import {
   Loader2,
   Users,
   Search,
+  Paperclip,
+  Image,
+  Video,
+  Music,
+  X,
 } from "lucide-react"
 import { getAllUsers } from "@/lib/admin"
 import { formatPhoneForWhatsApp, formatPhoneDisplay } from "@/lib/format-phone"
@@ -81,11 +86,15 @@ export function WhatsAppTab() {
   const [message, setMessage] = useState("")
   const [selectedUserId, setSelectedUserId] = useState("")
   const [searchFilter, setSearchFilter] = useState("")
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
 
   // Formulario envío masivo
   const [bulkMessage, setBulkMessage] = useState("")
   const [bulkResults, setBulkResults] = useState<SendResult[]>([])
   const [isSendingBulk, setIsSendingBulk] = useState(false)
+  const [bulkMediaFile, setBulkMediaFile] = useState<File | null>(null)
+  const [bulkMediaPreview, setBulkMediaPreview] = useState<string | null>(null)
 
   // Usuarios registrados con teléfono
   const [usersWithPhone, setUsersWithPhone] = useState<RegisteredUser[]>([])
@@ -218,6 +227,49 @@ export function WhatsAppTab() {
     }
   }
 
+  // Manejo de archivos media
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>, target: "single" | "bulk") => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (target === "single") {
+      setMediaFile(file)
+      if (file.type.startsWith("image/")) {
+        const url = URL.createObjectURL(file)
+        setMediaPreview(url)
+      } else {
+        setMediaPreview(null)
+      }
+    } else {
+      setBulkMediaFile(file)
+      if (file.type.startsWith("image/")) {
+        const url = URL.createObjectURL(file)
+        setBulkMediaPreview(url)
+      } else {
+        setBulkMediaPreview(null)
+      }
+    }
+  }
+
+  const clearMedia = (target: "single" | "bulk") => {
+    if (target === "single") {
+      setMediaFile(null)
+      if (mediaPreview) URL.revokeObjectURL(mediaPreview)
+      setMediaPreview(null)
+    } else {
+      setBulkMediaFile(null)
+      if (bulkMediaPreview) URL.revokeObjectURL(bulkMediaPreview)
+      setBulkMediaPreview(null)
+    }
+  }
+
+  const getMediaIcon = (file: File) => {
+    if (file.type.startsWith("image/")) return <Image className="w-4 h-4" />
+    if (file.type.startsWith("video/")) return <Video className="w-4 h-4" />
+    if (file.type.startsWith("audio/")) return <Music className="w-4 h-4" />
+    return <Paperclip className="w-4 h-4" />
+  }
+
   const handleConnect = async () => {
     setIsConnecting(true)
     try {
@@ -273,8 +325,8 @@ export function WhatsAppTab() {
   }
 
   const handleSendMessage = async () => {
-    if (!phone.trim() || !message.trim()) {
-      toast.error("Ingrese número y mensaje")
+    if (!phone.trim() || (!message.trim() && !mediaFile)) {
+      toast.error("Ingrese número y mensaje o adjunte un archivo")
       return
     }
 
@@ -282,17 +334,41 @@ export function WhatsAppTab() {
 
     setIsSending(true)
     try {
-      const res = await authFetch("/api/whatsapp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: formattedPhone, message: message.trim() }),
-      })
-      const data: { success: boolean; error?: string } = await res.json()
-      if (data.success) {
-        toast.success(`Mensaje enviado a ${formatPhoneDisplay(phone)}`)
-        setMessage("")
+      if (mediaFile) {
+        // Enviar con media via FormData
+        const formData = new FormData()
+        formData.append("phone", formattedPhone)
+        formData.append("file", mediaFile)
+        if (message.trim()) formData.append("caption", message.trim())
+
+        const token = localStorage.getItem("authToken")
+        const res = await fetch("/api/whatsapp/send-media", {
+          method: "POST",
+          headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+          body: formData,
+        })
+        const data: { success: boolean; error?: string } = await res.json()
+        if (data.success) {
+          toast.success(`Media enviado a ${formatPhoneDisplay(phone)}`)
+          setMessage("")
+          clearMedia("single")
+        } else {
+          toast.error(data.error || "Error al enviar media")
+        }
       } else {
-        toast.error(data.error || "Error al enviar mensaje")
+        // Enviar solo texto
+        const res = await authFetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: formattedPhone, message: message.trim() }),
+        })
+        const data: { success: boolean; error?: string } = await res.json()
+        if (data.success) {
+          toast.success(`Mensaje enviado a ${formatPhoneDisplay(phone)}`)
+          setMessage("")
+        } else {
+          toast.error(data.error || "Error al enviar mensaje")
+        }
       }
     } catch {
       toast.error("Error de conexión")
@@ -302,8 +378,8 @@ export function WhatsAppTab() {
   }
 
   const handleSendBulk = async () => {
-    if (selectedBulkUsers.size === 0 || !bulkMessage.trim()) {
-      toast.error("Seleccione al menos un usuario y escriba un mensaje")
+    if (selectedBulkUsers.size === 0 || (!bulkMessage.trim() && !bulkMediaFile)) {
+      toast.error("Seleccione al menos un usuario y escriba un mensaje o adjunte un archivo")
       return
     }
 
@@ -316,24 +392,49 @@ export function WhatsAppTab() {
       return
     }
 
-    if (!confirm(`¿Enviar mensaje a ${phones.length} contactos?`)) return
+    if (!confirm(`¿Enviar ${bulkMediaFile ? "media" : "mensaje"} a ${phones.length} contactos?`)) return
 
     setIsSendingBulk(true)
     setBulkResults([])
 
     try {
-      const res = await authFetch("/api/whatsapp/send-bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phones, message: bulkMessage.trim() }),
-      })
-      const data: { success: boolean; results?: SendResult[]; error?: string } = await res.json()
-      if (data.success) {
-        setBulkResults(data.results || [])
-        const sent = (data.results || []).filter((r) => r.success).length
-        toast.success(`${sent}/${phones.length} mensajes enviados`)
+      if (bulkMediaFile) {
+        // Envío masivo con media via FormData
+        const formData = new FormData()
+        formData.append("phones", JSON.stringify(phones))
+        formData.append("file", bulkMediaFile)
+        if (bulkMessage.trim()) formData.append("caption", bulkMessage.trim())
+
+        const token = localStorage.getItem("authToken")
+        const res = await fetch("/api/whatsapp/send-bulk-media", {
+          method: "POST",
+          headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+          body: formData,
+        })
+        const data: { success: boolean; results?: SendResult[]; error?: string } = await res.json()
+        if (data.success) {
+          setBulkResults(data.results || [])
+          const sent = (data.results || []).filter((r) => r.success).length
+          toast.success(`${sent}/${phones.length} media enviados`)
+          clearMedia("bulk")
+        } else {
+          toast.error(data.error || "Error al enviar media")
+        }
       } else {
-        toast.error(data.error || "Error al enviar mensajes")
+        // Envío masivo solo texto
+        const res = await authFetch("/api/whatsapp/send-bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phones, message: bulkMessage.trim() }),
+        })
+        const data: { success: boolean; results?: SendResult[]; error?: string } = await res.json()
+        if (data.success) {
+          setBulkResults(data.results || [])
+          const sent = (data.results || []).filter((r) => r.success).length
+          toast.success(`${sent}/${phones.length} mensajes enviados`)
+        } else {
+          toast.error(data.error || "Error al enviar mensajes")
+        }
       }
     } catch {
       toast.error("Error de conexión")
@@ -599,9 +700,52 @@ export function WhatsAppTab() {
                 rows={4}
               />
             </div>
+
+            {/* Adjuntar archivo media */}
+            <div className="grid gap-2">
+              <Label>Adjuntar Archivo (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors text-sm">
+                  <Paperclip className="w-4 h-4 text-gray-500" />
+                  <span className="text-gray-700">{mediaFile ? "Cambiar archivo" : "Seleccionar archivo"}</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                    onChange={(e) => handleMediaSelect(e, "single")}
+                  />
+                </label>
+                {mediaFile && (
+                  <Button variant="ghost" size="sm" onClick={() => clearMedia("single")}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              {mediaFile && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                  {mediaPreview ? (
+                    <img src={mediaPreview} alt="Preview" className="w-16 h-16 object-cover rounded" />
+                  ) : (
+                    <div className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded">
+                      {getMediaIcon(mediaFile)}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{mediaFile.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(mediaFile.size / 1024 / 1024).toFixed(2)} MB — {mediaFile.type}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-gray-500">
+                Soporta: imágenes, videos, audios y documentos (max 64MB)
+              </p>
+            </div>
+
             <Button
               onClick={handleSendMessage}
-              disabled={isSending || !phone.trim() || !message.trim()}
+              disabled={isSending || !phone.trim() || (!message.trim() && !mediaFile)}
               className="w-full"
             >
               {isSending ? (
@@ -704,6 +848,48 @@ export function WhatsAppTab() {
                 />
               </div>
 
+              {/* Adjuntar archivo media masivo */}
+              <div className="grid gap-2">
+                <Label>Adjuntar Archivo (opcional)</Label>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors text-sm">
+                    <Paperclip className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-700">{bulkMediaFile ? "Cambiar archivo" : "Seleccionar archivo"}</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                      onChange={(e) => handleMediaSelect(e, "bulk")}
+                    />
+                  </label>
+                  {bulkMediaFile && (
+                    <Button variant="ghost" size="sm" onClick={() => clearMedia("bulk")}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                {bulkMediaFile && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                    {bulkMediaPreview ? (
+                      <img src={bulkMediaPreview} alt="Preview" className="w-16 h-16 object-cover rounded" />
+                    ) : (
+                      <div className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded">
+                        {getMediaIcon(bulkMediaFile)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{bulkMediaFile.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {(bulkMediaFile.size / 1024 / 1024).toFixed(2)} MB — {bulkMediaFile.type}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  El mismo archivo se enviará a todos los contactos seleccionados (max 64MB)
+                </p>
+              </div>
+
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                 <p className="text-sm text-yellow-800">
                   <strong>Nota:</strong> Los mensajes se envían con intervalos aleatorios (1-3 seg) para
@@ -713,7 +899,7 @@ export function WhatsAppTab() {
 
               <Button
                 onClick={handleSendBulk}
-                disabled={isSendingBulk || selectedBulkUsers.size === 0 || !bulkMessage.trim()}
+                disabled={isSendingBulk || selectedBulkUsers.size === 0 || (!bulkMessage.trim() && !bulkMediaFile)}
                 className="w-full"
               >
                 {isSendingBulk ? (

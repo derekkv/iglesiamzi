@@ -216,6 +216,74 @@ export class WhatsAppService {
     return result!
   }
 
+  async sendMedia(
+    phone: string,
+    mediaBuffer: Buffer,
+    mediaType: "image" | "video" | "audio" | "document",
+    caption?: string,
+    mimetype?: string,
+    fileName?: string
+  ): Promise<proto.WebMessageInfo> {
+    if (!this.socket || !this.status.connected) {
+      throw new Error("WhatsApp no está conectado")
+    }
+
+    const cleanPhone = this.formatPhoneNumber(phone)
+    const jid = cleanPhone.includes("@s.whatsapp.net")
+      ? cleanPhone
+      : `${cleanPhone}@s.whatsapp.net`
+
+    let messageContent: any
+
+    switch (mediaType) {
+      case "image":
+        messageContent = { image: mediaBuffer, caption: caption || undefined, mimetype: mimetype || "image/jpeg" }
+        break
+      case "video":
+        messageContent = { video: mediaBuffer, caption: caption || undefined, mimetype: mimetype || "video/mp4" }
+        break
+      case "audio":
+        messageContent = { audio: mediaBuffer, mimetype: mimetype || "audio/mpeg", ptt: true }
+        break
+      case "document":
+        messageContent = { document: mediaBuffer, mimetype: mimetype || "application/pdf", fileName: fileName || "archivo", caption: caption || undefined }
+        break
+      default:
+        throw new Error(`Tipo de media no soportado: ${mediaType}`)
+    }
+
+    const result = await this.socket.sendMessage(jid, messageContent)
+    console.log(`📤 Media (${mediaType}) enviado a ${cleanPhone}`)
+    return result!
+  }
+
+  async sendBulkMedia(
+    phones: string[],
+    mediaBuffer: Buffer,
+    mediaType: "image" | "video" | "audio" | "document",
+    caption?: string,
+    mimetype?: string,
+    fileName?: string
+  ): Promise<{ phone: string; success: boolean; error?: string; messageId?: string }[]> {
+    if (!this.socket || !this.status.connected) {
+      throw new Error("WhatsApp no está conectado")
+    }
+
+    const results: { phone: string; success: boolean; error?: string; messageId?: string }[] = []
+
+    for (const phone of phones) {
+      try {
+        const result = await this.sendMedia(phone, mediaBuffer, mediaType, caption, mimetype, fileName)
+        results.push({ phone, success: true, messageId: result.key.id || undefined })
+        await this.delay(1000 + Math.random() * 2000)
+      } catch (error: any) {
+        results.push({ phone, success: false, error: error.message })
+      }
+    }
+
+    return results
+  }
+
   async sendBulkMessages(
     phones: string[],
     message: string

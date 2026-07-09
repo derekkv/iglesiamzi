@@ -1,18 +1,18 @@
-# Documentación Completa del Proyecto - Iglesia Regalo de Dios
+# Documentacion Completa del Proyecto - Iglesia Regalo de Dios
 
-## 1. Información General
+## 1. Informacion General
 
 **Nombre:** Panel Administrativo Iglesia Regalo de Dios
-**URL Producción:** https://panel.iglesiaregalodedios.com
+**URL Produccion:** https://panel.iglesiaregalodedios.com
 **Supabase URL:** https://servidor.iglesiaregalodedios.com
-**Repositorio:** Se despliega vía GitHub Actions a un VPS
+**Repositorio:** Se despliega via GitHub Actions a un VPS
 
-### Stack Tecnológico
+### Stack Tecnologico
 - **Frontend:** Next.js 15.4.6 con React 19, TypeScript, Tailwind CSS 4
-- **UI Components:** Radix UI (Dialog, Select, Checkbox, Tabs, etc.) + shadcn/ui
-- **Backend:** Next.js API Routes (App Router)
+- **UI Components:** Radix UI (Dialog, Select, Checkbox, Tabs, AlertDialog, Label, Slot, Toast) + shadcn/ui
+- **Backend:** Next.js API Routes (App Router) + Middleware JWT
 - **Base de datos:** Supabase (PostgreSQL auto-hospedado)
-- **Autenticación:** Custom JWT (jose) + bcryptjs (NO usa Supabase Auth)
+- **Autenticacion:** Custom JWT (jose) + bcryptjs (NO usa Supabase Auth)
 - **Realtime:** Supabase Realtime (postgres_changes)
 - **WhatsApp:** Servidor Express separado con @whiskeysockets/baileys
 - **Email:** Nodemailer via SMTP Hostinger (notificaciones@iglesiaregalodedios.com)
@@ -20,23 +20,74 @@
 - **PWA:** next-pwa con service worker personalizado
 - **Charts:** Recharts
 - **PDF:** pdf-lib (certificados)
-- **Deploy:** GitHub Actions → SSH → VPS con PM2 (puerto 3712)
+- **Fonts:** Geist Sans + Geist Mono
+- **Toast:** Sonner
+- **Deploy:** GitHub Actions -> SSH -> VPS con PM2 (puerto 3712)
+
 
 ---
 
-## 2. Sistema de Autenticación
+## 2. Arquitectura de Seguridad (Secure DB Layer)
+
+### Capa de Base de Datos Segura (`lib/secure-db.ts`)
+El sistema implementa un **proxy seguro de base de datos** que reemplaza las llamadas directas a Supabase desde el frontend:
+
+```
+Frontend (db.from("tabla").select())
+    -> POST /api/db (con JWT en header Authorization)
+        -> Verificar JWT valido
+        -> Obtener permisos del usuario (user_permissions)
+        -> Verificar acceso a la tabla via module-table-map.ts
+        -> Ejecutar query con service_key (bypasa RLS)
+        -> Strippear campos bloqueados (password_hash)
+        -> Retornar resultado
+```
+
+**Uso:** Drop-in replacement para supabase. Importar `db` de `@/lib/secure-db` en vez de `supabase` de `@/lib/supabase`.
+
+### Module Table Map (`lib/module-table-map.ts`)
+Define que modulo(s) se necesitan para acceder a cada tabla:
+- `"any"` = cualquier usuario autenticado
+- `string[]` = necesita can_view en al menos uno de los modulos listados
+- `[]` (vacio) = inaccesible desde el cliente (solo server-side)
+
+Reglas adicionales por tabla:
+- `requireEditForWrite` — Si se necesita can_edit para INSERT/UPDATE
+- `requireAdminForDelete` — Si se necesita can_admin para DELETE
+- `blockedFields` — Campos que nunca se retornan al cliente
+
+### API Auth (`lib/api-auth.ts`)
+Verificacion de autenticacion en API routes. Soporta:
+1. **JWT del usuario** — via header `Authorization: Bearer <jwt>`
+2. **Secreto interno** — via header `X-Internal-Secret: <secret>` (server-to-server)
+3. **Token en body** — retrocompatibilidad con frontend legacy
+
+### Auth Fetch (`lib/auth-fetch.ts`)
+- `authFetch(url, options)` — Wrapper que automaticamente adjunta JWT desde localStorage
+- `getInternalHeaders()` — Headers para llamadas server-to-server con INTERNAL_API_SECRET
+
+
+---
+
+## 3. Sistema de Autenticacion
 
 ### Flujo de Login
-1. El usuario envía credenciales a `POST /api/login`
+1. El usuario envia credenciales a `POST /api/login`
 2. Se busca en tabla `users` por username, email o phone
 3. Se verifica password con bcrypt
-4. Se genera un JWT (HS256, 24h de expiración) con `jose`
-5. El token se almacena en `localStorage` del cliente
+4. Se genera un JWT (HS256, 24h de expiracion) con `jose`
+5. El token se almacena en `localStorage` del cliente Y como cookie `authToken`
 6. Al cargar la app, `AuthContext` valida el token via `POST /api/verify-session`
 
-### Rate Limiting
-- Máximo 5 intentos por IP en 15 minutos
-- Se limpia automáticamente la memoria cada 5 minutos
+### Middleware de Rutas (`middleware.ts`)
+Next.js middleware que protege todas las rutas bajo `/dashboard`:
+- Verifica la cookie `authToken` con `jwtVerify` de jose
+- Si no hay cookie o es invalida, redirige a `/login?from=<ruta>`
+- Limpia la cookie si el token es invalido/expirado
+
+### Rate Limiting (Login)
+- Maximo 5 intentos por IP en 15 minutos
+- Se limpia automaticamente la memoria cada 5 minutos
 
 ### Estructura del Token JWT
 ```typescript
@@ -51,107 +102,122 @@
 }
 ```
 
-
 ### Tabla `users`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | UUID | PK |
 | account_type | text | "personal" o "ministerio" |
-| username | text | Único |
+| username | text | Unico |
 | password_hash | text | bcrypt hash |
 | displayName | text | Nombre visible |
 | email | text | Opcional, para notificaciones |
 | phone | text | Opcional, para WhatsApp |
-| cedula | text | Cédula de identidad |
+| cedula | text | Cedula de identidad |
 | ministerio_name | text | Solo para cuentas tipo ministerio |
-| is_active | boolean | Si el usuario está habilitado |
-| created_by | UUID | Quién lo creó |
-| created_at | timestamptz | Fecha creación |
+| is_active | boolean | Si el usuario esta habilitado |
+| created_by | UUID | Quien lo creo |
+| created_at | timestamptz | Fecha creacion |
 
-### Seguridad RLS
+### Seguridad de Acceso a Datos
 - La tabla `users` tiene RLS habilitado
-- Existe una vista `users_safe` que excluye `password_hash`
-- El login server-side usa una `SUPABASE_SERVICE_KEY` con acceso completo
-- El cliente usa la `anon key` con políticas RLS permisivas
+- El campo `password_hash` NUNCA se retorna al cliente (blockedFields en module-table-map)
+- El login y cambio de password usan `supabaseServer` (service_key) exclusivamente server-side
+- El endpoint `/api/user-profile` permite GET/PUT del perfil sin exponer password
+- El endpoint `/api/change-password` valida password actual antes de actualizar
+
+### Clientes Supabase:
+1. `supabase` (`lib/supabase.ts`) — Cliente con anon key (legacy, en desuso progresivo)
+2. `db` (`lib/secure-db.ts`) — Proxy seguro via /api/db (recomendado para frontend)
+3. `supabaseServer` (`lib/supabase-server.ts`) — Service role key, SOLO en API routes
+
 
 ---
 
-## 3. Sistema de Roles y Permisos
+## 4. Sistema de Roles y Permisos
 
 ### Arquitectura de Permisos
-El sistema NO usa roles fijos. Usa un sistema de **permisos granulares por módulo**:
+El sistema NO usa roles fijos. Usa un sistema de **permisos granulares por modulo**:
 
 #### Tablas clave:
-- `module_groups` — Grupos de módulos (ej: "protocolo", "administracion", "discipulado", "mdg")
-- `system_modules` — Módulos individuales del sistema
-- `user_permissions` — Relación usuario↔módulo con permisos
-- `user_group_leaders` — Líderes de grupo (rol especial)
+- `module_groups` — Grupos de modulos (ej: "protocolo", "administracion", "comunicacion", "jovenes")
+- `system_modules` — Modulos individuales del sistema
+- `user_permissions` — Relacion usuario<->modulo con permisos
+- `user_group_leaders` — Lideres de grupo (rol especial)
+- `acceso_restringido` — Control de acceso adicional para modulos sensibles (ej: nomina)
 
 ### Tabla `module_groups`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | UUID | PK |
-| name | text | Identificador (protocolo, administracion, etc.) |
+| name | text | Identificador (protocolo, administracion, comunicacion, jovenes, hombres, pastoral, etc.) |
 | display_name | text | Nombre visible |
 | icon | text | Emoji del grupo |
-| image | text | URL imagen opcional |
-| sort_order | int | Orden de visualización |
+| image | text | URL imagen (/NombreGrupo.jpeg) |
+| sort_order | int | Orden de visualizacion |
 
 ### Tabla `system_modules`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | UUID | PK |
-| name | text | Identificador único (ej: "cronograma-protocolo") |
+| name | text | Identificador unico (ej: "cronograma-protocolo") |
 | display_name | text | Nombre visible |
-| description | text | Descripción del módulo |
+| description | text | Descripcion del modulo |
 | icon | text | Emoji |
 | route | text | Ruta del dashboard (ej: "/dashboard/cronograma-protocolo") |
 | requires_active_month | boolean | Si necesita un mes activo |
-| is_active | boolean | Si el módulo está habilitado |
+| is_active | boolean | Si el modulo esta habilitado |
 | group_id | UUID FK | Grupo al que pertenece |
 | sort_order | int | Orden |
 
 ### Tabla `user_permissions`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | user_id | UUID FK | Usuario |
-| module_id | UUID FK | Módulo |
-| can_view | boolean | Puede ver el módulo |
+| module_id | UUID FK | Modulo |
+| can_view | boolean | Puede ver el modulo |
 | can_edit | boolean | Puede editar contenido |
 | can_admin | boolean | Permisos administrativos |
-| granted_by | UUID | Quién otorgó el permiso |
+| granted_by | UUID | Quien otorgo el permiso |
 | UNIQUE | (user_id, module_id) | |
 
 ### Tabla `user_group_leaders`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | user_id | UUID FK | Usuario |
-| group_id | UUID FK | Grupo del que es líder |
-| granted_by | UUID | Quién lo asignó |
+| group_id | UUID FK | Grupo del que es lider |
+| granted_by | UUID | Quien lo asigno |
 | UNIQUE | (user_id, group_id) | |
 
+### Tabla `acceso_restringido`
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| id | int | PK |
+| modulo | text | Nombre del modulo restringido (ej: "nomina") |
+| user_id | UUID FK | Usuario con acceso |
+
 ### Niveles de acceso efectivo:
-1. **can_view** — Puede ver el módulo en el dashboard y acceder a él
-2. **can_edit** — Puede crear/editar/eliminar datos dentro del módulo
-3. **can_admin** — Permisos especiales de administración
-4. **canLeader** — Si es líder del grupo, automáticamente tiene can_edit en todos los módulos del grupo
+1. **can_view** — Puede ver el modulo en el dashboard y acceder a el
+2. **can_edit** — Puede crear/editar/eliminar datos dentro del modulo
+3. **can_admin** — Permisos especiales de administracion
+4. **canLeader** — Si es lider del grupo, automaticamente tiene can_edit en todos los modulos del grupo
+5. **acceso_restringido** — Capa adicional para sub-modulos sensibles (ej: nomina dentro de flujo-pago)
 
 ### PermissionsGuard (Frontend)
-El componente `PermissionsGuard` en `lib/permissions-guard.tsx` protege cada página:
-- Verifica que el usuario tenga `can_view` en el módulo
+El componente `PermissionsGuard` en `lib/permissions-guard.tsx` protege cada pagina:
+- Verifica que el usuario tenga `can_view` en el modulo
 - Pasa `canEdit`, `canAdmin` y `canLeader` como props al componente hijo
 - Si no tiene permiso, redirige al dashboard con un toast de error
 
 
 ---
 
-## 4. Sistema de Doble Vista (Vista/Edición)
+## 5. Sistema de Doble Vista (Vista/Edicion)
 
-Cada módulo del dashboard tiene dos modos de operación:
-- **Vista (can_view):** El usuario puede ver la información pero no modificarla
-- **Edición (can_edit):** El usuario puede crear, editar y eliminar registros
+Cada modulo del dashboard tiene dos modos de operacion:
+- **Vista (can_view):** El usuario puede ver la informacion pero no modificarla
+- **Edicion (can_edit):** El usuario puede crear, editar y eliminar registros
 
-El patrón se implementa así:
+El patron se implementa asi:
 ```tsx
 <PermissionsGuard moduleName="cronograma-protocolo">
   {(canEdit, canAdmin, canLeader) => (
@@ -164,20 +230,20 @@ Dentro del componente, los botones de crear/editar/eliminar se ocultan si `canEd
 
 ---
 
-## 5. Sistema de Meses (Control Mensual)
+## 6. Sistema de Meses (Control Mensual)
 
 ### Concepto
 El sistema opera en periodos mensuales. Un "mes" es una unidad temporal que:
 - Tiene fecha de inicio y fin
 - Puede estar "active" o "closed"
-- Los módulos que requieren mes activo no funcionan sin uno abierto
+- Los modulos que requieren mes activo no funcionan sin uno abierto
 
 ### Tabla `meses`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | text | PK (formato: "YYYY-M-timestamp") |
 | name | text | "Enero 2025", etc. |
-| year | int | Año |
+| year | int | Ano |
 | month | int | Mes (1-12) |
 | start_date | text | Fecha inicio |
 | end_date | text | Fecha cierre (null si activo) |
@@ -186,75 +252,83 @@ El sistema opera en periodos mensuales. Un "mes" es una unidad temporal que:
 ### Tablas asociadas al mes:
 - `ingresos` — Ingresos financieros
 - `egresos` — Egresos financieros
-- `diezmos` — Registro de diezmos
+- `diezmos` — Registro de diezmos/primicias/ofrendas especiales
+- `nomina` — Registros de nomina mensual
 - `asistencia_detalles` / `asistencia_columnas` / `asistencia_datos` — Asistencia general
 - `discipulado_participantes` / `discipulado_fechas` / `discipulado_asistencia` — Discipulado por mes
-- `configuraciones_mes` — Ministerios, categorías y detalles del mes
+- `configuraciones_mes` — Ministerios, categorias y detalles del mes
 
 ### MonthContext (Frontend)
-Provee el mes activo a toda la app y métodos para:
+Provee el mes activo a toda la app y metodos para:
 - Iniciar nuevo mes
 - Cerrar mes actual
 - Editar fechas
 - Eliminar mes
 
+
 ---
 
-## 6. Sistema de Notificaciones (Multicanal)
+## 7. Sistema de Notificaciones (Multicanal)
 
-### Canales de notificación:
-1. **Buzón interno** — Tabla `buzon_mensajes` (con Realtime)
+### Canales de notificacion:
+1. **Buzon interno** — Tabla `buzon_mensajes` (con Realtime)
 2. **Push notifications** — Web Push via VAPID keys
 3. **Email** — SMTP via Hostinger (nodemailer)
 4. **WhatsApp** — Servidor Baileys separado
 
-### Buzón de Mensajes (`buzon_mensajes`)
-| Campo | Tipo | Descripción |
+### Buzon de Mensajes (`buzon_mensajes`)
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | bigserial | PK |
 | user_id | UUID FK | Destinatario |
-| titulo | varchar(200) | Título |
+| titulo | varchar(200) | Titulo |
 | mensaje | text | Contenido |
 | tipo | varchar(50) | info, requerimiento, aprobado, negado, suspenso |
-| leido | boolean | Si fue leído |
+| leido | boolean | Si fue leido |
 | referencia_tipo | varchar(50) | Tipo de recurso relacionado |
 | referencia_id | bigint | ID del recurso |
 
 ### Push Notifications
 - Tabla `push_subscriptions` almacena endpoints y keys por usuario
 - Service Worker en `worker/index.js` maneja eventos push
-- VAPID keys: Público y privado configurados en el cron
+- VAPID keys configurados en el cron
+- `PushNotificationPrompt` componente global que pide permiso al usuario
 
 ### Hook `useNotificaciones`
-- Carga mensajes del buzón del usuario actual
+- Carga mensajes del buzon del usuario actual
 - Se suscribe a Realtime para nuevos mensajes
-- Permite marcar como leído
-- `enviarNotificacion()` — Envía al buzón + push
+- Permite marcar como leido
+- `enviarNotificacion()` — Envia al buzon + push
 - `notificarAdmins()` — Notifica a todos los usuarios del grupo "administracion"
 
+### Componentes globales de notificacion:
+- `NotificacionModal` — Modal que aparece con nuevas notificaciones
+- `BuzonNotificaciones` — Panel de notificaciones en el dashboard
+- `ServiceAcknowledgeModal` — Modal de acuse de recibo para servicios asignados
+- `ServiceAlertModal` — Modal de alertas de servicio
 
 ---
 
-## 7. Sistema de Email
+## 8. Sistema de Email
 
-### Configuración SMTP
+### Configuracion SMTP
 - **Host:** smtp.hostinger.com (puerto 465, SSL)
 - **From:** notificaciones@iglesiaregalodedios.com
 - **Archivo:** `lib/mod/email-service.ts`
 
 ### Tipos de email:
 1. **asignacion** — "Nuevo Servicio Asignado" (azul)
-2. **alerta2** — "Tu servicio es en 5 días" (naranja/amarillo)
-3. **alerta1** — "¡Mañana tienes servicio!" (rojo)
+2. **alerta2** — "Tu servicio es en 5 dias" (naranja/amarillo)
+3. **alerta1** — "Manana tienes servicio!" (rojo)
 
 ### Flujo:
-- Se envía vía `POST /api/send-email` 
+- Se envia via `POST /api/send-email`
 - El body incluye: `to`, `type`, `data` (userName, asignacion, fecha, horaEntrada, modulo, ministerio, evento)
-- El email es HTML responsive con diseño profesional
+- El email es HTML responsive con diseno profesional
 
 ---
 
-## 8. Sistema de WhatsApp
+## 9. Sistema de WhatsApp
 
 ### Arquitectura
 El WhatsApp funciona como un **microservicio separado**:
@@ -263,95 +337,104 @@ El WhatsApp funciona como un **microservicio separado**:
 whatsapp-server/           (Express, puerto 3100)
 ├── src/
 │   ├── index.ts          — Endpoints REST
-│   └── whatsapp-service.ts — Conexión con Baileys
+│   └── whatsapp-service.ts — Conexion con Baileys
 ├── auth_info/            — Credenciales guardadas (multi-file auth state)
 ```
 
-### Conexión
-- Usa `@whiskeysockets/baileys` (conexión directa, NO la API oficial de Meta)
+### Conexion
+- Usa `@whiskeysockets/baileys` (conexion directa, NO la API oficial de Meta)
 - Requiere escanear QR desde el frontend la primera vez
-- Las credenciales se guardan en `auth_info/` y reconecta automáticamente
-- Máximo 5 reintentos de conexión antes de detenerse
+- Las credenciales se guardan en `auth_info/` y reconecta automaticamente
+- Maximo 5 reintentos de conexion antes de detenerse
 
 ### Endpoints del servidor WhatsApp:
-| Método | Ruta | Descripción |
+| Metodo | Ruta | Descripcion |
 |--------|------|-------------|
-| GET | /api/whatsapp/status | Estado de conexión |
+| GET | /api/whatsapp/status | Estado de conexion |
 | GET | /api/whatsapp/qr | QR code base64 |
-| POST | /api/whatsapp/connect | Iniciar conexión |
+| POST | /api/whatsapp/connect | Iniciar conexion |
 | POST | /api/whatsapp/disconnect | Desconectar |
 | POST | /api/whatsapp/send | Enviar mensaje (phone + message) |
-| POST | /api/whatsapp/send-bulk | Envío masivo (phones[] + message) |
-| POST | /api/whatsapp/logout | Cerrar sesión (borra credenciales) |
+| POST | /api/whatsapp/send-bulk | Envio masivo (phones[] + message) |
+| POST | /api/whatsapp/logout | Cerrar sesion (borra credenciales) |
 
 ### Proxy en Next.js
-El frontend llama a `/api/whatsapp/send` → Next.js API Route → redirige al servidor Express en `WA_SERVER_URL`
+El frontend llama a `/api/whatsapp/send` -> Next.js API Route -> redirige al servidor Express en `WA_SERVER_URL`
 
-### Formato de teléfonos (Ecuador)
-- `0980932062` → `593980932062`
-- `+593980932062` → `593980932062`
-- `593980932062` → sin cambio
+### Formato de telefonos (Ecuador)
+- `0980932062` -> `593980932062`
+- `+593980932062` -> `593980932062`
+- `593980932062` -> sin cambio
 - Anti-ban: delay aleatorio de 1-3s entre mensajes masivos
+
+### Tab de WhatsApp en Administracion
+El panel de administracion tiene un tab dedicado (`WhatsAppTab.tsx`) para:
+- Ver estado de conexion
+- Escanear QR
+- Enviar mensajes de prueba
+- Enviar mensajes masivos a usuarios seleccionados
 
 ### Historial
 Tabla `whatsapp_messages` registra cada mensaje enviado con status (sent/failed).
 
+
 ---
 
-## 9. Sistema de Cronogramas de Servicio
+## 10. Sistema de Cronogramas de Servicio
 
 ### Tabla `cronograma_servicio`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | serial | PK |
 | user_id | UUID FK | Servidor asignado |
 | user_name | text | Nombre del servidor |
 | asignacion | text | Rol/lugar asignado |
 | fecha | date | Fecha del servicio |
-| modulo | text | protocolo, administracion, discipulado, mdg, etc. |
+| modulo | text | protocolo, administracion, discipulado, comunicacion, jovenes, hombres, pastoral, mdg, etc. |
 | ministerio | text | Ministerio (opcional) |
 | evento | text | Evento (opcional) |
 | hora_entrada | text | Hora esperada |
 | hora_llegada | text | Hora real de llegada |
-| atraso | boolean | Si llegó tarde |
-| acuse_asignacion | boolean | Confirmó recepción |
-| acuse_alerta2 | boolean | Confirmó alerta 5 días |
-| acuse_alerta1 | boolean | Confirmó alerta 1 día |
-| alerta2_enviada | boolean | Flag de envío |
-| alerta1_enviada | boolean | Flag de envío |
+| atraso | boolean | Si llego tarde |
+| acuse_asignacion | boolean | Confirmo recepcion |
+| acuse_alerta2 | boolean | Confirmo alerta 5 dias |
+| acuse_alerta1 | boolean | Confirmo alerta 1 dia |
+| alerta2_enviada | boolean | Flag de envio |
+| alerta1_enviada | boolean | Flag de envio |
 | email_*_enviado | boolean | Flags de email por tipo |
 | whatsapp_*_enviado | boolean | Flags de WhatsApp por tipo |
 
-### Flujo al crear asignación:
-1. Validar que el usuario NO esté asignado el mismo día en ningún módulo
+### Flujo al crear asignacion:
+1. Validar que el usuario NO este asignado el mismo dia en ningun modulo
 2. Insertar en `cronograma_servicio`
-3. Enviar notificación multicanal:
-   - Buzón interno
+3. Enviar notificacion multicanal:
+   - Buzon interno
    - Push notification
    - Email (si tiene correo)
-   - WhatsApp (si tiene teléfono)
-4. Marcar flags de envío
+   - WhatsApp (si tiene telefono)
+4. Marcar flags de envio
 
 ### Sistema de Alertas (Cron)
 Endpoint: `GET /api/cron-reminders` (protegido con Bearer token)
 
-Se ejecuta periódicamente y procesa:
-- **Alerta 2:** Servicios en exactamente 5 días (sin enviar aún)
-- **Alerta 1:** Servicios mañana (sin enviar aún)
+Se ejecuta periodicamente y procesa:
+- **Alerta 2:** Servicios en exactamente 5 dias (sin enviar aun)
+- **Alerta 1:** Servicios manana (sin enviar aun)
 
 Para cada servicio pendiente:
-1. Envía al buzón interno
-2. Envía push notification
-3. Envía email
-4. Envía WhatsApp
+1. Envia al buzon interno
+2. Envia push notification
+3. Envia email
+4. Envia WhatsApp
 5. Marca flags en la base de datos
 
 ### Sistema de Acuse de Recibo
-Los servidores deben confirmar que recibieron la notificación:
+Los servidores deben confirmar que recibieron la notificacion:
 - `markAcknowledgment(id, tipo)` — Marca acuse con timestamp
 - `getPendingAcknowledgments(userId)` — Obtiene servicios sin confirmar
+- `ServiceAcknowledgeModal` — Modal global que muestra servicios pendientes de confirmar
 
-### Módulos de cronograma existentes:
+### Modulos de cronograma existentes:
 - cronograma-protocolo
 - cronograma-administracion
 - cronograma-discipulado
@@ -360,198 +443,260 @@ Los servidores deben confirmar que recibieron la notificación:
 - cronograma-intercesion
 - cronograma-herederos
 - cronograma-redil
+- cronograma-comunicacion
+- cronograma-jovenes
+- cronograma-hombres
+- cronograma-pastoral
+
+### Componente reutilizable: `CronogramaServicio`
+Componente compartido (`components/CronogramaServicio.tsx`) que recibe `modulo` como prop y renderiza todo el CRUD del cronograma para cualquier ministerio.
 
 
 ---
 
-## 10. Módulos del Sistema
+## 11. Modulos del Sistema
 
-### 10.1 Ingresos y Egresos
+### 11.1 Ingresos y Egresos
 - **Tablas:** `ingresos`, `egresos`
 - **Campos:** mes_id, concepto, monto, fecha, ministerio, categoria_principal, detalle, observacion, estado
 - **Funcionalidad:** CRUD completo vinculado al mes activo
-- **Auditoría:** Cada operación se registra en `audit_logs`
+- **Auditoria:** Cada operacion se registra en `audit_logs`
 
-### 10.2 Diezmos
+### 11.2 Diezmos
 - **Tabla:** `diezmos`
-- **Campos:** mes_id, numero (secuencial), fecha, donador, valor
-- **Funcionalidad:** Registro numerado de diezmos por mes
-- **Búsqueda:** Por donador y rango de fechas (cross-month)
+- **Campos:** mes_id, numero (secuencial), fecha, donador, valor, tipo_ofrenda, transaccion
+- **tipo_ofrenda:** "diezmo" | "primicia" | "ofrenda_especial"
+- **transaccion:** "efectivo" | "transferencia"
+- **Funcionalidad:** Registro numerado de diezmos/primicias/ofrendas por mes
+- **Busqueda:** Por donador y rango de fechas (cross-month)
 
-### 10.3 Asistencia General
+### 11.3 Asistencia General
 - **Tablas:** `asistencia_detalles` (filas), `asistencia_columnas` (fechas/columnas), `asistencia_datos` (valores)
-- **Estructura:** Tabla dinámica donde filas son categorías (ej: "Hombres", "Mujeres", "Niños") y columnas son fechas
-- **Detalle:** Cada celda contiene un valor numérico (cantidad de personas)
+- **Estructura:** Tabla dinamica donde filas son categorias (ej: "Hombres", "Mujeres", "Ninos") y columnas son fechas
+- **Detalle:** Cada celda contiene un valor numerico (cantidad de personas)
+- **updated_at:** Cada celda tiene timestamp de ultima actualizacion para security check individual
 - **Defaults:** Al crear un mes nuevo, se inicializan filas predeterminadas
 
-### 10.4 Discipulado (por mes)
-- **Tablas:** `discipulado_participantes`, `discipulado_fechas`, `discipulado_asistencia`
-- **Funcionalidad:** Control de asistencia de participantes por fecha
-- **Estados:** A (asistió), F (faltó), J (justificó), AT (atrasado)
-
-### 10.5 Discipulado por Ciclos (3 sub-módulos)
+### 11.4 Discipulado por Ciclos (3 sub-modulos)
 - **Tablas:** `discipulado_ciclos`, `discipulado_ciclo_participantes`, `discipulado_ciclo_fechas`, `discipulado_ciclo_asistencia`
 
-| Ciclo | Clases | Módulo |
+| Ciclo | Clases | Modulo |
 |-------|--------|--------|
 | Primeros pasos | 13 | discipulado_primeros_pasos |
 | Seguimos avanzando | 15 | discipulado_seguimos_avanzando |
 | Siendo iglesia | 11 | discipulado_siendo_iglesia |
 
-- **Ciclos:** Se inicia uno nuevo, el anterior se desactiva automáticamente
-- **Fechas:** Se calculan automáticamente como domingos consecutivos desde la fecha de inicio
+- **Ciclos:** Se inicia uno nuevo, el anterior se desactiva automaticamente
+- **Fechas:** Se calculan automaticamente como domingos consecutivos desde la fecha de inicio
 - **Cambio de fecha:** Si modificas una fecha, recalcula todas las posteriores como domingos consecutivos
 - **Participantes:** Tienen estatus: en_curso, aprobado, reprobado
-- **Historial:** Se puede ver el historial de ciclos cerrados
+- **Historial:** Se puede ver el historial de ciclos cerrados (modulo `historial-discipulado`)
 
-### 10.6 Censo (Protocolo)
+### 11.5 Censo (Protocolo)
 - **Tabla:** `censo`
-- **Campos extensos:** Datos personales (cédula, nombre, fecha nacimiento, tipo sangre, estado civil, sexo, discapacidad, teléfonos, dirección), datos iglesia (jornada, cargo, ministerio, discipulado, bautizo, matrimonio, membresía, célula, hijos)
-- **Catálogos:** Tabla `censo_catalogos` con opciones dinámicas por tipo
-- **Búsqueda:** Por cédula, nombre, parroquia, barrio
+- **Campos extensos:** Datos personales (cedula, nombre, fecha nacimiento, tipo sangre, estado civil, sexo, discapacidad, telefonos, direccion), datos iglesia (jornada, cargo, ministerio, discipulado, bautizo, matrimonio, membresia, celula, hijos)
+- **Catalogos:** Tabla `censo_catalogos` con opciones dinamicas por tipo
+- **Configuraciones:** Tabla `censo_configuraciones` para settings del censo
+- **Busqueda:** Por cedula, nombre, parroquia, barrio
 
-### 10.7 Censo MDG
+### 11.6 Censo MDG
 - **Tabla:** `censo_mdg` (misma estructura que censo)
-- **Comparte catálogos** con el censo principal
+- **Comparte catalogos** con el censo principal
 - **Campo adicional:** `nuevo_creyente`
+- **Servicio dedicado:** `lib/mod/censo-mdg-service.ts`
 
-### 10.8 Control de Asistencia de Servidores
+### 11.7 Control de Asistencia de Servidores
 - **Tabla:** `asistencia_servidores`
 - **Campos:** modulo, user_id, user_name, fecha, estado (asistio/falto/justifico/pendiente)
 - **Unique:** (modulo, user_id, fecha)
-- **Módulos:** Uno por cada ministerio (protocolo, mdg, administracion, discipulado, alabanza, intercesion, herederos, redil)
+- **Modulos:** Uno por cada ministerio:
+  - asistencia-servidores-protocolo
+  - asistencia-servidores-administracion
+  - asistencia-servidores-discipulado
+  - asistencia-servidores-mdg
+  - asistencia-servidores-alabanza
+  - asistencia-servidores-intercesion
+  - asistencia-servidores-herederos
+  - asistencia-servidores-redil
+  - asistencia-servidores-comunicacion
+  - asistencia-servidores-jovenes
+  - asistencia-servidores-hombres
+  - asistencia-servidores-pastoral
+- **Componente reutilizable:** `ControlAsistenciaServidores`
 
-### 10.9 Cronograma de Eventos General
+### 11.8 Cronograma de Eventos General
 - Cada grupo tiene su propio cronograma de eventos
-- Módulos: cronograma-eventos-protocolo, cronograma-eventos-administracion, etc.
+- **Componente reutilizable:** `CronogramaEventosGeneral`
+- Modulos: cronograma-eventos-protocolo, cronograma-eventos-administracion, cronograma-eventos-discipulado, cronograma-eventos-mdg, cronograma-eventos-alabanza, cronograma-eventos-intercesion, cronograma-eventos-herederos, cronograma-eventos-redil, cronograma-eventos-comunicacion, cronograma-eventos-jovenes, cronograma-eventos-hombres, cronograma-eventos-pastoral
 
-### 10.10 Bautizos
+### 11.9 Bautizos
 - **Tabla:** `bautizos`
 - **Campos:** numero (secuencial global), fecha, nombre_bautizado, nombre_padre, nombre_madre, padrinos, observacion
-- **Búsqueda:** Por nombre o rango de fechas
+- **Busqueda:** Por nombre o rango de fechas
+- **Certificados:** Generacion de PDF con `lib/generate-certificados.ts`
 
-### 10.11 Matrimonios
+### 11.10 Matrimonios
 - **Tabla:** `matrimonios`
 - **Campos:** numero (secuencial global), fecha, nombres_esposos, cedula_esposo, cedula_esposa, observacion
-- **Búsqueda:** Por nombre/cédula o rango de fechas
+- **Busqueda:** Por nombre/cedula o rango de fechas
 
-### 10.12 Inventario
+### 11.11 Inventario
 - **Tabla:** `inventory_items`
 - **Campos:** cantidad, codigo, detalle, numero_serie, ubicacion, ministerio, estado, fecha_registro
 - **Configuraciones:** Ministerios, ubicaciones, estados vienen de `configuraciones_globales`
 
-### 10.13 Flujo de Pago
-- **Tablas:** `payment_tables`, `payment_rows`
-- **Concepto:** Tablas dinámicas de pagos. Cada tabla tiene filas con: fecha, beneficiarios, detalle, valor
-- **CRUD completo** con auditoría
+### 11.12 Flujo de Pago y Nomina
+- **Tablas de Flujo:** `payment_tables`, `payment_rows`
+- **Tabla Nomina:** `nomina`
+- **Concepto Flujo:** Tablas dinamicas de pagos. Cada tabla tiene filas con: fecha, beneficiarios, detalle, valor
+- **Concepto Nomina:** Registro mensual de personal con sueldos, descuentos y quincenas
 
-### 10.14 Alfolí
+#### Tabla `nomina`
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| id | serial | PK |
+| mes_id | text FK | Mes asociado |
+| cedula | text | Cedula del empleado |
+| nombre | text | Nombre completo |
+| telefono | text | Telefono |
+| email | text | Email |
+| valor_sueldo | numeric | Sueldo base |
+| descuento | text | Tipo de descuento |
+| descuento_valor | numeric | Monto del descuento |
+| descuento_motivo | text | Razon del descuento |
+| valor_a_pagar | numeric | Sueldo - descuento |
+| categoria_principal | text | Categoria (default: "Pago de nomina") |
+| detalle | text | Detalle configurable |
+| primera_quincena_pagada | boolean | Si se pago 1ra quincena |
+| primera_quincena_valor | numeric | Monto 1ra quincena |
+| primera_quincena_fecha | text | Fecha de pago |
+| primera_quincena_metodo | text | Metodo de pago |
+| segunda_quincena_pagada | boolean | Si se pago 2da quincena |
+| segunda_quincena_valor | numeric | Monto 2da quincena |
+| segunda_quincena_fecha | text | Fecha de pago |
+| segunda_quincena_metodo | text | Metodo de pago |
+| created_at | timestamptz | Fecha creacion |
+
+- **Acceso restringido:** Nomina usa `useRestrictedAccess("nomina")` — solo usuarios en tabla `acceso_restringido` pueden verla
+- **Auto-calculo:** Las quincenas se calculan automaticamente como mitad del valor_a_pagar
+- **CRUD completo** con auditoria
+
+### 11.13 Alfoli
 - **Tabla:** `alfoli`
-- **Campos:** fecha, mes, anio, tipo (domingo/mdg), valor, recibido, recibido_por, registrado_por
+- **Campos:** fecha, mes, anio, tipo (domingo/mdg), valor, recibido, recibido_por, recibido_por_nombre, recibido_at, registrado_por, registrado_por_nombre, created_at
 - **Unique:** (fecha, tipo)
 - **Funcionalidad:** Registrar ofrendas de domingos y MDG, marcar como recibidas
+- **Calculo automatico:** Genera todos los domingos del mes para precargar fechas
 
-### 10.15 Ofrenda de Células
+### 11.14 Ofrenda de Celulas
 - **Tabla:** `ofrendas_celulas`
 - **Campos:** celula_nombre, fecha, mes, anio, valor, recibido, recibido_por, registrado_por
 - **Unique:** (celula_nombre, fecha)
-- **Funcionalidad:** Registro de ofrendas por célula en cada jueves del mes
+- **Funcionalidad:** Registro de ofrendas por celula en cada jueves del mes
 
-### 10.16 Células / Somos Uno
+### 11.15 Celulas / Somos Uno
 - Los miembros del censo pueden tener campos: `celula_asiste`, `celula_nombre`
-- Permite agrupar miembros por célula
+- Permite agrupar miembros por celula
 
-### 10.17 Gestión de Células
+### 11.16 Gestion de Celulas
 - **Tabla:** `gestion_celulas`
 - **Campos:** miembro_id, fuente (protocolo/mdg), celula_nombre, semana_inicio, gestionado, respuesta, asistio, gestionado_por
-- **Concepto:** Seguimiento semanal de miembros de cada célula
+- **Concepto:** Seguimiento semanal de miembros de cada celula
 - **Semana:** Se calcula desde el lunes de la semana actual (zona Ecuador)
 
-### 10.18 Gestión de Atrasados
+### 11.17 Gestion de Atrasados
 - **Tabla:** `gestion_atrasados`
 - **Campos:** modulo, user_id, user_name, fecha, gestionado, respuesta_gestion, acuerdo, gestionado_por, notificado
-- **Flujo:** 
+- **Flujo:**
   1. Se marca un atraso en asistencia de servidores
-  2. Se notifica al líder del grupo (push + email + WhatsApp)
-  3. El líder gestiona: registra si se resolvió y acuerdo alcanzado
+  2. Se notifica al lider del grupo (push + email + WhatsApp)
+  3. El lider gestiona: registra si se resolvio y acuerdo alcanzado
 
-### 10.19 Mensajes y Citaciones
+### 11.18 Mensajes y Citaciones
 - **Tablas:** `mensajes_citaciones`, `mensajes_citaciones_recibidos`
-- **Tipos de destinatario:** usuario específico, módulo completo, todos
+- **Tipos de destinatario:** usuario especifico, modulo completo, todos
 - **Campos:** remitente, destinatario, tipo (mensaje/invitacion), detalle, fecha, valor, evento_lugar
-- **Tracking:** Tabla de recepción con estado leido/no leido por usuario
-- **Módulos:** Uno por cada ministerio (mensajes-protocolo, mensajes-mdg, etc.)
+- **Tracking:** Tabla de recepcion con estado leido/no leido por usuario
+- **Componente reutilizable:** `MensajesCitaciones`
+- **Modulos:** mensajes-protocolo, mensajes-administracion, mensajes-discipulado, mensajes-alabanza, mensajes-comunicacion, mensajes-herederos, mensajes-intercesion, mensajes-mdg, mensajes-redil, mensajes-jovenes, mensajes-hombres, mensajes-pastoral
 
-### 10.20 Requerimientos de Bienes y Servicios
+### 11.19 Requerimientos de Bienes y Servicios
 - **Tabla:** `requerimientos_bienes_servicios`
 - **Campos:** modulo, ministerio, persona_id, persona_nombre, requerimiento (max 250), valor, evento_lugar, fecha_requerimiento, fecha_entrega
 - **Respuesta:** respuesta (pendiente/aprobado/negado/suspenso), observaciones, respondido_por
+- **Componente reutilizable:** `RequerimientosBienesServicios` (cada ministerio) + `AdminRequerimientos` (admin)
 - **Flujo:**
-  1. Un usuario con acceso al módulo envía un requerimiento
+  1. Un usuario con acceso al modulo envia un requerimiento
   2. Se notifica a los administradores
   3. Un admin aprueba/niega/suspende con observaciones
   4. Se notifica al solicitante con el resultado
+- **Modulos:** requerimientos-admin, requerimientos-protocolo, requerimientos-discipulado, requerimientos-mdg, requerimientos-alabanza, requerimientos-intercesion, requerimientos-herederos, requerimientos-redil, requerimientos-comunicacion, requerimientos-jovenes, requerimientos-hombres, requerimientos-pastoral
 
-### 10.21 Pastoral
-- Vista especial para la pastoral con acceso panorámico
+### 11.20 Pastoral
+- Vista especial para la pastoral con acceso panoramico (resumen-pastoral)
+- Ahora es un GRUPO completo con modulos propios (cronograma, eventos, mensajes, asistencia, requerimientos)
 
-### 10.22 Gestión de Cronogramas
-- Vista administrativa para gestionar todos los cronogramas
+### 11.21 Gestion de Cronogramas
+- Vista administrativa para gestionar todos los cronogramas de todos los ministerios
 
-### 10.23 Historial de Discipulado
+### 11.22 Historial de Discipulado
 - Vista para ver el historial de ciclos de discipulado cerrados
 
 
 ---
 
-## 11. Sistema de Auditoría
+## 12. Sistema de Auditoria
 
 ### Tabla `audit_logs`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | UUID | PK |
-| timestamp | timestamptz | Cuándo ocurrió |
-| user_id | text | Quién lo hizo |
+| timestamp | timestamptz | Cuando ocurrio |
+| user_id | text | Quien lo hizo |
 | user_name | text | Nombre del usuario |
-| module | text | Módulo afectado |
+| module | text | Modulo afectado |
 | action | text | crear, editar, eliminar |
-| description | text | Descripción legible |
-| details | jsonb | Datos antes/después |
+| description | text | Descripcion legible |
+| details | jsonb | Datos antes/despues |
 | is_ai | boolean | Si lo hizo una IA |
-| ai_authorized_by | text | Quién autorizó la IA |
+| ai_authorized_by | text | Quien autorizo la IA |
 
-### Integración
-Casi todos los servicios (`storage`, `attendance-service`, `cronograma-service`, `diezmos-service`, `bautizo-service`, `matrimonio-service`, `payment-flow-service`, `censo-service`, `discipulado-ciclos-service`) reciben un parámetro opcional `audit?: AuditInfo` que registra la acción.
+### Integracion
+Casi todos los servicios (`storage`, `attendance-service`, `cronograma-service`, `diezmos-service`, `bautizo-service`, `matrimonio-service`, `payment-flow-service`, `censo-service`, `discipulado-ciclos-service`) reciben un parametro opcional `audit?: AuditInfo` que registra la accion.
+
+### Tab de Auditoria en Administracion
+El panel de administracion tiene un tab dedicado (`AuditLogTab.tsx`) para consultar el historial de auditoria con filtros por modulo, accion y usuario.
 
 ---
 
-## 12. Sistema de Seguridad (Security Keys)
+## 13. Sistema de Seguridad (Security Keys)
 
 ### Concepto
-Para operaciones sensibles en registros con más de 6 horas de antigüedad, se requiere una "clave de seguridad".
+Para operaciones sensibles en registros con mas de 6 horas de antiguedad, se requiere una "clave de seguridad".
 
 ### Tabla `security_keys`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | UUID | PK |
-| key_code | text | Código de 6 caracteres (A-Z, 2-9) |
+| key_code | text | Codigo de 6 caracteres (A-Z, 2-9) |
 | is_used | boolean | Si ya fue usada |
-| used_at | timestamptz | Cuándo se usó |
-| used_by | UUID | Quién la usó |
+| used_at | timestamptz | Cuando se uso |
+| used_by | UUID | Quien la uso |
 
 ### Flujo:
 1. Siempre hay 3 claves activas (no usadas) en la base de datos
-2. Cuando se edita/elimina algo con +6h de antigüedad, se pide una clave
-3. Los usuarios "jaime" y "dev" están exentos
-4. Al usar una clave, se marca como usada y se genera una nueva automáticamente
+2. Cuando se edita/elimina algo con +6h de antiguedad, se pide una clave
+3. Los usuarios "jaime" y "dev" estan exentos
+4. Al usar una clave, se marca como usada y se genera una nueva automaticamente
 5. Un admin puede regenerar todas las claves
 
 ### SecurityCheckContext (Frontend)
 - `checkAndExecute(createdAt, callback)` — Verifica si necesita clave y ejecuta el callback
+- `SecurityKeyDialog` — Componente global que muestra el dialog de ingreso de clave
 
 ---
 
-## 13. Realtime (Supabase)
+## 14. Realtime (Supabase)
 
 ### Hook `useRealtime`
 ```typescript
@@ -564,7 +709,7 @@ useRealtime({
 ```
 
 ### Hook `useRealtimeMultiple`
-Se suscribe a múltiples tablas y llama `onChange` cuando cualquiera cambia.
+Se suscribe a multiples tablas y llama `onChange` cuando cualquiera cambia.
 
 ### Tablas con Realtime habilitado:
 - buzon_mensajes
@@ -573,32 +718,36 @@ Se suscribe a múltiples tablas y llama `onChange` cuando cualquiera cambia.
 - mensajes_citaciones_recibidos
 - asistencia_servidores
 - discipulado_ciclos, discipulado_ciclo_participantes, discipulado_ciclo_fechas, discipulado_ciclo_asistencia
+- payment_tables, payment_rows
+- nomina
+
 
 ---
 
-## 14. Configuraciones Globales
+## 15. Configuraciones Globales
 
 ### Tabla `configuraciones_globales`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | id | int | PK (siempre 1) |
 | ministerios | text[] | Lista de ministerios |
 | ubicaciones | text[] | Ubicaciones del inventario |
 | estados | text[] | Estados del inventario |
-| categorias_principales | text[] | Categorías financieras |
+| categorias_principales | text[] | Categorias financieras |
 | detalles | text[] | Detalles financieros |
+| nomina_detalles | text[] | Detalles configurables para nomina |
 
 ### Tabla `configuraciones_mes`
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | mes_id | text FK | Mes |
 | ministerios | text[] | Ministerios activos ese mes |
-| categorias_principales | text[] | Categorías del mes |
+| categorias_principales | text[] | Categorias del mes |
 | detalles | text[] | Detalles del mes |
 
 ---
 
-## 15. Deployment y Infraestructura
+## 16. Deployment e Infraestructura
 
 ### Flujo de Deploy
 1. Push a rama `main`
@@ -609,7 +758,7 @@ Se suscribe a múltiples tablas y llama `onChange` cuando cualquiera cambia.
 6. `pm2 reload iglesia`
 
 ### Puertos
-- **Next.js app:** 3712 (producción), 3001 (desarrollo)
+- **Next.js app:** 3712 (produccion), 3001 (desarrollo con Turbopack)
 - **WhatsApp server:** 3100
 
 ### Variables de Entorno (.env)
@@ -619,6 +768,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_URL=https://servidor.iglesiaregalodedios.com
 SUPABASE_SERVICE_KEY=... (service role, acceso completo)
 JWT_SECRET=...
+INTERNAL_API_SECRET=... (server-to-server auth)
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=465
 SMTP_USER=notificaciones@iglesiaregalodedios.com
@@ -627,363 +777,13 @@ WA_SERVER_URL=http://localhost:3100
 CRON_SECRET=...
 ```
 
----
-
-## 16. Estructura de Archivos Clave
-
-```
-app/
-├── api/
-│   ├── login/route.ts           — Endpoint de login con rate limiting
-│   ├── verify-session/          — Verificación de JWT
-│   ├── send-email/route.ts      — Envío de emails
-│   ├── send-notification/       — Push notifications
-│   ├── cron-reminders/route.ts  — Cron de alertas multicanal
-│   └── whatsapp/                — Proxy al servidor WhatsApp
-│       ├── send/
-│       ├── send-bulk/
-│       ├── connect/
-│       ├── disconnect/
-│       ├── logout/
-│       ├── qr/
-│       └── status/
-├── dashboard/
-│   ├── page.tsx                 — Dashboard principal (módulos agrupados)
-│   ├── administracion/          — Panel de usuarios y permisos
-│   ├── asistencia/              — Asistencia general
-│   ├── asistencia-servidores-*/  — Control por ministerio
-│   ├── bautizo/
-│   ├── celulas/
-│   ├── censo/
-│   ├── censo-mdg/
-│   ├── control-mensual/         — Gestión de meses
-│   ├── cronograma-*/            — Cronogramas por ministerio
-│   ├── cronograma-eventos-*/    — Eventos por ministerio
-│   ├── diezmos/
-│   ├── discipulado/
-│   ├── discipulado-primeros-pasos/
-│   ├── discipulado-seguimos-avanzando/
-│   ├── discipulado-siendo-iglesia/
-│   ├── flujo-pago/
-│   ├── gestion-cronogramas/
-│   ├── historial-discipulado/
-│   ├── ingresos-egresos/
-│   ├── inventario/
-│   ├── matrimonio/
-│   ├── mdg/
-│   ├── mensajes-*/              — Mensajes por ministerio
-│   ├── mes/                     — Vista de mes
-│   ├── ofrenda-celulas/
-│   ├── pastoral/
-│   ├── requerimientos/
-│   ├── requerimientos-admin/
-│   └── somos-uno/
-├── login/                       — Página de login
-└── layout.tsx                   — Layout raíz con providers
-
-contexts/
-├── auth-context.tsx             — Estado de autenticación
-├── month-context.tsx            — Mes activo y historial
-└── security-context.tsx         — Verificación de claves de seguridad
-
-hooks/
-├── use-mobile.ts                — Detección de mobile
-├── use-notificaciones.ts        — Buzón + notificaciones
-├── use-realtime.ts              — Suscripción Realtime Supabase
-├── use-restricted-access.ts     — Acceso restringido
-└── use-toast.ts                 — Toast notifications
-
-lib/
-├── supabase.ts                  — Cliente Supabase (anon key)
-├── auth.ts                      — Login y verificación de permisos
-├── admin.ts                     — CRUD usuarios, módulos, permisos
-├── database.ts                  — Queries de datos básicos
-├── storage.ts                   — SupabaseAdapter (CRUD meses, ingresos, egresos, inventario)
-├── jwt.ts                       — Firma y verificación JWT
-├── security-keys.ts             — Claves de seguridad
-├── permissions-guard.tsx        — Componente de protección de rutas
-├── globalConfig.ts              — Configuraciones globales
-├── format-phone.ts              — Formateo de teléfonos Ecuador
-├── timezone.ts                  — Utilidades de zona horaria Ecuador
-├── generate-certificados.ts     — Generación de PDFs
-├── utils.ts                     — cn() para tailwind-merge
-└── mod/
-    ├── alfoli-service.ts
-    ├── attendance-service.ts
-    ├── audit-service.ts
-    ├── bautizo-service.ts
-    ├── censo-mdg-service.ts
-    ├── censo-service.ts
-    ├── cronograma-service.ts
-    ├── diezmos-service.ts
-    ├── discipulado-ciclos-service.ts
-    ├── discipulado-service.ts
-    ├── email-service.ts
-    ├── gestion-atrasados-service.ts
-    ├── gestion-celulas-service.ts
-    ├── matrimonio-service.ts
-    ├── ofrenda-celulas-service.ts
-    ├── payment-flow-service.ts
-    ├── push-service.ts
-    └── whatsapp-service.ts
-
-whatsapp-server/
-├── src/
-│   ├── index.ts                 — Express server (puerto 3100)
-│   └── whatsapp-service.ts      — WhatsAppService con Baileys
-├── auth_info/                   — Credenciales WhatsApp
-└── package.json
-
-worker/
-└── index.js                     — Service Worker para Push Notifications
-
-sql/                             — Scripts de migración SQL
-```
-
-
----
-
-## 17. Base de Datos — Esquema Completo de Tablas
-
-### Tablas Principales:
-| Tabla | Descripción |
-|-------|-------------|
-| users | Usuarios del sistema |
-| user_sessions | Registro de logins |
-| module_groups | Grupos de módulos |
-| system_modules | Módulos individuales |
-| user_permissions | Permisos usuario↔módulo |
-| user_group_leaders | Líderes de grupo |
-| security_keys | Claves de seguridad |
-| audit_logs | Registro de auditoría |
-| configuraciones_globales | Config global (ministerios, ubicaciones, estados) |
-
-### Tablas Financieras:
-| Tabla | Descripción |
-|-------|-------------|
-| meses | Periodos mensuales |
-| configuraciones_mes | Config por mes |
-| ingresos | Ingresos financieros |
-| egresos | Egresos financieros |
-| diezmos | Registro de diezmos |
-| payment_tables | Tablas de flujo de pago |
-| payment_rows | Filas de flujo de pago |
-| alfoli | Registro de alfolí |
-| ofrendas_celulas | Ofrendas por célula |
-
-### Tablas de Asistencia:
-| Tabla | Descripción |
-|-------|-------------|
-| asistencia_detalles | Filas de la tabla de asistencia |
-| asistencia_columnas | Columnas/fechas de asistencia |
-| asistencia_datos | Valores numéricos de asistencia |
-| asistencia_servidores | Asistencia individual de servidores |
-
-### Tablas de Discipulado:
-| Tabla | Descripción |
-|-------|-------------|
-| discipulado_participantes | Participantes por mes |
-| discipulado_fechas | Fechas por mes |
-| discipulado_asistencia | Asistencia por mes |
-| discipulado_ciclos | Ciclos de discipulado |
-| discipulado_ciclo_participantes | Participantes por ciclo |
-| discipulado_ciclo_fechas | Fechas por ciclo |
-| discipulado_ciclo_asistencia | Asistencia por ciclo |
-
-### Tablas de Cronograma/Servicio:
-| Tabla | Descripción |
-|-------|-------------|
-| cronograma_servicio | Asignaciones de servicio |
-| gestion_atrasados | Registro de atrasos |
-
-### Tablas de Comunicación:
-| Tabla | Descripción |
-|-------|-------------|
-| buzon_mensajes | Notificaciones internas |
-| push_subscriptions | Suscripciones push |
-| whatsapp_messages | Historial de WhatsApp |
-| mensajes_citaciones | Mensajes entre ministerios |
-| mensajes_citaciones_recibidos | Tracking de recepción |
-
-### Tablas de Censo/Registro:
-| Tabla | Descripción |
-|-------|-------------|
-| censo | Censo de protocolo |
-| censo_mdg | Censo de MDG |
-| censo_catalogos | Opciones dinámicas para selects |
-| bautizos | Registro de bautizos |
-| matrimonios | Registro de matrimonios |
-| gestion_celulas | Gestión semanal de células |
-
-### Tablas de Inventario:
-| Tabla | Descripción |
-|-------|-------------|
-| inventory_items | Items del inventario |
-
-### Tablas de Requerimientos:
-| Tabla | Descripción |
-|-------|-------------|
-| requerimientos_bienes_servicios | Solicitudes de bienes/servicios |
-
----
-
-## 18. Grupos de Módulos y sus Módulos
-
-### Grupo: Administración
-- administracion — Panel de admin (usuarios, permisos)
-- control-mensual — Gestión de meses
-- ingresos-egresos
-- diezmos
-- inventario
-- flujo-pago
-- bautizo
-- matrimonio
-- requerimientos-admin
-
-### Grupo: Protocolo
-- cronograma-protocolo
-- cronograma-eventos-protocolo
-- asistencia-servidores-protocolo
-- mensajes-protocolo
-- censo (protocolo)
-- celulas
-- somos-uno
-
-### Grupo: MDG
-- cronograma-mdg
-- cronograma-eventos-mdg
-- asistencia-servidores-mdg
-- mensajes-mdg
-- censo-mdg
-
-### Grupo: Discipulado
-- discipulado (por mes)
-- discipulado_primeros_pasos
-- discipulado_seguimos_avanzando
-- discipulado_siendo_iglesia
-- cronograma-discipulado
-- cronograma-eventos-discipulado
-- asistencia-servidores-discipulado
-- mensajes-discipulado
-- historial-discipulado
-
-### Grupo: Alabanza
-- cronograma-alabanza
-- cronograma-eventos-alabanza
-- asistencia-servidores-alabanza
-- mensajes-alabanza
-
-### Grupo: Intercesión
-- cronograma-intercesion
-- cronograma-eventos-intercesion
-- asistencia-servidores-intercesion
-- mensajes-intercesion
-
-### Grupo: Herederos
-- cronograma-herederos
-- cronograma-eventos-herederos
-- asistencia-servidores-herederos
-- mensajes-herederos
-
-### Grupo: Redil
-- cronograma-redil
-- cronograma-eventos-redil
-- asistencia-servidores-redil
-- mensajes-redil
-
----
-
-## 19. Zona Horaria
-
-El sistema opera en **zona horaria Ecuador (UTC-5)**. El archivo `lib/timezone.ts` provee utilidades:
-- `nowEcuador()` — Date actual en Ecuador
-- `todayEcuador()` — Fecha string YYYY-MM-DD actual en Ecuador
-- `currentMonthEcuador()` — Mes actual (1-12)
-- `currentYearEcuador()` — Año actual
-
----
-
-## 20. PWA (Progressive Web App)
-
-- Configurado con `next-pwa`
-- Service Worker personalizado en `worker/index.js`
-- Maneja push notifications y click en notificaciones
-- Iconos en `public/icon-192.png`
-- Instlable en dispositivos móviles
-
----
-
-## 21. Patrones de Desarrollo
-
-### Patrón de Service Layer
-Cada módulo tiene un archivo en `lib/mod/` que encapsula toda la lógica de base de datos:
-```typescript
-export const miService = {
-  async getAll(): Promise<MiTipo[]> { ... },
-  async create(data, audit?): Promise<MiTipo> { ... },
-  async update(id, data, audit?): Promise<MiTipo> { ... },
-  async delete(id, audit?): Promise<void> { ... },
+### Scripts de Package.json
+```json
+{
+  "dev": "next dev --turbopack -p 3001",
+  "build": "next build",
+  "start": "next start -p 3712",
+  "deploy": "npm run build && pm2 reload iglesia",
+  "lint": "next lint"
 }
 ```
-
-### Patrón de Auditoría
-```typescript
-const audit: AuditInfo = { user_id: user.id, user_name: user.displayName }
-await miService.create(data, audit)
-```
-
-### Patrón de Realtime
-```typescript
-useRealtime({
-  table: "mi_tabla",
-  filter: `mes_id=eq.${mesId}`,
-  enabled: !!mesId,
-  onChange: () => cargarDatos(true),
-})
-```
-
-### Patrón de Página con Permisos
-```tsx
-export default function MiPagina() {
-  return (
-    <PermissionsGuard moduleName="mi-modulo">
-      {(canEdit, canAdmin, canLeader) => (
-        <MiComponenteInterno canEdit={canEdit} />
-      )}
-    </PermissionsGuard>
-  )
-}
-```
-
----
-
-## 22. Resumen de APIs
-
-| Endpoint | Método | Descripción |
-|----------|--------|-------------|
-| /api/login | POST | Login con JWT |
-| /api/verify-session | POST | Validar token |
-| /api/send-email | POST | Enviar email de servicio |
-| /api/send-notification | POST | Enviar push notification |
-| /api/cron-reminders | GET | Procesar alertas automáticas |
-| /api/whatsapp/send | POST | Enviar WhatsApp |
-| /api/whatsapp/send-bulk | POST | WhatsApp masivo |
-| /api/whatsapp/connect | POST | Conectar WhatsApp |
-| /api/whatsapp/disconnect | POST | Desconectar |
-| /api/whatsapp/logout | POST | Cerrar sesión WA |
-| /api/whatsapp/qr | GET | Obtener QR |
-| /api/whatsapp/status | GET | Estado de conexión |
-
----
-
-## 23. Notas Importantes
-
-1. **NO usa Supabase Auth** — Tiene su propio sistema de autenticación con JWT custom
-2. **Supabase solo como base de datos** — Se usa el cliente de Supabase para queries, realtime, y storage, pero no la autenticación nativa
-3. **Dos clientes Supabase:**
-   - `anon key` (cliente) — Para el frontend
-   - `service_role key` (server) — Solo en API routes del server
-4. **WhatsApp es un microservicio separado** — No forma parte del build de Next.js
-5. **El sistema es multitenencia implícita** — Todos comparten la misma base de datos, los permisos determinan qué ve cada usuario
-6. **La seguridad de edición/eliminación** se refuerza con el sistema de Security Keys para registros antiguos
-7. **Configuraciones se heredan** — Al crear un nuevo mes, se copian las configuraciones (ministerios, categorías) del mes anterior

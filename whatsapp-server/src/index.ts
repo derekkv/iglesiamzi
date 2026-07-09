@@ -1,5 +1,6 @@
 import express from "express"
 import cors from "cors"
+import multer from "multer"
 import { WhatsAppService } from "./whatsapp-service"
 
 const app = express()
@@ -10,6 +11,12 @@ app.use(cors({
   credentials: true,
 }))
 app.use(express.json())
+
+// Multer: almacenar archivos en memoria (Buffer)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 64 * 1024 * 1024 }, // 64MB max
+})
 
 const waService = new WhatsAppService()
 
@@ -83,6 +90,64 @@ app.post("/api/whatsapp/send-bulk", async (req, res) => {
   }
 })
 
+// Enviar media (imagen, video, audio, documento) a un número
+app.post("/api/whatsapp/send-media", upload.single("file"), async (req, res) => {
+  const { phone, caption, mediaType } = req.body
+
+  if (!phone || !req.file) {
+    return res.status(400).json({ success: false, error: "Se requiere 'phone' y un archivo 'file'" })
+  }
+
+  const type = mediaType || detectMediaType(req.file.mimetype)
+
+  try {
+    const result = await waService.sendMedia(
+      phone,
+      req.file.buffer,
+      type,
+      caption || undefined,
+      req.file.mimetype,
+      req.file.originalname
+    )
+    res.json({ success: true, messageId: result.key.id })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// Enviar media masivo
+app.post("/api/whatsapp/send-bulk-media", upload.single("file"), async (req, res) => {
+  const { phones, caption, mediaType } = req.body
+
+  if (!phones || !req.file) {
+    return res.status(400).json({ success: false, error: "Se requiere 'phones' (JSON array string) y un archivo 'file'" })
+  }
+
+  let phoneList: string[]
+  try {
+    phoneList = JSON.parse(phones)
+    if (!Array.isArray(phoneList)) throw new Error()
+  } catch {
+    return res.status(400).json({ success: false, error: "'phones' debe ser un JSON array válido" })
+  }
+
+  const type = mediaType || detectMediaType(req.file.mimetype)
+
+  try {
+    const results = await waService.sendBulkMedia(
+      phoneList,
+      req.file.buffer,
+      type,
+      caption || undefined,
+      req.file.mimetype,
+      req.file.originalname
+    )
+    res.json({ success: true, results })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 // Cerrar sesión (borra credenciales guardadas)
 app.post("/api/whatsapp/logout", async (req, res) => {
   try {
@@ -92,6 +157,15 @@ app.post("/api/whatsapp/logout", async (req, res) => {
     res.status(500).json({ success: false, error: error.message })
   }
 })
+
+// ============ HELPERS ============
+
+function detectMediaType(mimetype: string): "image" | "video" | "audio" | "document" {
+  if (mimetype.startsWith("image/")) return "image"
+  if (mimetype.startsWith("video/")) return "video"
+  if (mimetype.startsWith("audio/")) return "audio"
+  return "document"
+}
 
 // ============ INICIAR SERVIDOR ============
 
