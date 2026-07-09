@@ -77,16 +77,13 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireAdminForDelete: true,
   },
   ingresos: {
-    modules: ["ingresos_egresos"],
-    requireAdminForDelete: true,
+    modules: ["ingresos_egresos", "diezmos"],
   },
   egresos: {
     modules: ["ingresos_egresos"],
-    requireAdminForDelete: true,
   },
   diezmos: {
-    modules: ["diezmos"],
-    requireAdminForDelete: true,
+    modules: ["diezmos", "ingresos_egresos"],
   },
   alfoli: {
     modules: ["administracion", "control_mensual"],
@@ -128,10 +125,10 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === DATOS PERSONALES ===
   censo: {
-    modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion"],
+    modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados"],
   },
   censo_mdg: {
-    modules: ["censo-mdg", "cumpleanos-comunicacion"],
+    modules: ["censo-mdg", "cumpleanos-comunicacion", "listados"],
   },
   censo_catalogos: {
     modules: ["censo", "censo-mdg"],
@@ -153,19 +150,19 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === DISCIPULADO ===
   discipulado_ciclos: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
   discipulado_ciclo_fechas: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
   discipulado_asistencia: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
   discipulado_fechas: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
   discipulado_participantes: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
 
   // === MENSAJES Y CITACIONES ===

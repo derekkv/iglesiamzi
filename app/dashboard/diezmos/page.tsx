@@ -26,9 +26,9 @@ import { useSecurityCheck } from "@/contexts/security-context"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
 import { todayEcuador } from "@/lib/timezone"
 
-type TipoOfrenda = "diezmo" | "primicia" | "ofrenda_especial"
-const TIPO_LABELS: Record<TipoOfrenda, string> = { diezmo: "Diezmo", primicia: "Primicia", ofrenda_especial: "Ofrenda Especial" }
-const TIPO_COLORS: Record<TipoOfrenda, string> = { diezmo: "bg-blue-100 text-blue-800 border-blue-200", primicia: "bg-purple-100 text-purple-800 border-purple-200", ofrenda_especial: "bg-rose-100 text-rose-800 border-rose-200" }
+type TipoOfrenda = "diezmo" | "primicia" | "diezmo_especial"
+const TIPO_LABELS: Record<TipoOfrenda, string> = { diezmo: "Diezmo", primicia: "Primicia", diezmo_especial: "Ofrenda Especial" }
+const TIPO_COLORS: Record<TipoOfrenda, string> = { diezmo: "bg-blue-100 text-blue-800 border-blue-200", primicia: "bg-purple-100 text-purple-800 border-purple-200", diezmo_especial: "bg-rose-100 text-rose-800 border-rose-200" }
 
 
 function DiezmosContent({ canEdit }: { canEdit: boolean }) {
@@ -145,8 +145,8 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   const totalDiezmoEfectivo = records.filter(r => (r.tipo_ofrenda === "diezmo" || !r.tipo_ofrenda) && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
   const totalPrimiciaTransf = records.filter(r => r.tipo_ofrenda === "primicia" && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
   const totalPrimiciaEfectivo = records.filter(r => r.tipo_ofrenda === "primicia" && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
-  const totalEspecialTransf = records.filter(r => r.tipo_ofrenda === "ofrenda_especial" && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
-  const totalEspecialEfectivo = records.filter(r => r.tipo_ofrenda === "ofrenda_especial" && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
+  const totalEspecialTransf = records.filter(r => r.tipo_ofrenda === "diezmo_especial" && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
+  const totalEspecialEfectivo = records.filter(r => r.tipo_ofrenda === "diezmo_especial" && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
   const totalGeneral = records.reduce((s, r) => s + Number(r.valor), 0)
   const totalSearchResults = searchResults.reduce((s, r) => s + Number(r.valor), 0)
 
@@ -211,7 +211,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                 <option value="todos">Todos los tipos</option>
                 <option value="diezmo">Diezmo</option>
                 <option value="primicia">Primicia</option>
-                <option value="ofrenda_especial">Ofrenda Especial</option>
+                <option value="diezmo_especial">Ofrenda Especial</option>
               </select>
               <select value={filterTransaccion} onChange={(e) => setFilterTransaccion(e.target.value)} className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white">
                 <option value="todos">Todas las transacciones</option>
@@ -393,7 +393,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                   <SelectContent>
                     <SelectItem value="diezmo">Diezmo</SelectItem>
                     <SelectItem value="primicia">Primicia</SelectItem>
-                    <SelectItem value="ofrenda_especial">Ofrenda Especial</SelectItem>
+                    <SelectItem value="diezmo_especial">Ofrenda Especial</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -430,7 +430,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                   <SelectContent>
                     <SelectItem value="diezmo">Diezmo</SelectItem>
                     <SelectItem value="primicia">Primicia</SelectItem>
-                    <SelectItem value="ofrenda_especial">Ofrenda Especial</SelectItem>
+                    <SelectItem value="diezmo_especial">Ofrenda Especial</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

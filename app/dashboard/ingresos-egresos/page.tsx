@@ -233,7 +233,7 @@ const handleDeleteClick = (record: FinancialRecord) => {
       setTotalPrimicias(primiciasTotal)
 
       // Total Ofrenda Especial (transferencia) del mes
-      const especialTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "ofrenda_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      const especialTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "diezmo_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalDiezmoEspecial(especialTotal)
     } catch (error) {
       console.error("Error loading consolidated totals:", error)
@@ -950,6 +950,7 @@ function formatDateForTable(dateString: string) {
                 <p className="text-lg font-bold text-teal-600">${totalDiezmosTransferencia.toLocaleString()}</p>
                 <p className="text-xs text-gray-600">Diezmos</p>
                 <p className="text-[10px] text-gray-400">Transferencia</p>
+                <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
               </div>
             </CardContent>
           </Card>
@@ -959,6 +960,7 @@ function formatDateForTable(dateString: string) {
                 <p className="text-lg font-bold text-fuchsia-600">${totalPrimicias.toLocaleString()}</p>
                 <p className="text-xs text-gray-600">Primicias</p>
                 <p className="text-[10px] text-gray-400">Transferencia</p>
+                <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
               </div>
             </CardContent>
           </Card>
@@ -968,6 +970,7 @@ function formatDateForTable(dateString: string) {
                 <p className="text-lg font-bold text-rose-600">${totalDiezmoEspecial.toLocaleString()}</p>
                 <p className="text-xs text-gray-600">Ofrenda Especial</p>
                 <p className="text-[10px] text-gray-400">Transferencia</p>
+                <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
               </div>
             </CardContent>
           </Card>
@@ -982,8 +985,9 @@ function formatDateForTable(dateString: string) {
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
-                <p className="text-lg font-bold text-blue-600">${(totalIngresos + totalCelulas + totalAlfoli + totalDiezmosTransferencia + totalPrimicias + totalDiezmoEspecial).toLocaleString()}</p>
+                <p className="text-lg font-bold text-blue-600">${(totalIngresos + totalCelulas + totalAlfoli).toLocaleString()}</p>
                 <p className="text-xs text-gray-600">Total Ingresos</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">Incluye diezmos, primicias y ofrendas esp.</p>
               </div>
             </CardContent>
           </Card>

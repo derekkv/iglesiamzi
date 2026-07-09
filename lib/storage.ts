@@ -134,11 +134,12 @@ async addIngreso(mesId: string, ingreso: any, audit?: AuditInfo) {
 }
 
 async updateIngreso(id: number, ingreso: any, audit?: AuditInfo) {
-  const { data: antes } = audit ? await supabase.from("ingresos").select("monto,fecha,ministerio,categoria_principal,detalle,observacion,estado").eq("id", id).single() : { data: null };
+  // Verificar si es un ingreso auto-generado de diezmos
+  const { data: antes } = await supabase.from("ingresos").select("*").eq("id", id).single();
   const { error } = await supabase
     .from("ingresos")
     .update({
-      concepto: "edit we",
+      concepto: antes?.concepto === "auto-diezmo" ? "auto-diezmo" : "edit we",
       monto: ingreso.monto,
       fecha: ingreso.fecha || new Date().toISOString(),
       ministerio: ingreso.ministerio,
@@ -150,6 +151,30 @@ async updateIngreso(id: number, ingreso: any, audit?: AuditInfo) {
     .eq("id", id);
   if (error) throw new Error(`Supabase updateIngreso error: ${error.message}`);
   if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "editar", description: `Ingreso #${id}: ${ingreso.detalle} - $${ingreso.monto}`, details: { tipo: "Ingreso", antes: { monto: antes?.monto, fecha: antes?.fecha, ministerio: antes?.ministerio, categoria: antes?.categoria_principal, detalle: antes?.detalle, estado: antes?.estado }, despues: { monto: ingreso.monto, fecha: ingreso.fecha, ministerio: ingreso.ministerio, categoria: ingreso.categoria_principal, detalle: ingreso.detalle, estado: ingreso.estado } } })
+
+  // Si es auto-diezmo, sincronizar con la tabla diezmos
+  if (antes?.concepto === "auto-diezmo" && antes?.mes_id) {
+    // Buscar el diezmo vinculado por detalle y mes
+    const { data: diezmoVinculado } = await supabase
+      .from("diezmos")
+      .select("id")
+      .eq("mes_id", antes.mes_id)
+      .eq("transaccion", "transferencia")
+      .ilike("donador", `%${antes.detalle?.split(" - ")[1] || ""}%`)
+      .limit(1)
+      .single()
+
+    if (diezmoVinculado) {
+      // Extraer donador del nuevo detalle (formato: "Tipo - Donador")
+      const newDonador = ingreso.detalle?.split(" - ").slice(1).join(" - ") || ""
+      await supabase.from("diezmos").update({
+        valor: Number(ingreso.monto),
+        fecha: ingreso.fecha,
+        donador: newDonador || undefined,
+        updated_at: new Date().toISOString(),
+      }).eq("id", diezmoVinculado.id)
+    }
+  }
 }
 
 async updateEgreso(id: number, egreso: any, audit?: AuditInfo) {
@@ -172,10 +197,24 @@ async updateEgreso(id: number, egreso: any, audit?: AuditInfo) {
 }
 
 async deleteIngreso(id: number, audit?: AuditInfo) {
-  const { data: rec } = await supabase.from("ingresos").select("monto,detalle,ministerio,fecha").eq("id", id).single();
+  const { data: rec } = await supabase.from("ingresos").select("*").eq("id", id).single();
   const { error } = await supabase.from("ingresos").delete().eq("id", id);
   if (error) throw new Error(`Supabase deleteIngreso error: ${error.message}`);
   if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "eliminar", description: `Ingreso #${id}: ${rec?.detalle} - $${rec?.monto}`, details: { tipo: "Ingreso", id, monto: rec?.monto, detalle: rec?.detalle, ministerio: rec?.ministerio, fecha: rec?.fecha } })
+
+  // Si era auto-diezmo, eliminar el diezmo vinculado
+  if (rec?.concepto === "auto-diezmo" && rec?.mes_id) {
+    const donador = rec.detalle?.split(" - ").slice(1).join(" - ") || ""
+    if (donador) {
+      await supabase
+        .from("diezmos")
+        .delete()
+        .eq("mes_id", rec.mes_id)
+        .eq("donador", donador)
+        .eq("transaccion", "transferencia")
+        .eq("valor", Number(rec.monto))
+    }
+  }
 }
 
 async deleteEgreso(id: number, audit?: AuditInfo) {
