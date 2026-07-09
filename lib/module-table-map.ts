@@ -208,6 +208,12 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: false,
   },
 
+  // === BAUTIZOS PDF ===
+  bautizos_pdf_generados: {
+    modules: ["bautizo"],
+    requireEditForWrite: false,
+  },
+
   // === AUDITORÍA (solo lectura + insert, nunca delete/update) ===
   audit_logs: {
     modules: "any",
