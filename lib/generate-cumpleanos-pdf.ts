@@ -25,7 +25,7 @@ export async function generateCumpleanosPDF(nombre: string): Promise<Uint8Array>
   const nombreTextWidth = fontCursiva.widthOfTextAtSize(nombre.toUpperCase(), nombreFontSize)
   const nombreX = (width - nombreTextWidth) / 2
   // Posición vertical — ajustar según dónde va el nombre en la plantilla
-  const nombreY = height / 2 + 60
+  const nombreY = height / 2 + 80
 
   page.drawText(nombre.toUpperCase(), {
     x: nombreX,
