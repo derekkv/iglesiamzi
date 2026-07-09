@@ -116,24 +116,23 @@ async function sendPush(userId: string, title: string, body: string): Promise<bo
 }
 
 // Enviar WhatsApp con imagen de cumpleaños
-async function sendWhatsAppImage(phone: string, caption: string): Promise<boolean> {
+async function sendWhatsAppImage(phone: string, nombre: string, caption: string): Promise<boolean> {
   try {
     const formatted = formatPhoneForWhatsApp(phone)
 
-    const media = await getBirthdayImage()
+    const media = await getBirthdayImage(nombre)
     if (!media) {
       console.warn("No se pudo obtener imagen de cumpleaños")
       return false
     }
 
     const blob = new Blob([new Uint8Array(media.buffer)], { type: media.type })
-    const mediaType = media.type === "image/png" ? "image" : "document"
 
     const formData = new FormData()
     formData.append("phone", formatted)
     formData.append("file", blob, media.filename)
     formData.append("caption", caption)
-    formData.append("mediaType", mediaType)
+    formData.append("mediaType", "image")
 
     const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
       method: "POST",
@@ -189,12 +188,12 @@ async function sendBirthdayEmail(to: string, nombre: string, edad: number): Prom
       },
     })
 
-    // Adjuntar imagen convertida del PDF
+    // Adjuntar imagen personalizada con nombre
     const attachments: any[] = []
-    const media = await getBirthdayImage()
+    const media = await getBirthdayImage(nombre)
     if (media) {
       attachments.push({
-        filename: `Feliz Cumpleaños - ${nombre}.${media.type === "image/png" ? "png" : "pdf"}`,
+        filename: media.filename,
         content: media.buffer,
         cid: "cumpleanos-imagen",
       })
@@ -290,7 +289,7 @@ export async function POST(request: NextRequest) {
 
     // 3. WhatsApp — imagen con felicitación
     if (celular) {
-      resultados.whatsapp_imagen = await sendWhatsAppImage(celular, mensaje)
+      resultados.whatsapp_imagen = await sendWhatsAppImage(celular, nombre, mensaje)
 
       // Esperar un poco entre mensajes para no disparar anti-spam
       await new Promise((r) => setTimeout(r, 2000))
@@ -456,7 +455,7 @@ export async function GET(request: NextRequest) {
 
       // WhatsApp imagen + audio
       if (c.celular) {
-        resultados.whatsapp_imagen = await sendWhatsAppImage(c.celular, mensaje)
+        resultados.whatsapp_imagen = await sendWhatsAppImage(c.celular, c.nombre, mensaje)
         await new Promise((r) => setTimeout(r, 2000))
         resultados.whatsapp_audio = await sendWhatsAppAudio(c.celular)
         await new Promise((r) => setTimeout(r, 1500))

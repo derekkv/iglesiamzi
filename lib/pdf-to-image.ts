@@ -1,37 +1,80 @@
 import * as fs from "fs"
 import * as path from "path"
+import * as os from "os"
+import { execSync } from "child_process"
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 
-/**
- * Obtiene la imagen de cumpleaños como Buffer.
- * Busca primero un PNG pre-convertido. Si no existe, usa el PDF directamente.
- * 
- * IMPORTANTE: Para que funcione como imagen en WhatsApp, debes tener
- * el archivo "plantilla-cumpleanos.png" en public/.
- * Si solo tienes el PDF, se enviará como documento.
- */
-
-const BIRTHDAY_PNG_PATH = path.join(process.cwd(), "public", "plantilla-cumpleanos.png")
 const BIRTHDAY_PDF_PATH = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
 
-let cachedImage: { buffer: Buffer; type: "image/png" | "application/pdf"; filename: string } | null = null
+/**
+ * Genera un PDF personalizado con el nombre y lo convierte a imagen PNG
+ * usando ImageMagick (convert) instalado en el servidor.
+ * Retorna el Buffer de la imagen PNG.
+ */
+export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer; type: "image/png"; filename: string } | null> {
+  try {
+    if (!fs.existsSync(BIRTHDAY_PDF_PATH)) {
+      console.warn("PDF de cumpleaños no encontrado:", BIRTHDAY_PDF_PATH)
+      return null
+    }
 
-export async function getBirthdayImage(): Promise<{ buffer: Buffer; type: "image/png" | "application/pdf"; filename: string } | null> {
-  if (cachedImage) return cachedImage
+    // 1. Generar PDF con el nombre usando pdf-lib
+    const templateBytes = fs.readFileSync(BIRTHDAY_PDF_PATH)
+    const templateDoc = await PDFDocument.load(templateBytes)
+    const fontCursiva = await templateDoc.embedFont(StandardFonts.TimesRomanBoldItalic)
 
-  // Preferir PNG si existe
-  if (fs.existsSync(BIRTHDAY_PNG_PATH)) {
-    const buffer = fs.readFileSync(BIRTHDAY_PNG_PATH)
-    cachedImage = { buffer, type: "image/png", filename: "Feliz Cumpleaños.png" }
-    return cachedImage
+    const pages = templateDoc.getPages()
+    const page = pages[0]
+    const { width, height } = page.getSize()
+
+    const nombreFontSize = 28
+    const nombreTextWidth = fontCursiva.widthOfTextAtSize(nombre.toUpperCase(), nombreFontSize)
+    const nombreX = (width - nombreTextWidth) / 2
+    const nombreY = height / 2 + 80
+
+    page.drawText(nombre.toUpperCase(), {
+      x: nombreX,
+      y: nombreY,
+      size: nombreFontSize,
+      font: fontCursiva,
+      color: rgb(0.72, 0.53, 0.04),
+    })
+
+    const pdfBytes = await templateDoc.save()
+
+    // 2. Guardar PDF temporal
+    const tmpDir = os.tmpdir()
+    const tmpPdf = path.join(tmpDir, `cumple-${Date.now()}.pdf`)
+    const tmpPng = path.join(tmpDir, `cumple-${Date.now()}.png`)
+
+    fs.writeFileSync(tmpPdf, pdfBytes)
+
+    // 3. Convertir con ImageMagick
+    try {
+      execSync(`convert -density 200 "${tmpPdf}[0]" -quality 90 "${tmpPng}"`, {
+        timeout: 15000,
+      })
+    } catch {
+      // Intentar con magick (ImageMagick 7)
+      execSync(`magick -density 200 "${tmpPdf}[0]" -quality 90 "${tmpPng}"`, {
+        timeout: 15000,
+      })
+    }
+
+    // 4. Leer la imagen resultante
+    const pngBuffer = fs.readFileSync(tmpPng)
+
+    // 5. Limpiar archivos temporales
+    try { fs.unlinkSync(tmpPdf) } catch {}
+    try { fs.unlinkSync(tmpPng) } catch {}
+
+    return {
+      buffer: pngBuffer,
+      type: "image/png",
+      filename: `Feliz Cumpleaños - ${nombre}.png`,
+    }
+  } catch (err) {
+    console.error("Error generando imagen de cumpleaños:", err)
+    return null
   }
-
-  // Fallback al PDF
-  if (fs.existsSync(BIRTHDAY_PDF_PATH)) {
-    const buffer = fs.readFileSync(BIRTHDAY_PDF_PATH)
-    cachedImage = { buffer, type: "application/pdf", filename: "Feliz Cumpleaños.pdf" }
-    return cachedImage
-  }
-
-  console.warn("No se encontró archivo de imagen de cumpleaños en public/")
-  return null
 }
