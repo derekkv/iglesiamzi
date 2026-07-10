@@ -160,13 +160,97 @@ export function NominaSection() {
         updated_at: new Date().toISOString(),
       }).eq("id", editingRecord.id)
       if (error) throw error
-      if (formData.primera_quincena_pagada && !editingRecord.primera_quincena_pagada) { const v = parseFloat(formData.primera_quincena_valor) || 0; await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.primera_quincena_metodo, "primera"); await registerEgreso(formData.nombre, v, formData.primera_quincena_fecha || new Date().toISOString().split("T")[0], formData.primera_quincena_metodo, "1ra quincena", formData.detalle) }
-      if (formData.segunda_quincena_pagada && !editingRecord.segunda_quincena_pagada) { const v = parseFloat(formData.segunda_quincena_valor) || 0; await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.segunda_quincena_metodo, "segunda"); await registerEgreso(formData.nombre, v, formData.segunda_quincena_fecha || new Date().toISOString().split("T")[0], formData.segunda_quincena_metodo, "2da quincena", formData.detalle) }
+
+      // Sync egresos: primera quincena
+      if (formData.primera_quincena_pagada && !editingRecord.primera_quincena_pagada) {
+        // Newly marked as paid → create egreso + notify
+        const v = parseFloat(formData.primera_quincena_valor) || 0
+        await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.primera_quincena_metodo, "primera")
+        await registerEgreso(formData.nombre, v, formData.primera_quincena_fecha || new Date().toISOString().split("T")[0], formData.primera_quincena_metodo, "1ra quincena", formData.detalle)
+      } else if (formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
+        // Already paid, update egreso if value/date changed
+        const oldV = editingRecord.primera_quincena_valor || 0
+        const newV = parseFloat(formData.primera_quincena_valor) || 0
+        if (oldV !== newV || editingRecord.primera_quincena_fecha !== formData.primera_quincena_fecha || editingRecord.nombre !== formData.nombre) {
+          const { data: egreso } = await supabase.from("egresos").select("id")
+            .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+            .ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
+            .limit(1).single()
+          if (egreso) {
+            await supabase.from("egresos").update({
+              monto: newV,
+              fecha: formData.primera_quincena_fecha || undefined,
+              observacion: `1ra quincena de ${formData.nombre} — ${formData.primera_quincena_metodo}`,
+              metodo_pago: formData.primera_quincena_metodo,
+            }).eq("id", egreso.id)
+          }
+        }
+      } else if (!formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
+        // Unmarked as paid → delete egreso
+        await supabase.from("egresos").delete()
+          .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+          .ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
+      }
+
+      // Sync egresos: segunda quincena
+      if (formData.segunda_quincena_pagada && !editingRecord.segunda_quincena_pagada) {
+        const v = parseFloat(formData.segunda_quincena_valor) || 0
+        await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.segunda_quincena_metodo, "segunda")
+        await registerEgreso(formData.nombre, v, formData.segunda_quincena_fecha || new Date().toISOString().split("T")[0], formData.segunda_quincena_metodo, "2da quincena", formData.detalle)
+      } else if (formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
+        const oldV = editingRecord.segunda_quincena_valor || 0
+        const newV = parseFloat(formData.segunda_quincena_valor) || 0
+        if (oldV !== newV || editingRecord.segunda_quincena_fecha !== formData.segunda_quincena_fecha || editingRecord.nombre !== formData.nombre) {
+          const { data: egreso } = await supabase.from("egresos").select("id")
+            .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+            .ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
+            .limit(1).single()
+          if (egreso) {
+            await supabase.from("egresos").update({
+              monto: newV,
+              fecha: formData.segunda_quincena_fecha || undefined,
+              observacion: `2da quincena de ${formData.nombre} — ${formData.segunda_quincena_metodo}`,
+              metodo_pago: formData.segunda_quincena_metodo,
+            }).eq("id", egreso.id)
+          }
+        }
+      } else if (!formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
+        await supabase.from("egresos").delete()
+          .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+          .ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
+      }
+
       toast.success("Nómina actualizada"); setShowEditModal(false); setEditingRecord(null); resetForm(); loadNomina(true)
     } catch (error) { console.error(error); toast.error("Error al actualizar") } finally { setSaving(false) }
   }
 
-  const handleDelete = async (id: number) => { if (!confirm("¿Eliminar este registro?")) return; try { await supabase.from("nomina").delete().eq("id", id); toast.success("Eliminado"); loadNomina(true) } catch { toast.error("Error") } }
+  const handleDelete = async (id: number) => {
+    if (!confirm("¿Eliminar este registro?")) return
+    try {
+      // Obtener datos antes de borrar para sincronizar egresos
+      const record = records.find(r => r.id === id)
+      if (record) {
+        // Eliminar egresos vinculados (1ra y 2da quincena)
+        if (record.primera_quincena_pagada) {
+          await supabase.from("egresos")
+            .delete()
+            .eq("mes_id", record.mes_id)
+            .eq("categoria_principal", "Pago de nómina")
+            .ilike("observacion", `%1ra quincena de ${record.nombre}%`)
+        }
+        if (record.segunda_quincena_pagada) {
+          await supabase.from("egresos")
+            .delete()
+            .eq("mes_id", record.mes_id)
+            .eq("categoria_principal", "Pago de nómina")
+            .ilike("observacion", `%2da quincena de ${record.nombre}%`)
+        }
+      }
+      await supabase.from("nomina").delete().eq("id", id)
+      toast.success("Eliminado")
+      loadNomina(true)
+    } catch { toast.error("Error") }
+  }
   if (accessLoading || !hasAccess) return null
 
 

@@ -80,7 +80,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["ingresos_egresos", "diezmos"],
   },
   egresos: {
-    modules: ["ingresos_egresos"],
+    modules: ["ingresos_egresos", "flujo_pago", "pago_diario"],
   },
   diezmos: {
     modules: ["diezmos", "ingresos_egresos"],
@@ -209,6 +209,11 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   bautizos_pdf_generados: {
     modules: ["bautizo"],
     requireEditForWrite: false,
+  },
+
+  // === PAGO DIARIO ===
+  pago_diario: {
+    modules: ["pago_diario", "ingresos_egresos"],
   },
 
   // === AUDITORÍA (solo lectura + insert, nunca delete/update) ===
