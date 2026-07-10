@@ -80,9 +80,15 @@ export function MonthProvider({ children }: { children: ReactNode }) {
     // ID determinista: solo año-mes (no Date.now()) para evitar duplicados
     const monthId = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}`
 
-    // Verificar si ya existe un mes activo antes de crear uno nuevo
+    // Verificar si ya existe un mes activo (cualquier ID) antes de crear uno nuevo
     const existing = await storage.getActiveMonth()
     if (existing) {
+      // Si ya hay un mes activo del mismo año/mes, usarlo directamente
+      if (existing.year === selectedDate.getFullYear() && existing.month === selectedDate.getMonth() + 1) {
+        setCurrentMonth(existing)
+        return existing
+      }
+      // Si es de otro mes, algo raro pasó — igualmente no duplicar
       setCurrentMonth(existing)
       return existing
     }
@@ -214,8 +220,8 @@ const editMonthDates = async (
 
       // Verificar que no exista ya un mes activo (protección contra duplicados)
       const existing = await storage.getActiveMonth()
-      if (existing && existing.id !== currentMonth.id) {
-        // Ya hay otro mes activo (otro tab lo creó), usarlo
+      if (existing) {
+        // Ya hay un mes activo (puede ser que otro tab lo creó), usarlo
         setCurrentMonth(existing)
         return
       }

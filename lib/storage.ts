@@ -95,15 +95,29 @@ async updateMonthDates({
 
 async saveMonth(month: any) {
   if (month.status === "active" && !month.end_date) {
-    // mes nuevo — usar upsert para evitar duplicados si el ID ya existe
-    const { error } = await supabase.from("meses").upsert({
+    // Antes de crear, verificar si ya existe un mes activo con el mismo año/mes
+    const { data: existing } = await supabase
+      .from("meses")
+      .select("id")
+      .eq("year", month.year)
+      .eq("month", month.month)
+      .eq("status", "active")
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      // Ya existe un mes activo para este año/mes, no crear duplicado
+      return;
+    }
+
+    // mes nuevo
+    const { error } = await supabase.from("meses").insert({
       id: month.id,
       name: month.name,
       year: month.year,
       month: month.month,
       start_date: month.start_date,
       status: month.status,
-    }, { onConflict: "id" });
+    });
     if (error) throw new Error(`Supabase saveMonth error: ${error.message}`);
   } else {
     // mes cerrado o actualización
