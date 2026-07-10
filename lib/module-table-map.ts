@@ -147,6 +147,9 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   matrimonios: {
     modules: ["matrimonio"],
   },
+  presentacion_ninos: {
+    modules: ["presentacion-ninos"],
+  },
 
   // === INVENTARIO ===
   inventory_items: {

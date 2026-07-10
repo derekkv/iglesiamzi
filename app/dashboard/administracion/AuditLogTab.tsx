@@ -19,6 +19,7 @@ const MODULES = [
   { value: "all", label: "Todos" },
   { value: "bautizo", label: "Bautizo" },
   { value: "matrimonio", label: "Matrimonio" },
+  { value: "presentacion-ninos", label: "Presentación de Niños" },
   { value: "censo", label: "Censo" },
   { value: "diezmos", label: "Diezmos" },
   { value: "asistencia", label: "Asistencia" },

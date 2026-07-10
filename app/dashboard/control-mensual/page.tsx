@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -38,29 +38,41 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
   const [openNomina, setOpenNomina] = useState(false)
 
   // Auto apertura/cierre de mes
+  const autoManageRef = useRef(false)
+  const hasAutoManagedRef = useRef(false)
+
   useEffect(() => {
     // Solo ejecutar una vez cuando se monta y hay datos cargados
     if (!canEdit || !user) return
+    // Solo ejecutar una vez por montaje del componente
+    if (hasAutoManagedRef.current) return
     autoManageMonth()
   }, [currentMonth, canEdit, user])
 
   const autoManageMonth = async () => {
-    // No hacer nada si ya está gestionando
+    // Prevenir ejecuciones simultáneas
+    if (autoManageRef.current) return
     if (!canEdit) return
+
     const mesActual = currentMonthEcuador()
     const anioActual = currentYearEcuador()
 
     // Si hay mes activo y es el mes correcto, no hacer nada
-    if (currentMonth && currentMonth.month === mesActual && currentMonth.year === anioActual) return
+    if (currentMonth && currentMonth.month === mesActual && currentMonth.year === anioActual) {
+      hasAutoManagedRef.current = true
+      return
+    }
 
     // Si hay mes activo pero es de otro mes, cerrarlo
     if (currentMonth && (currentMonth.month !== mesActual || currentMonth.year !== anioActual)) {
+      autoManageRef.current = true
+      hasAutoManagedRef.current = true
       try {
         await closeCurrentMonth(todayEcuador())
       } catch (e) { console.error("Error auto-cerrando mes:", e) }
+      finally { autoManageRef.current = false }
     }
     // No crear automáticamente — dejar que el usuario lo haga desde el dashboard
-    // El mes se crea cuando no hay uno activo y el usuario entra a un módulo que lo requiere
   }
 
   // Cargar resumen del mes
@@ -225,22 +237,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Total pagado general */}
-            <Card className="border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-blue-700 font-medium">Total Pagado (Egresos + Pago Diario)</p>
-                    <p className="text-3xl font-bold text-blue-800">${totalTodoPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Nómina pagada: ${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                    <p className="text-xs text-gray-500">Pago Diario: ${totalPagoDiario.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Acordeones */}
             <div className="space-y-3">

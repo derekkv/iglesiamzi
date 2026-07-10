@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { nowEcuador, currentMonthEcuador, currentYearEcuador } from "../timezone"
+import { auditService } from "./audit-service"
 
 export interface OfrendaCelula {
   id: number
@@ -122,6 +123,7 @@ export async function upsertOfrenda(params: {
     }, { onConflict: "celula_nombre,fecha" })
 
   if (error) return { success: false, error: error.message }
+  auditService.log({ user_id: params.userId, user_name: params.userName, module: "ofrenda-celulas", action: "crear", description: `Ofrenda: ${params.celula} - $${params.valor} (${params.fecha})`, details: { celula: params.celula, fecha: params.fecha, valor: params.valor } })
   return { success: true }
 }
 
@@ -129,6 +131,7 @@ export async function upsertOfrenda(params: {
  * Eliminar una ofrenda
  */
 export async function eliminarOfrenda(id: number): Promise<{ success: boolean; error?: string }> {
+  const { data } = await supabase.from("ofrendas_celulas").select("celula_nombre, valor, fecha").eq("id", id).single()
   const { error } = await supabase
     .from("ofrendas_celulas")
     .delete()
@@ -176,5 +179,6 @@ export async function toggleRecibido(params: {
     .eq("id", params.id)
 
   if (error) return { success: false, error: error.message }
+  auditService.log({ user_id: params.userId, user_name: params.userName, module: "ofrenda-celulas", action: "editar", description: `Ofrenda ${params.recibido ? "recibida" : "desmarcada"} (ID: ${params.id})`, details: { id: params.id, recibido: params.recibido } })
   return { success: true }
 }

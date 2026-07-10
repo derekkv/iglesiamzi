@@ -808,7 +808,11 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                             <TableRow key={module.id}>
                               <TableCell>
                                 <div className="flex items-center space-x-3">
-                                  <span className="text-2xl">{module.icon}</span>
+                                  {module.icon?.startsWith("/") || module.icon?.startsWith("http") ? (
+                                    <img src={module.icon} alt="" className="w-7 h-7 object-contain" />
+                                  ) : (
+                                    <span className="text-2xl">{module.icon}</span>
+                                  )}
                                   <div>
                                     <div className="font-medium">{module.displayName || module.display_name}</div>
                                     <div className="text-sm text-gray-500">{module.description}</div>
@@ -911,7 +915,11 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                               }
                             }}
                           />
-                          <span className="text-xl">{group.icon}</span>
+                          {group.icon?.startsWith("/") || group.icon?.startsWith("http") ? (
+                            <img src={group.icon} alt="" className="w-6 h-6 object-contain" />
+                          ) : (
+                            <span className="text-xl">{group.icon}</span>
+                          )}
                           <div>
                             <div className="font-semibold text-gray-900">{group.display_name}</div>
                             <div className="text-xs text-gray-500">{group.description}</div>
@@ -983,7 +991,11 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                               <TableRow key={module.id}>
                                 <TableCell className="pl-12">
                                   <div className="flex items-center space-x-3">
-                                    <span className="text-lg">{module.icon}</span>
+                                    {module.icon?.startsWith("/") || module.icon?.startsWith("http") ? (
+                                      <img src={module.icon} alt="" className="w-6 h-6 object-contain" />
+                                    ) : (
+                                      <span className="text-lg">{module.icon}</span>
+                                    )}
                                     <div>
                                       <div className="font-medium">{module.display_name}</div>
                                       <div className="text-sm text-gray-500">{module.description}</div>

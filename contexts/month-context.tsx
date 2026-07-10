@@ -77,8 +77,18 @@ export function MonthProvider({ children }: { children: ReactNode }) {
       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ]
 
+    // ID determinista: solo año-mes (no Date.now()) para evitar duplicados
+    const monthId = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}`
+
+    // Verificar si ya existe un mes activo antes de crear uno nuevo
+    const existing = await storage.getActiveMonth()
+    if (existing) {
+      setCurrentMonth(existing)
+      return existing
+    }
+
     const newMonth: MonthData = {
-      id: `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${Date.now()}`,
+      id: monthId,
       name: `${monthNames[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
       year: selectedDate.getFullYear(),
       month: selectedDate.getMonth() + 1,
@@ -199,11 +209,22 @@ const editMonthDates = async (
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
       ]
 
+      // ID determinista: solo año-mes
+      const monthId = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}`
+
+      // Verificar que no exista ya un mes activo (protección contra duplicados)
+      const existing = await storage.getActiveMonth()
+      if (existing && existing.id !== currentMonth.id) {
+        // Ya hay otro mes activo (otro tab lo creó), usarlo
+        setCurrentMonth(existing)
+        return
+      }
+
       const newMonth: MonthData = {
-        id: `${now.getFullYear()}-${now.getMonth() + 1}`,
-        name: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
-        year: now.getFullYear(),
-        month: now.getMonth() + 1,
+        id: monthId,
+        name: `${monthNames[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
+        year: selectedDate.getFullYear(),
+        month: selectedDate.getMonth() + 1,
         start_date: startDate,
         status: "active",
         data: {

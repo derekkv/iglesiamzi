@@ -20,6 +20,7 @@ import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 import { useRealtime } from "@/hooks/use-realtime"
 import { storage } from "@/lib/storage"
 import { toast } from "sonner"
+import { auditService } from "@/lib/mod/audit-service"
 
 
 interface NominaRecord {
@@ -130,6 +131,7 @@ export function NominaSection() {
       if (formData.primera_quincena_pagada) { const v = parseFloat(formData.primera_quincena_valor) || 0; await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.primera_quincena_metodo, "primera"); await registerEgreso(formData.nombre, v, formData.primera_quincena_fecha || new Date().toISOString().split("T")[0], formData.primera_quincena_metodo, "1ra quincena", formData.detalle) }
       if (formData.segunda_quincena_pagada) { const v = parseFloat(formData.segunda_quincena_valor) || 0; await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.segunda_quincena_metodo, "segunda"); await registerEgreso(formData.nombre, v, formData.segunda_quincena_fecha || new Date().toISOString().split("T")[0], formData.segunda_quincena_metodo, "2da quincena", formData.detalle) }
       toast.success("Registro agregado"); setShowAddModal(false); resetForm(); loadNomina(true)
+      auditService.log({ user_id: user!.id, user_name: user!.username, module: "flujo_pago", action: "crear", description: `Nómina: ${formData.nombre} - $${vap}`, details: { nombre: formData.nombre, cedula: formData.cedula, valor_a_pagar: vap, detalle: formData.detalle } })
     } catch (error) { console.error(error); toast.error("Error al guardar") } finally { setSaving(false) }
   }
 
@@ -221,6 +223,7 @@ export function NominaSection() {
       }
 
       toast.success("Nómina actualizada"); setShowEditModal(false); setEditingRecord(null); resetForm(); loadNomina(true)
+      auditService.log({ user_id: user!.id, user_name: user!.username, module: "flujo_pago", action: "editar", description: `Nómina editada: ${formData.nombre}`, details: { nombre: formData.nombre, cedula: formData.cedula, valor_a_pagar: vap } })
     } catch (error) { console.error(error); toast.error("Error al actualizar") } finally { setSaving(false) }
   }
 
@@ -248,6 +251,7 @@ export function NominaSection() {
       }
       await supabase.from("nomina").delete().eq("id", id)
       toast.success("Eliminado")
+      auditService.log({ user_id: user!.id, user_name: user!.username, module: "flujo_pago", action: "eliminar", description: `Nómina eliminada: ${record?.nombre}`, details: { id, nombre: record?.nombre, valor: record?.valor_a_pagar } })
       loadNomina(true)
     } catch { toast.error("Error") }
   }

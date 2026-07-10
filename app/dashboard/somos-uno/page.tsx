@@ -15,11 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Users, UserPlus, Lock, Eye, ClipboardCheck, History, DollarSign } from "lucide-react"
+import { ArrowLeft, Users, UserPlus, Lock, Eye, ClipboardCheck, History, DollarSign, Trash2, Pencil } from "lucide-react"
 import { toast } from "sonner"
 import {
   registrarGestion,
   editarGestion,
+  eliminarGestion,
   getHistorialGestiones,
   getGestionesSemanaActual,
   getLunesSemanaActual,
@@ -105,6 +106,9 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const [editRespuesta, setEditRespuesta] = useState("")
   const [editValue, setEditValue] = useState<boolean>(false)
   const [editAsistio, setEditAsistio] = useState<boolean>(false)
+
+  // Ver gestión (solo lectura)
+  const [viewingGestion, setViewingGestion] = useState<GestionCelula | null>(null)
 
   // Ofrendas
   const [ofrendas, setOfrendas] = useState<OfrendaCelula[]>([])
@@ -284,6 +288,23 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  const handleDeleteGestion = (g: GestionCelula) => {
+    checkAndExecute(g.created_at, async () => {
+      if (!user) return
+      const result = await eliminarGestion(g.id, { userId: user.id, userName: user.username })
+      if (result.success) {
+        toast.success("Gestión eliminada")
+        if (historialMember) {
+          const data = await getHistorialGestiones(historialMember.id, historialMember.fuente)
+          setHistorial(data)
+        }
+        if (selectedCelula) loadGestionesSemana(selectedCelula)
+      } else {
+        toast.error(result.error || "Error al eliminar")
+      }
+    })
+  }
+
 
   const handleInlineGestion = async (m: MiembroCelula, asistio: boolean, gestionado: boolean) => {
     if (!user || tieneRegistroSemana(m)) return
@@ -403,11 +424,19 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                           <ClipboardCheck className="w-3 h-3 mr-1" /> Gestionar
                         </Button>
                       )}
+                      {/* Ver gestión: solo si fue gestionado esta semana */}
+                      {yaGestionado && gestionSemana && (
+                        <Button variant="outline" size="sm" className="text-xs text-green-600 border-green-200 hover:bg-green-50" onClick={() => {
+                          setViewingGestion(gestionSemana)
+                        }}>
+                          <Eye className="w-3 h-3 mr-1" /> Ver gestión
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" title="Ver datos" onClick={() => setDetailMember(m)}>
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" title="Historial" onClick={() => handleOpenHistorial(m)}>
-                        <History className="w-3.5 h-3.5" />
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => handleOpenHistorial(m)}>
+                        <History className="w-3 h-3 mr-1" /> Ver historial
                       </Button>
                     </div>
                   </TableCell>
@@ -709,7 +738,14 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                       <TableCell className="text-xs">{g.gestionado_por_nombre || "-"}</TableCell>
                       <TableCell className="text-xs text-right">
                         {canEdit && (
-                          <Button variant="ghost" size="sm" onClick={() => handleEditGestion(g)}>Editar</Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-blue-600" onClick={() => handleEditGestion(g)}>
+                              <Pencil className="w-3 h-3 mr-1" /> Editar
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-red-600" onClick={() => handleDeleteGestion(g)}>
+                              <Trash2 className="w-3 h-3 mr-1" /> Eliminar
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -730,6 +766,21 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
             <DialogDescription>Semana del {editingGestion?.semana_inicio}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-medium">¿Asistió?</Label>
+              <div className="flex gap-3 mt-2">
+                <Button
+                  variant={editAsistio === true ? "default" : "outline"}
+                  className={editAsistio === true ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => setEditAsistio(true)}
+                >Sí</Button>
+                <Button
+                  variant={editAsistio === false ? "default" : "outline"}
+                  className={editAsistio === false ? "bg-red-600 hover:bg-red-700" : ""}
+                  onClick={() => setEditAsistio(false)}
+                >No</Button>
+              </div>
+            </div>
             <div>
               <Label className="text-sm font-medium">¿Se pudo gestionar?</Label>
               <div className="flex gap-3 mt-2">
@@ -763,6 +814,45 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Modal: Ver Gestión (solo lectura) */}
+      <Dialog open={!!viewingGestion} onOpenChange={() => setViewingGestion(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalle de Gestión</DialogTitle>
+            <DialogDescription>Semana del {viewingGestion?.semana_inicio}</DialogDescription>
+          </DialogHeader>
+          {viewingGestion && (
+            <div className="space-y-3 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-sm text-gray-500">Asistió:</span>
+                  <Badge className={`ml-2 ${viewingGestion.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    {viewingGestion.asistio ? "Sí" : "No"}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-500">Gestionado:</span>
+                  <Badge className={`ml-2 ${viewingGestion.gestionado ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                    {viewingGestion.gestionado ? "Sí" : "No"}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500">Observación:</span>
+                <p className="mt-1 text-sm bg-gray-50 rounded p-2">{viewingGestion.respuesta || "Sin observación"}</p>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500">Registrado por:</span>
+                <span className="ml-2 text-sm font-medium">{viewingGestion.gestionado_por_nombre || "-"}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingGestion(null)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal: Historial Ofrendas */}
       <Dialog open={showOfrendaHistorial} onOpenChange={setShowOfrendaHistorial}>
         <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">

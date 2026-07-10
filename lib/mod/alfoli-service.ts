@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { nowEcuador } from "../timezone"
+import { auditService } from "./audit-service"
 
 export interface AlfoliRecord {
   id: number
@@ -74,6 +75,7 @@ export async function upsertAlfoli(params: {
       updated_at: new Date().toISOString(),
     }, { onConflict: "fecha,tipo" })
   if (error) return { success: false, error: error.message }
+  auditService.log({ user_id: params.userId, user_name: params.userName, module: "ofrenda-celulas", action: "crear", description: `Alfolí ${params.tipo}: $${params.valor} (${params.fecha})`, details: { fecha: params.fecha, tipo: params.tipo, valor: params.valor } })
   return { success: true }
 }
 
@@ -81,6 +83,7 @@ export async function upsertAlfoli(params: {
  * Eliminar un registro de alfolí
  */
 export async function eliminarAlfoli(id: number): Promise<{ success: boolean; error?: string }> {
+  const { data } = await supabase.from("alfoli").select("fecha, tipo, valor").eq("id", id).single()
   const { error } = await supabase.from("alfoli").delete().eq("id", id)
   if (error) return { success: false, error: error.message }
   return { success: true }
@@ -105,6 +108,7 @@ export async function toggleAlfoliRecibido(params: {
     })
     .eq("id", params.id)
   if (error) return { success: false, error: error.message }
+  auditService.log({ user_id: params.userId, user_name: params.userName, module: "ofrenda-celulas", action: "editar", description: `Alfolí ${params.recibido ? "recibido" : "desmarcado"} (ID: ${params.id})`, details: { id: params.id, recibido: params.recibido } })
   return { success: true }
 }
 

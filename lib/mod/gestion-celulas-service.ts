@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { nowEcuador } from "../timezone"
+import { auditService } from "./audit-service"
 
 export interface GestionCelula {
   id: number
@@ -84,6 +85,7 @@ export async function registrarGestion(params: {
   })
 
   if (error) return { success: false, error: error.message }
+  auditService.log({ user_id: params.userId, user_name: params.userName, module: "celulas", action: "crear", description: `Gestión célula: ${params.celulaNombre} - ${params.asistio ? "Asistió" : "Faltó"}`, details: { miembroId: params.miembroId, celula: params.celulaNombre, asistio: params.asistio, gestionado: params.gestionado, semana: semana } })
   return { success: true }
 }
 
@@ -142,4 +144,41 @@ export async function getGestionesSemanaActual(
 
   if (error) return []
   return data || []
+}
+
+
+
+/**
+ * Eliminar una gestión por ID
+ */
+export async function eliminarGestion(
+  id: number,
+  audit?: { userId: string; userName: string }
+): Promise<{ success: boolean; error?: string }> {
+  // Obtener datos antes de eliminar para auditoría
+  const { data: antes } = await supabase
+    .from("gestion_celulas")
+    .select("*")
+    .eq("id", id)
+    .single()
+
+  const { error } = await supabase
+    .from("gestion_celulas")
+    .delete()
+    .eq("id", id)
+
+  if (error) return { success: false, error: error.message }
+
+  if (audit && antes) {
+    auditService.log({
+      user_id: audit.userId,
+      user_name: audit.userName,
+      module: "celulas",
+      action: "eliminar",
+      description: `Gestión eliminada: ${antes.celula_nombre} - Semana ${antes.semana_inicio}`,
+      details: { id, celula: antes.celula_nombre, semana: antes.semana_inicio, miembroId: antes.miembro_id },
+    })
+  }
+
+  return { success: true }
 }
