@@ -115,8 +115,8 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
   useEffect(() => { loadData(); loadMinisterios() }, [loadData])
   useRealtime({ table: "pago_diario", onChange: () => loadData(true) })
 
-  // Filtered: today's records
-  const todayRecords = records.filter(r => r.fecha === today)
+  // Filtered: today's records (normalize date comparison)
+  const todayRecords = records.filter(r => r.fecha?.substring(0, 10) === today)
   const totalToday = todayRecords.reduce((s, r) => s + Number(r.valor), 0)
   const totalMonth = records.reduce((s, r) => s + Number(r.valor), 0)
   const totalSearch = searchResults.reduce((s, r) => s + Number(r.valor), 0)
@@ -345,8 +345,9 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="hoy" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
             <TabsTrigger value="hoy">Hoy</TabsTrigger>
+            <TabsTrigger value="mes">Mes Actual</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
           </TabsList>
 
@@ -400,7 +401,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                       </tbody>
                       <tfoot>
                         <tr className="bg-purple-50 font-bold">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-2 text-right">TOTAL:</td>
+                          <td colSpan={4} className="border border-gray-300 px-3 py-2 text-right">TOTAL HOY:</td>
                           <td className="border border-gray-300 px-3 py-2 text-right">${totalToday.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
@@ -411,6 +412,68 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                   <div className="text-center py-8 text-gray-500">
                     <p>No hay pagos registrados hoy.</p>
                     {canEdit && <p className="text-sm mt-1">Haga clic en "Registrar Pago" para comenzar.</p>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* === MES ACTUAL === */}
+          <TabsContent value="mes" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Todos los Pagos — {currentMonth?.name}</CardTitle>
+                <CardDescription>{records.length} registros · Total: ${totalMonth.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {records.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-300 text-sm">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Fecha</th>
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Beneficiario</th>
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Ministerio</th>
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Detalle</th>
+                          <th className="border border-gray-300 px-3 py-2 text-center font-semibold">Método</th>
+                          <th className="border border-gray-300 px-3 py-2 text-right font-semibold">Valor</th>
+                          {canEdit && <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-20">Acc.</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {records.map((r) => (
+                          <tr key={r.id} className={`hover:bg-gray-50 ${r.fecha?.substring(0, 10) === today ? "bg-purple-50/50" : ""}`}>
+                            <td className="border border-gray-300 px-3 py-1.5">{formatDate(r.fecha)}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 font-medium">{r.nombre}</td>
+                            <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-xs">{r.detalle}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-center">
+                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(r.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                            {canEdit && (
+                              <td className="border border-gray-300 px-3 py-1.5 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => checkAndExecute(r.created_at, () => openEdit(r))}><Edit2 className="w-3 h-3" /></Button>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => checkAndExecute(r.created_at, () => setPendingDelete(r))}><Trash2 className="w-3 h-3" /></Button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-purple-50 font-bold">
+                          <td colSpan={5} className="border border-gray-300 px-3 py-2 text-right">TOTAL MES:</td>
+                          <td className="border border-gray-300 px-3 py-2 text-right">${totalMonth.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                          {canEdit && <td className="border border-gray-300"></td>}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No hay pagos este mes.</p>
                   </div>
                 )}
               </CardContent>

@@ -149,11 +149,15 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
           {CELULAS.map((celula) => {
             const total = getTotalCelula(celula)
+            const celOfrendas = ofrendas.filter((o) => o.celula_nombre === celula)
+            const allRecibidas = celOfrendas.length > 0 && celOfrendas.every((o) => o.recibido)
+            const hasAny = celOfrendas.length > 0
             return (
-              <Card key={celula} className="p-0">
+              <Card key={celula} className={`p-0 ${allRecibidas ? "border-green-300 bg-green-50" : hasAny ? "border-amber-300 bg-amber-50" : ""}`}>
                 <CardContent className="p-2">
                   <p className="text-[10px] font-medium text-gray-700 truncate">{celula}</p>
-                  <p className={`text-sm font-bold ${total > 0 ? "text-green-700" : "text-gray-300"}`}>${total.toFixed(2)}</p>
+                  <p className={`text-sm font-bold ${allRecibidas ? "text-green-700" : hasAny ? "text-amber-600" : "text-gray-300"}`}>${total.toFixed(2)}</p>
+                  {hasAny && <p className={`text-[9px] ${allRecibidas ? "text-green-600" : "text-amber-500"}`}>{allRecibidas ? "✓ Todo recibido" : "⏳ Pendiente"}</p>}
                 </CardContent>
               </Card>
             )
@@ -188,21 +192,39 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                           const o = getOfrenda(celula, j)
                           if (!o) return <TableCell key={j} className="text-center px-1 py-1"><span className="text-gray-300">—</span></TableCell>
                           return (
-                            <TableCell key={j} className="text-center px-1 py-1">
-                              <div className="flex flex-col items-center">
-                                <span className={`text-[10px] ${o.recibido ? "text-green-700 font-semibold" : "text-gray-400"}`}>${Number(o.valor).toFixed(0)}</span>
-                                <Checkbox checked={o.recibido} disabled={!canEdit} onCheckedChange={() => handleToggleRecibido(o)} className="h-3 w-3" />
+                            <TableCell key={j} className={`text-center px-1 py-1 ${o.recibido ? "bg-green-50" : "bg-amber-50"}`}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <Checkbox checked={o.recibido} disabled={!canEdit} onCheckedChange={() => handleToggleRecibido(o)} className={`h-4 w-4 ${o.recibido ? "data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600" : "border-amber-400"}`} />
+                                <span className={`text-[11px] font-semibold ${o.recibido ? "text-green-700" : "text-amber-600"}`}>${Number(o.valor).toFixed(0)}</span>
                               </div>
                             </TableCell>
                           )
                         })}
-                        <TableCell className="text-[10px] text-center font-bold text-green-800 py-1">${getTotalCelula(celula).toFixed(2)}</TableCell>
+                        {(() => {
+                          const total = getTotalCelula(celula)
+                          const celOfrendas = ofrendas.filter((o) => o.celula_nombre === celula)
+                          const allRecibidas = celOfrendas.length > 0 && celOfrendas.every((o) => o.recibido)
+                          return (
+                            <TableCell className={`text-[10px] text-center font-bold py-1 ${allRecibidas ? "text-green-800 bg-green-100" : celOfrendas.length > 0 ? "text-amber-700 bg-amber-50" : "text-gray-400"}`}>
+                              ${total.toFixed(2)}
+                            </TableCell>
+                          )
+                        })()}
                       </TableRow>
                     ))}
                     <TableRow className="bg-green-50/50">
                       <TableCell className="text-[10px] font-bold py-1">TOTAL</TableCell>
-                      {jueves.map((j) => <TableCell key={j} className="text-[10px] text-center font-bold text-green-800 py-1">${getTotalJueves(j).toFixed(0)}</TableCell>)}
-                      <TableCell className="text-[10px] text-center font-bold text-green-900 py-1">${totalOfrendas.toFixed(2)}</TableCell>
+                      {jueves.map((j) => {
+                        const colOfrendas = ofrendas.filter((o) => o.fecha === j)
+                        const allRecibidas = colOfrendas.length > 0 && colOfrendas.every((o) => o.recibido)
+                        const total = getTotalJueves(j)
+                        return (
+                          <TableCell key={j} className={`text-[10px] text-center font-bold py-1 ${allRecibidas ? "text-green-800 bg-green-100" : colOfrendas.length > 0 ? "text-amber-700 bg-amber-50" : "text-gray-400"}`}>
+                            ${total.toFixed(0)}
+                          </TableCell>
+                        )
+                      })}
+                      <TableCell className="text-[10px] text-center font-bold text-green-900 py-1 bg-green-100">${totalOfrendas.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>

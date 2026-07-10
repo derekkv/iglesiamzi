@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Download, FileText, FileSpreadsheet, ArrowLeft } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
+import { Loader2, Download, FileText, FileSpreadsheet, ArrowLeft, Filter } from "lucide-react"
 import { supabase } from "@/lib/secure-db"
 import { toast } from "sonner"
 import { generateBautizoPDF } from "@/lib/generate-bautizo-pdf"
@@ -20,6 +25,12 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const [generating, setGenerating] = useState(false)
   const [exporting, setExporting] = useState(false)
+
+  // Column filter for Excel export
+  const [showColumnFilter, setShowColumnFilter] = useState(false)
+  const [columnFilterTarget, setColumnFilterTarget] = useState<"protocolo" | "mdg" | "combinado">("protocolo")
+  const [availableColumns, setAvailableColumns] = useState<string[]>([])
+  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set())
 
   // ========== BAUTIZOS ==========
   async function handleGenerateBautizos() {
@@ -157,6 +168,44 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
   }
 
   // ========== EXPORTAR CENSO A EXCEL ==========
+  async function openColumnFilter(target: "protocolo" | "mdg" | "combinado") {
+    setColumnFilterTarget(target)
+    try {
+      let sampleData: any[] = []
+      if (target === "protocolo") {
+        const { data } = await supabase.from("censo").select("*").limit(1)
+        sampleData = data || []
+      } else if (target === "mdg") {
+        const { data } = await supabase.from("censo_mdg").select("*").limit(1)
+        sampleData = data || []
+      } else {
+        const [{ data: p }, { data: m }] = await Promise.all([
+          supabase.from("censo").select("*").limit(1),
+          supabase.from("censo_mdg").select("*").limit(1),
+        ])
+        const allKeys = new Set<string>()
+        for (const row of [...(p || []), ...(m || [])]) { Object.keys(row).forEach(k => allKeys.add(k)) }
+        allKeys.add("fuente")
+        sampleData = [Object.fromEntries([...allKeys].map(k => [k, ""]))]
+      }
+      if (sampleData.length > 0) {
+        const cols = Object.keys(sampleData[0])
+        setAvailableColumns(cols)
+        setSelectedColumns(new Set(cols)) // todas seleccionadas por defecto
+      }
+    } catch (error) {
+      console.error("Error cargando columnas:", error)
+    }
+    setShowColumnFilter(true)
+  }
+
+  async function handleExportWithColumns() {
+    setShowColumnFilter(false)
+    if (columnFilterTarget === "protocolo") await handleExportCenso()
+    else if (columnFilterTarget === "mdg") await handleExportCensoMdg()
+    else await handleExportCensoCombinado()
+  }
+
   async function handleExportCenso() {
     setExporting(true)
     try {
@@ -168,7 +217,8 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
       if (error) throw error
       if (!data || data.length === 0) { toast.error("No hay datos en el censo"); return }
 
-      const blob = generateExcel(data, "Censo Protocolo")
+      const filtered = filterColumns(data)
+      const blob = generateExcel(filtered, "Censo Protocolo")
       downloadExcel(blob, `Censo_Protocolo_${todayStr()}.xlsx`)
       toast.success(`Censo exportado: ${data.length} registros`)
     } catch (error) {
@@ -190,7 +240,8 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
       if (error) throw error
       if (!data || data.length === 0) { toast.error("No hay datos en el censo MDG"); return }
 
-      const blob = generateExcel(data, "Censo MDG")
+      const filtered = filterColumns(data)
+      const blob = generateExcel(filtered, "Censo MDG")
       downloadExcel(blob, `Censo_MDG_${todayStr()}.xlsx`)
       toast.success(`Censo MDG exportado: ${data.length} registros`)
     } catch (error) {
@@ -218,21 +269,20 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
 
       if (combined.length === 0) { toast.error("No hay datos en ningún censo"); return }
 
-      // Unificar columnas (puede que tengan campos diferentes)
+      // Unificar columnas
       const allKeys = new Set<string>()
       for (const row of combined) { Object.keys(row).forEach(k => allKeys.add(k)) }
-      // Asegurar que "fuente" esté al final
       allKeys.delete("fuente")
       const headers = [...Array.from(allKeys), "fuente"]
 
-      // Normalizar filas para que tengan todas las columnas
       const normalized = combined.map((row: any) => {
         const obj: any = {}
         for (const h of headers) { obj[h] = row[h] !== undefined ? row[h] : null }
         return obj
       })
 
-      const blob = generateExcel(normalized, "Censo Combinado")
+      const filtered = filterColumns(normalized)
+      const blob = generateExcel(filtered, "Censo Combinado")
       downloadExcel(blob, `Censo_Combinado_${todayStr()}.xlsx`)
       toast.success(`Censo combinado exportado: ${combined.length} registros (${allProtocolo.length} protocolo + ${allMdg.length} MDG)`)
     } catch (error) {
@@ -241,6 +291,17 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
     } finally {
       setExporting(false)
     }
+  }
+
+  function filterColumns(data: any[]): any[] {
+    if (selectedColumns.size === 0 || selectedColumns.size === availableColumns.length) return data
+    return data.map((row: any) => {
+      const filtered: any = {}
+      for (const key of selectedColumns) {
+        filtered[key] = row[key]
+      }
+      return filtered
+    })
   }
 
   // ========== UTILS ==========
@@ -341,6 +402,10 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
       return { wch: Math.min(Math.max(maxLen + 2, 12), 50) }
     })
     ws["!cols"] = colWidths
+
+    // Agregar autofilter en la fila de headers
+    const lastCol = XLSX.utils.encode_col(headers.length - 1)
+    ws["!autofilter"] = { ref: `A1:${lastCol}1` }
 
     // Crear workbook
     const wb = XLSX.utils.book_new()
@@ -475,13 +540,13 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
                     Exporta toda la tabla de censo como archivo Excel (.xlsx) con columnas ajustadas y headers legibles.
                   </p>
                   <div className="flex flex-wrap gap-3 mt-3">
-                    <Button className="bg-green-600 hover:bg-green-700" onClick={handleExportCenso} disabled={exporting}>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => openColumnFilter("protocolo")} disabled={exporting}>
                       {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exportando...</> : <><FileSpreadsheet className="w-4 h-4 mr-2" />Censo Protocolo</>}
                     </Button>
-                    <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-100" onClick={handleExportCensoMdg} disabled={exporting}>
+                    <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-100" onClick={() => openColumnFilter("mdg")} disabled={exporting}>
                       {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exportando...</> : <><FileSpreadsheet className="w-4 h-4 mr-2" />Censo MDG</>}
                     </Button>
-                    <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100" onClick={handleExportCensoCombinado} disabled={exporting}>
+                    <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100" onClick={() => openColumnFilter("combinado")} disabled={exporting}>
                       {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exportando...</> : <><FileSpreadsheet className="w-4 h-4 mr-2" />Combinado (Protocolo + MDG)</>}
                     </Button>
                   </div>
@@ -490,6 +555,52 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* Dialog: Filtro de Columnas */}
+        <Dialog open={showColumnFilter} onOpenChange={setShowColumnFilter}>
+          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-green-600" />
+                Seleccionar columnas para exportar
+              </DialogTitle>
+              <DialogDescription>
+                Marque las columnas que desea incluir en el archivo Excel.
+                {columnFilterTarget === "combinado" && " Incluirá una columna 'Fuente' indicando el origen."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-between border-b pb-3">
+              <span className="text-sm text-gray-500">{selectedColumns.size}/{availableColumns.length} columnas</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setSelectedColumns(new Set(availableColumns))}>Todas</Button>
+                <Button variant="outline" size="sm" onClick={() => setSelectedColumns(new Set())}>Ninguna</Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto max-h-[50vh] space-y-1 py-2">
+              {availableColumns.map((col) => (
+                <label key={col} className="flex items-center gap-3 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                  <Checkbox
+                    checked={selectedColumns.has(col)}
+                    onCheckedChange={(checked) => {
+                      const next = new Set(selectedColumns)
+                      if (checked) next.add(col)
+                      else next.delete(col)
+                      setSelectedColumns(next)
+                    }}
+                  />
+                  <span className="text-sm font-medium">{getHeaderLabel(col)}</span>
+                  <span className="text-xs text-gray-400 ml-auto">{col}</span>
+                </label>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowColumnFilter(false)}>Cancelar</Button>
+              <Button onClick={handleExportWithColumns} disabled={selectedColumns.size === 0 || exporting}>
+                {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exportando...</> : <><FileSpreadsheet className="w-4 h-4 mr-2" />Exportar ({selectedColumns.size} columnas)</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
