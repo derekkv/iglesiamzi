@@ -201,6 +201,48 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  async function handleExportCensoCombinado() {
+    setExporting(true)
+    try {
+      const [{ data: protocolo, error: err1 }, { data: mdg, error: err2 }] = await Promise.all([
+        supabase.from("censo").select("*").order("apellidos_nombres", { ascending: true }),
+        supabase.from("censo_mdg").select("*").order("apellidos_nombres", { ascending: true }),
+      ])
+
+      if (err1) throw err1
+      if (err2) throw err2
+
+      const allProtocolo = (protocolo || []).map((r: any) => ({ ...r, fuente: "Protocolo" }))
+      const allMdg = (mdg || []).map((r: any) => ({ ...r, fuente: "MDG" }))
+      const combined = [...allProtocolo, ...allMdg]
+
+      if (combined.length === 0) { toast.error("No hay datos en ningún censo"); return }
+
+      // Unificar columnas (puede que tengan campos diferentes)
+      const allKeys = new Set<string>()
+      for (const row of combined) { Object.keys(row).forEach(k => allKeys.add(k)) }
+      // Asegurar que "fuente" esté al final
+      allKeys.delete("fuente")
+      const headers = [...Array.from(allKeys), "fuente"]
+
+      // Normalizar filas para que tengan todas las columnas
+      const normalized = combined.map((row: any) => {
+        const obj: any = {}
+        for (const h of headers) { obj[h] = row[h] !== undefined ? row[h] : null }
+        return obj
+      })
+
+      const blob = generateExcel(normalized, "Censo Combinado")
+      downloadExcel(blob, `Censo_Combinado_${todayStr()}.xlsx`)
+      toast.success(`Censo combinado exportado: ${combined.length} registros (${allProtocolo.length} protocolo + ${allMdg.length} MDG)`)
+    } catch (error) {
+      console.error("Error exportando censo combinado:", error)
+      toast.error("Error al exportar el censo combinado")
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // ========== UTILS ==========
   function todayStr() {
     return new Date().toISOString().split("T")[0]
@@ -245,6 +287,7 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
     nuevo_creyente: "Nuevo Creyente",
     fecha_conversion: "Fecha de Conversión",
     quien_lo_trajo: "Quién lo trajo",
+    fuente: "Fuente",
   }
 
   function getHeaderLabel(key: string): string {
@@ -437,6 +480,9 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
                     </Button>
                     <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-100" onClick={handleExportCensoMdg} disabled={exporting}>
                       {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exportando...</> : <><FileSpreadsheet className="w-4 h-4 mr-2" />Censo MDG</>}
+                    </Button>
+                    <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100" onClick={handleExportCensoCombinado} disabled={exporting}>
+                      {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exportando...</> : <><FileSpreadsheet className="w-4 h-4 mr-2" />Combinado (Protocolo + MDG)</>}
                     </Button>
                   </div>
                 </div>

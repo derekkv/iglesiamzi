@@ -10,6 +10,7 @@ export interface PagoDiarioRecord {
   telefono: string | null
   email: string | null
   ministerio: string
+  categoria: string
   detalle: string
   valor: number
   metodo_pago: "Efectivo" | "Transferencia"
@@ -62,6 +63,7 @@ export const pagoDiarioService = {
         telefono: record.telefono || null,
         email: record.email || null,
         ministerio: record.ministerio,
+        categoria: record.categoria,
         detalle: record.detalle,
         valor: record.valor,
         metodo_pago: record.metodo_pago,
@@ -118,7 +120,7 @@ export const pagoDiarioService = {
       monto: record.valor,
       fecha: record.fecha,
       ministerio: record.ministerio,
-      categoria_principal: "Pago diario",
+      categoria_principal: record.categoria,
       detalle: `Pago diario - ${record.nombre}`,
       observacion: record.detalle,
       estado: "Procesado",

@@ -93,7 +93,7 @@ export function NominaSection() {
 
   const registerEgreso = async (nombre: string, valor: number, fecha: string, metodo: string, quincena: string, detalle: string | null) => {
     if (!currentMonth) return
-    try { await storage.addEgreso(currentMonth.id, { mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "Pago de nómina", detalle: detalle || "Nómina", observacion: `${quincena} de ${nombre} — ${metodo}`, monto: valor, fecha, metodo_pago: metodo, estado: "Procesado" }, { user_id: user!.id, user_name: user!.username }) } catch (e) { console.error("Error registrando egreso:", e) }
+    try { await storage.addEgreso(currentMonth.id, { mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA", detalle: detalle || "Nómina", observacion: `${quincena} de ${nombre} — ${metodo}`, monto: valor, fecha, metodo_pago: metodo, estado: "Procesado" }, { user_id: user!.id, user_name: user!.username }) } catch (e) { console.error("Error registrando egreso:", e) }
   }
 
   const sendPaymentNotification = async (nombre: string, telefono: string | null, email: string | null, valor: number, metodo: string, quincena: "primera" | "segunda") => {
@@ -120,7 +120,7 @@ export function NominaSection() {
         telefono: formData.telefono || null, email: formData.email || null,
         valor_sueldo: parseFloat(formData.valor_sueldo), descuento: formData.descuento || null,
         descuento_valor: parseFloat(formData.descuento_valor) || 0, descuento_motivo: formData.descuento_motivo || null,
-        valor_a_pagar: vap, categoria_principal: "Pago de nómina", detalle: formData.detalle || null,
+        valor_a_pagar: vap, categoria_principal: "PAGO DE NOMINA", detalle: formData.detalle || null,
         primera_quincena_pagada: formData.primera_quincena_pagada, primera_quincena_valor: formData.primera_quincena_pagada ? parseFloat(formData.primera_quincena_valor) || 0 : null,
         primera_quincena_fecha: formData.primera_quincena_fecha || null, primera_quincena_metodo: formData.primera_quincena_pagada ? formData.primera_quincena_metodo : null,
         segunda_quincena_pagada: formData.segunda_quincena_pagada, segunda_quincena_valor: formData.segunda_quincena_pagada ? parseFloat(formData.segunda_quincena_valor) || 0 : null,
@@ -152,7 +152,7 @@ export function NominaSection() {
         cedula: formData.cedula, nombre: formData.nombre, telefono: formData.telefono || null, email: formData.email || null,
         valor_sueldo: parseFloat(formData.valor_sueldo), descuento: formData.descuento || null,
         descuento_valor: parseFloat(formData.descuento_valor) || 0, descuento_motivo: formData.descuento_motivo || null,
-        valor_a_pagar: vap, categoria_principal: "Pago de nómina", detalle: formData.detalle || null,
+        valor_a_pagar: vap, categoria_principal: "PAGO DE NOMINA", detalle: formData.detalle || null,
         primera_quincena_pagada: formData.primera_quincena_pagada, primera_quincena_valor: formData.primera_quincena_pagada ? parseFloat(formData.primera_quincena_valor) || 0 : null,
         primera_quincena_fecha: formData.primera_quincena_fecha || null, primera_quincena_metodo: formData.primera_quincena_pagada ? formData.primera_quincena_metodo : null,
         segunda_quincena_pagada: formData.segunda_quincena_pagada, segunda_quincena_valor: formData.segunda_quincena_pagada ? parseFloat(formData.segunda_quincena_valor) || 0 : null,
@@ -173,7 +173,7 @@ export function NominaSection() {
         const newV = parseFloat(formData.primera_quincena_valor) || 0
         if (oldV !== newV || editingRecord.primera_quincena_fecha !== formData.primera_quincena_fecha || editingRecord.nombre !== formData.nombre) {
           const { data: egreso } = await supabase.from("egresos").select("id")
-            .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+            .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA")
             .ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
             .limit(1).single()
           if (egreso) {
@@ -188,7 +188,7 @@ export function NominaSection() {
       } else if (!formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
         // Unmarked as paid → delete egreso
         await supabase.from("egresos").delete()
-          .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+          .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA")
           .ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
       }
 
@@ -202,7 +202,7 @@ export function NominaSection() {
         const newV = parseFloat(formData.segunda_quincena_valor) || 0
         if (oldV !== newV || editingRecord.segunda_quincena_fecha !== formData.segunda_quincena_fecha || editingRecord.nombre !== formData.nombre) {
           const { data: egreso } = await supabase.from("egresos").select("id")
-            .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+            .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA")
             .ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
             .limit(1).single()
           if (egreso) {
@@ -216,7 +216,7 @@ export function NominaSection() {
         }
       } else if (!formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
         await supabase.from("egresos").delete()
-          .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "Pago de nómina")
+          .eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA")
           .ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
       }
 
@@ -235,14 +235,14 @@ export function NominaSection() {
           await supabase.from("egresos")
             .delete()
             .eq("mes_id", record.mes_id)
-            .eq("categoria_principal", "Pago de nómina")
+            .eq("categoria_principal", "PAGO DE NOMINA")
             .ilike("observacion", `%1ra quincena de ${record.nombre}%`)
         }
         if (record.segunda_quincena_pagada) {
           await supabase.from("egresos")
             .delete()
             .eq("mes_id", record.mes_id)
-            .eq("categoria_principal", "Pago de nómina")
+            .eq("categoria_principal", "PAGO DE NOMINA")
             .ilike("observacion", `%2da quincena de ${record.nombre}%`)
         }
       }
@@ -307,7 +307,7 @@ export function NominaSection() {
 
       {/* Categoría y Detalle */}
       <div className="grid grid-cols-2 gap-4">
-        <div><Label>Categoría Principal</Label><Input value="Pago de nómina" disabled className="bg-gray-50" /></div>
+        <div><Label>Categoría Principal</Label><Input value="PAGO DE NOMINA" disabled className="bg-gray-50" /></div>
         <div>
           <div className="flex items-center justify-between"><Label>Detalle</Label><Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowDetallesConfig(true)}><Settings className="h-3 w-3" /></Button></div>
           <Select value={formData.detalle} onValueChange={(v) => setFormData({ ...formData, detalle: v })}><SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger><SelectContent>{detalles.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}</SelectContent></Select>

@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useRealtime } from "@/hooks/use-realtime"
 import { pagoDiarioService, type PagoDiarioRecord } from "@/lib/mod/pago-diario-service"
+import { getGlobalConfig } from "@/lib/globalConfig"
 import { supabase } from "@/lib/secure-db"
 import { todayEcuador } from "@/lib/timezone"
 import { toast } from "sonner"
@@ -50,6 +51,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
     telefono: "",
     email: "",
     ministerio: "",
+    categoria: "",
     detalle: "",
     valor: "",
     metodo_pago: "Transferencia" as "Efectivo" | "Transferencia",
@@ -57,6 +59,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
 
   // Ministerios (from module_groups)
   const [ministerios, setMinisterios] = useState<string[]>([])
+  const [categorias, setCategorias] = useState<string[]>([])
 
   // Search/history
   const [searchResults, setSearchResults] = useState<PagoDiarioRecord[]>([])
@@ -105,6 +108,8 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
   const loadMinisterios = async () => {
     const { data } = await supabase.from("module_groups").select("display_name").order("sort_order", { ascending: true })
     if (data) setMinisterios(data.map((g: any) => g.display_name))
+    const config = await getGlobalConfig()
+    setCategorias(config.categorias_principales || [])
   }
 
   useEffect(() => { loadData(); loadMinisterios() }, [loadData])
@@ -116,10 +121,10 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
   const totalMonth = records.reduce((s, r) => s + Number(r.valor), 0)
   const totalSearch = searchResults.reduce((s, r) => s + Number(r.valor), 0)
 
-  const resetForm = () => setForm({ fecha: todayEcuador(), nombre: "", telefono: "", email: "", ministerio: "", detalle: "", valor: "", metodo_pago: "Transferencia" })
+  const resetForm = () => setForm({ fecha: todayEcuador(), nombre: "", telefono: "", email: "", ministerio: "", categoria: "", detalle: "", valor: "", metodo_pago: "Transferencia" })
 
   const handleCreate = async () => {
-    if (!form.nombre.trim() || !form.valor || !form.ministerio || !form.detalle.trim() || !currentMonth) {
+    if (!form.nombre.trim() || !form.valor || !form.ministerio || !form.detalle.trim() || !form.categoria || !currentMonth) {
       toast.error("Complete todos los campos obligatorios")
       return
     }
@@ -136,6 +141,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
         telefono: form.telefono || null,
         email: form.email || null,
         ministerio: form.ministerio,
+        categoria: form.categoria,
         detalle: form.detalle.trim(),
         valor: Number(form.valor),
         metodo_pago: form.metodo_pago,
@@ -171,6 +177,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
         telefono: form.telefono || null,
         email: form.email || null,
         ministerio: form.ministerio,
+        categoria: form.categoria,
         detalle: form.detalle.trim(),
         valor: Number(form.valor),
         metodo_pago: form.metodo_pago,
@@ -208,6 +215,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
       telefono: record.telefono || "",
       email: record.email || "",
       ministerio: record.ministerio,
+      categoria: record.categoria || "",
       detalle: record.detalle,
       valor: String(record.valor),
       metodo_pago: record.metodo_pago,
@@ -277,6 +285,15 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
             {ministerios.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             <SelectItem value="Administración">Administración</SelectItem>
             <SelectItem value="General">General</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Categoría *</Label>
+        <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v })}>
+          <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+          <SelectContent>
+            {categorias.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
