@@ -30,6 +30,7 @@ interface QueryState {
   orderBy?: { column: string; ascending?: boolean }
   limitCount?: number
   isSingle?: boolean
+  isMaybeSingle?: boolean
   onConflictStr?: string
 }
 
@@ -165,6 +166,7 @@ class QueryBuilder implements PromiseLike<QueryResult> {
 
   maybeSingle(): QueryBuilder {
     this.state.isSingle = true
+    this.state.isMaybeSingle = true
     return this
   }
 
@@ -201,6 +203,7 @@ class QueryBuilder implements PromiseLike<QueryResult> {
       if (this.state.orderBy) body.order = this.state.orderBy
       if (this.state.limitCount) body.limit = this.state.limitCount
       if (this.state.isSingle) body.single = true
+      if (this.state.isMaybeSingle) body.maybeSingle = true
       if (this.state.onConflictStr) body.onConflict = this.state.onConflictStr
 
       const res = await fetch("/api/db", {

@@ -422,15 +422,15 @@ async getEgresosByMonth(id: string) {
       .from("meses")
       .select("*")
       .eq("status", "active")
-      .single();
+      .order("start_date", { ascending: false })
+      .limit(1);
 
     if (error) {
-      if (error.code === "PGRST116") return null;
       throw new Error(`Supabase getActiveMonth error: ${error.message}`);
     }
     
-    if (data) {
-      return await this.getFullMonth(data.id);
+    if (data && data.length > 0) {
+      return await this.getFullMonth(data[0].id);
     }
     
     return null;

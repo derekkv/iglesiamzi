@@ -39,27 +39,28 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
 
   // Auto apertura/cierre de mes
   useEffect(() => {
+    // Solo ejecutar una vez cuando se monta y hay datos cargados
+    if (!canEdit || !user) return
     autoManageMonth()
-  }, [currentMonth])
+  }, [currentMonth, canEdit, user])
 
   const autoManageMonth = async () => {
+    // No hacer nada si ya está gestionando
     if (!canEdit) return
     const mesActual = currentMonthEcuador()
     const anioActual = currentYearEcuador()
 
-    if (!currentMonth) {
-      // No hay mes activo → crear automáticamente
-      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-      try {
-        await startNewMonth(todayEcuador(), null)
-      } catch (e) { console.error("Error auto-creando mes:", e) }
-    } else if (currentMonth.month !== mesActual || currentMonth.year !== anioActual) {
-      // El mes activo no es el mes actual → cerrar y abrir nuevo
+    // Si hay mes activo y es el mes correcto, no hacer nada
+    if (currentMonth && currentMonth.month === mesActual && currentMonth.year === anioActual) return
+
+    // Si hay mes activo pero es de otro mes, cerrarlo
+    if (currentMonth && (currentMonth.month !== mesActual || currentMonth.year !== anioActual)) {
       try {
         await closeCurrentMonth(todayEcuador())
-        // startNewMonth se ejecutará automáticamente en el siguiente render cuando currentMonth sea null
       } catch (e) { console.error("Error auto-cerrando mes:", e) }
     }
+    // No crear automáticamente — dejar que el usuario lo haga desde el dashboard
+    // El mes se crea cuando no hay uno activo y el usuario entra a un módulo que lo requiere
   }
 
   // Cargar resumen del mes

@@ -292,8 +292,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
       miembroId: m.id,
       fuente: m.fuente,
       celulaNombre: m.celula_nombre,
-      gestionado,
-      respuesta: "",
+      gestionado: asistio ? true : gestionado, // Si asistió, se marca automáticamente como gestionado
+      respuesta: asistio ? "Asistió" : "",
       asistio,
       userId: user.id,
       userName: user.username,
@@ -301,6 +301,27 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
     setIsSaving(false)
     if (result.success) {
       toast.success("Registrado")
+
+      // Si un "posible" asistió → pasarlo a activo
+      if (asistio && !m.celula_asiste) {
+        const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+        await supabase.from(tabla).update({ celula_asiste: true }).eq("id", m.id)
+        toast.success(`${m.apellidos_nombres} ahora es miembro activo`)
+        loadMiembros()
+      }
+
+      // Verificar si un activo tiene 3+ faltas → pasarlo a posible
+      if (!asistio && m.celula_asiste) {
+        const historial = await getHistorialGestiones(m.id, m.fuente)
+        const ultimasFaltas = historial.filter((g) => !g.asistio).length
+        if (ultimasFaltas >= 3) {
+          const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+          await supabase.from(tabla).update({ celula_asiste: false }).eq("id", m.id)
+          toast.info(`${m.apellidos_nombres} pasó a posibles (3+ faltas)`)
+          loadMiembros()
+        }
+      }
+
       if (selectedCelula) loadGestionesSemana(selectedCelula)
     } else {
       toast.error(result.error || "Error")
@@ -360,26 +381,30 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {yaGestionado ? (
-                      <Badge className="bg-blue-100 text-blue-700">Gestionado</Badge>
-                    ) : tieneRegistro ? (
-                      <Badge variant="outline" className="text-amber-600 border-amber-300">Pendiente</Badge>
+                    {yaGestionado || gestionSemana?.asistio ? (
+                      <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}>
+                        {gestionSemana?.asistio ? "✓ Asistió" : "Gestionado"}
+                      </Badge>
+                    ) : tieneRegistro && !gestionSemana?.asistio ? (
+                      <Badge variant="outline" className="text-red-600 border-red-300">Faltó</Badge>
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {/* Botón Gestionar: solo para los que faltaron y no están gestionados */}
+                      {tieneRegistro && !gestionSemana?.asistio && !yaGestionado && canEdit && (
+                        <Button
+                          variant="outline" size="sm"
+                          onClick={() => handleGestionar(m)}
+                          className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                          <ClipboardCheck className="w-3 h-3 mr-1" /> Gestionar
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" title="Ver datos" onClick={() => setDetailMember(m)}>
                         <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="sm" title="Gestionar"
-                        onClick={() => handleGestionar(m)}
-                        disabled={yaGestionado || !canEdit}
-                        className={yaGestionado ? "opacity-40" : "text-blue-600"}
-                      >
-                        <ClipboardCheck className="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" title="Historial" onClick={() => handleOpenHistorial(m)}>
                         <History className="w-3.5 h-3.5" />

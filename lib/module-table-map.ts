@@ -92,6 +92,11 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["ofrenda-celulas"],
   },
 
+  // === GESTIÓN DE CÉLULAS ===
+  gestion_celulas: {
+    modules: ["celulas", "ofrenda-celulas"],
+  },
+
   // === CRONOGRAMA Y ASISTENCIA ===
   cronograma_servicio: {
     modules: [

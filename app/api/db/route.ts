@@ -85,6 +85,7 @@ export interface DbRequest {
   order?: { column: string; ascending?: boolean }
   limit?: number
   single?: boolean
+  maybeSingle?: boolean
   onConflict?: string
 }
 
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     // 2. PARSEAR REQUEST
     const body = await request.json() as DbRequest
-    const { action, table, select: selectFields, data, filters, order, limit, single, onConflict } = body
+    const { action, table, select: selectFields, data, filters, order, limit, single, maybeSingle, onConflict } = body
 
     if (!action || !table) {
       return NextResponse.json({ error: "action y table son requeridos" }, { status: 400 })
@@ -178,7 +179,9 @@ export async function POST(request: NextRequest) {
         }
         if (order) query = query.order(order.column, { ascending: order.ascending ?? true })
         if (limit) query = query.limit(limit)
-        if (single) {
+        if (maybeSingle) {
+          result = await query.maybeSingle()
+        } else if (single) {
           result = await query.single()
         } else {
           result = await query
@@ -243,6 +246,7 @@ export async function POST(request: NextRequest) {
 
     // 5. RETORNAR RESULTADO (sin campos bloqueados)
     if (result.error) {
+      console.error(`[/api/db] 500 DB ERROR — table: ${table}, action: ${action}, error:`, result.error.message, result.error.details || "", result.error.hint || "")
       return NextResponse.json({ error: result.error.message, details: result.error }, { status: 500 })
     }
 
@@ -250,7 +254,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: cleanData, count: result.count })
   } catch (error: any) {
-    console.error("Error en /api/db:", error)
+    console.error("[/api/db] 500 CATCH ERROR:", error.message, error.stack?.split("\n").slice(0, 3).join(" | "))
     return NextResponse.json({ error: error.message || "Error interno" }, { status: 500 })
   }
 }
