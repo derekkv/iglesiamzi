@@ -83,6 +83,7 @@ export async function getUserPermissions(userId: string) {
           description,
           icon,
           route,
+          sort_order,
           requires_active_month,
           is_active,
           group_id,

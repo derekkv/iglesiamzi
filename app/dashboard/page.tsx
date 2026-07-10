@@ -60,6 +60,15 @@ interface ModuleData {
   requiresActiveMonth: boolean
   hasAccess: boolean
   is_active: boolean
+  sortOrder?: number
+}
+
+function ModuleIcon({ icon, size = "text-4xl" }: { icon: string; size?: string }) {
+  if (icon.startsWith("/") || icon.startsWith("http")) {
+    const sizeClass = size === "text-5xl" ? "w-12 h-12" : size === "text-4xl" ? "w-10 h-10" : "w-8 h-8"
+    return <img src={icon} alt="" className={`${sizeClass} object-contain mx-auto`} />
+  }
+  return <span className={size}>{icon}</span>
 }
 
 function DownloadSeparator({
@@ -184,6 +193,7 @@ export default function DashboardPage() {
       requiresActiveMonth: permission.module.requires_active_month || false,
       hasAccess: permission.can_view,
       is_active: permission.is_active,
+      sortOrder: (permission.module as any).sort_order || 0,
       groupId: permission.module.group_id || null,
       group: permission.module.group || null,
     }))
@@ -214,9 +224,15 @@ export default function DashboardPage() {
         requiresActiveMonth: module.requiresActiveMonth,
         hasAccess: module.hasAccess,
         is_active: module.is_active,
+        sortOrder: module.sortOrder,
       })
       return acc
     }, {} as Record<string, GroupData>)
+
+  // Ordenar módulos dentro de cada grupo por sort_order
+  for (const group of Object.values(groupedModulesMap)) {
+    group.modules.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+  }
 
   const sortedGroups = Object.values(groupedModulesMap).sort(
     (a, b) => (a.sort_order || 0) - (b.sort_order || 0)
@@ -375,7 +391,7 @@ export default function DashboardPage() {
                   onClick={() => handleModuleClick(module)}
                 >
                   <CardHeader className="text-center">
-                    <div className="text-4xl mb-2">{module.icon}</div>
+                    <div className="mb-2"><ModuleIcon icon={module.icon} size="text-4xl" /></div>
                     <CardTitle className="text-lg">{module.title}</CardTitle>
                     <CardDescription>{module.description}</CardDescription>
                   </CardHeader>
@@ -423,7 +439,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex flex-wrap gap-1">
                       {group.modules.slice(0, 4).map((m, i) => (
-                        <span key={i} className="text-lg" title={m.title}>{m.icon}</span>
+                        <span key={i} className="text-lg" title={m.title}>{m.icon.startsWith("/") ? <img src={m.icon} className="w-5 h-5 inline" alt="" /> : m.icon}</span>
                       ))}
                       {group.modules.length > 4 && (
                         <span className="text-sm text-gray-500 self-center">+{group.modules.length - 4}</span>
@@ -488,7 +504,7 @@ export default function DashboardPage() {
                   ) : (
                     <>
                       <CardHeader className="text-center pt-8 pb-4">
-                        <div className="text-5xl mb-3">{module.icon}</div>
+                        <div className="mb-3"><ModuleIcon icon={module.icon} size="text-5xl" /></div>
                         <CardTitle className="text-lg">{module.title}</CardTitle>
                         <CardDescription>{module.description}</CardDescription>
                       </CardHeader>
@@ -529,7 +545,7 @@ export default function DashboardPage() {
                         onClick={() => isAccessible && handleModuleClick(module)}
                       >
                         <CardHeader className="text-center">
-                          <div className="text-4xl mb-2">{module.icon}</div>
+                          <div className="mb-2"><ModuleIcon icon={module.icon} size="text-4xl" /></div>
                           <CardTitle className="text-lg">{module.title}</CardTitle>
                           <CardDescription>{module.description}</CardDescription>
                         </CardHeader>
@@ -575,7 +591,7 @@ export default function DashboardPage() {
                         onClick={() => handleModuleClick(module)}
                       >
                         <CardHeader className="text-center">
-                          <div className="text-4xl mb-2">{module.icon}</div>
+                          <div className="mb-2"><ModuleIcon icon={module.icon} size="text-4xl" /></div>
                           <CardTitle className="text-lg">{module.title}</CardTitle>
                           <CardDescription>{module.description}</CardDescription>
                         </CardHeader>
