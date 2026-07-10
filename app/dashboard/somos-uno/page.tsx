@@ -381,12 +381,12 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {yaGestionado || gestionSemana?.asistio ? (
-                      <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}>
-                        {gestionSemana?.asistio ? "✓ Asistió" : "Gestionado"}
-                      </Badge>
+                    {yaGestionado ? (
+                      <Badge className="bg-blue-100 text-blue-700">Gestionado</Badge>
+                    ) : gestionSemana?.asistio ? (
+                      <Badge className="bg-green-100 text-green-700">✓ Asistió</Badge>
                     ) : tieneRegistro && !gestionSemana?.asistio ? (
-                      <Badge variant="outline" className="text-red-600 border-red-300">Faltó</Badge>
+                      <Badge variant="outline" className="text-amber-600 border-amber-300">Pendiente</Badge>
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}
