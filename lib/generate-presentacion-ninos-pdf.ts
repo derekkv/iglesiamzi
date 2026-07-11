@@ -86,53 +86,69 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
     borderWidth: 0.5,
   })
 
-  // Start lower to avoid content being too high
-  let yPos = height - 120
+  // === LOGO esquina superior derecha ===
+  try {
+    const logoResponse = await fetch("/logo.png")
+    const logoBytes = await logoResponse.arrayBuffer()
+    const logoImage = await doc.embedPng(logoBytes)
+    const logoSize = 70
+    page.drawImage(logoImage, {
+      x: width - borderInset - logoSize - 12,
+      y: height - borderInset - logoSize - 12,
+      width: logoSize,
+      height: logoSize,
+    })
+  } catch (e) {
+    // Si no se puede cargar el logo, continuar sin él
+  }
+
+  // Centrar contenido verticalmente
+  let yPos = height - 135
 
   // === ENCABEZADO ===
-  // "CERTIFICADO DE" — serif regular, mayúsculas, 18pt
-  drawCentered(page, "CERTIFICADO DE", yPos, serifRegular, 18, textColor)
-  yPos -= 50
+  // "CERTIFICADO DE" — serif regular, mayúsculas, 16pt
+  drawCentered(page, "CERTIFICADO DE", yPos, serifRegular, 16, textColor)
+  yPos -= 44
 
-  // "Dedicación de Niño" — Bemdayni script, 44pt (bold = script font itself)
-  drawCentered(page, "Dedicación de Niño", yPos, scriptFont, 44, textColor)
-  yPos -= 70
+  // "Dedicación de Niño" — Bemdayni script, 38pt
+  drawCentered(page, "Dedicación de Niño", yPos, scriptFont, 38, textColor)
+  yPos -= 62
 
   // === "ESTO CERTIFICA QUE" ===
-  drawCentered(page, "ESTO CERTIFICA QUE", yPos, serifRegular, 16, textColor)
-  yPos -= 50
+  drawCentered(page, "ESTO CERTIFICA QUE", yPos, serifRegular, 14, textColor)
+  yPos -= 46
 
   // === NOMBRE DEL NIÑO (elemento principal) ===
-  drawCentered(page, data.nombre_presentado, yPos, scriptFont, 38, textColor)
-  yPos -= 16
-  drawCenteredLine(page, yPos, 0.65, 0.75)
+  drawCentered(page, data.nombre_presentado, yPos, scriptFont, 34, textColor)
   yPos -= 14
-  drawCentered(page, "NOMBRE DEL NIÑO", yPos, serifRegular, 10, grayText)
-  yPos -= 55
+  drawCenteredLine(page, yPos, 0.60, 0.75)
+  yPos -= 12
+  drawCentered(page, "NOMBRE DEL NIÑO", yPos, serifRegular, 9, grayText)
+  yPos -= 48
 
   // === PADRES ===
   const padresText = `${data.nombre_padre} y ${data.nombre_madre}`
-  drawCentered(page, padresText, yPos, scriptFont, 28, textColor)
-  yPos -= 16
-  drawCenteredLine(page, yPos, 0.60, 0.75)
+  drawCentered(page, padresText, yPos, scriptFont, 24, textColor)
   yPos -= 14
-  drawCentered(page, "NOMBRES DE LOS PADRES", yPos, serifRegular, 10, grayText)
-  yPos -= 65
+  drawCenteredLine(page, yPos, 0.55, 0.75)
+  yPos -= 12
+  drawCentered(page, "NOMBRES DE LOS PADRES", yPos, serifRegular, 9, grayText)
+  yPos -= 56
 
   // === TEXTO CENTRAL ===
   // "FUE DEDICADO AL SEÑOR"
-  drawCentered(page, "FUE DEDICADO AL SEÑOR", yPos, serifRegular, 14, textColor)
-  yPos -= 45
+  drawCentered(page, "FUE DEDICADO AL SEÑOR", yPos, serifRegular, 13, textColor)
+  yPos -= 40
 
-  // "EL DÍA 13 DE Junio" — día y mes en bold/script
+  // "EL DÍA 13 DE Junio" — día bold, mes en script
   const { dia, mes, anio } = parseFecha(data.fecha)
   const diaStr = String(dia)
 
   const parts = [
-    { text: "EL DÍA ", font: serifRegular, size: 14 },
-    { text: diaStr, font: serifBold, size: 20 },
-    { text: " DE ", font: serifRegular, size: 14 },
-    { text: mes, font: scriptFont, size: 34 },
+    { text: "EL DÍA ", font: serifRegular, size: 13 },
+    { text: diaStr, font: serifBold, size: 18 },
+    { text: " DE ", font: serifRegular, size: 13 },
+    { text: mes, font: scriptFont, size: 30 },
   ]
 
   let totalWidth = 0
@@ -144,12 +160,12 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
     page.drawText(part.text, { x: xPos, y: yPos, size: part.size, font: part.font, color: textColor })
     xPos += part.font.widthOfTextAtSize(part.text, part.size)
   }
-  yPos -= 42
+  yPos -= 38
 
   // "DEL AÑO DE NUESTRO SEÑOR, 2026."
   const anioLine = [
-    { text: "DEL AÑO DE NUESTRO SEÑOR, ", font: serifRegular, size: 14 },
-    { text: `${anio}.`, font: serifBold, size: 20 },
+    { text: "DEL AÑO DE NUESTRO SEÑOR, ", font: serifRegular, size: 13 },
+    { text: `${anio}.`, font: serifBold, size: 18 },
   ]
 
   let totalWidth2 = 0
@@ -161,27 +177,27 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
     page.drawText(part.text, { x: xPos2, y: yPos, size: part.size, font: part.font, color: textColor })
     xPos2 += part.font.widthOfTextAtSize(part.text, part.size)
   }
-  yPos -= 90
+  yPos -= 76
 
   // === FIRMA ===
-  drawCenteredLine(page, yPos, 0.45, 0.75)
-  yPos -= 22
+  drawCenteredLine(page, yPos, 0.40, 0.75)
+  yPos -= 18
   // "Pastor [Nombre]"
   const pastorText = `Pastor ${data.nombre_pastor}`
-  drawCentered(page, pastorText, yPos, serifRegular, 14, textColor)
-  yPos -= 75
+  drawCentered(page, pastorText, yPos, serifRegular, 12, textColor)
+  yPos -= 62
 
-  // === VERSÍCULO — con la fuente Bemdayni, más grande ===
+  // === VERSÍCULO — con la fuente Bemdayni ===
   const versLine1 = "Él les dijo: \"Dejen que los niños vengan a mí,"
   const versLine2 = "y no se lo impidan, porque el reino de Dios"
   const versLine3 = "es de quienes son como ellos\"."
-  drawCentered(page, versLine1, yPos, scriptFont, 18, grayText)
-  yPos -= 22
-  drawCentered(page, versLine2, yPos, scriptFont, 18, grayText)
-  yPos -= 22
-  drawCentered(page, versLine3, yPos, scriptFont, 18, grayText)
-  yPos -= 22
-  drawCentered(page, "Mateo 19:14", yPos, serifItalic, 12, grayText)
+  drawCentered(page, versLine1, yPos, scriptFont, 17, grayText)
+  yPos -= 20
+  drawCentered(page, versLine2, yPos, scriptFont, 17, grayText)
+  yPos -= 20
+  drawCentered(page, versLine3, yPos, scriptFont, 17, grayText)
+  yPos -= 18
+  drawCentered(page, "Mateo 19:14", yPos, serifItalic, 11, grayText)
 
   return await doc.save()
 }
