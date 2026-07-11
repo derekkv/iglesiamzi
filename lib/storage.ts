@@ -45,10 +45,9 @@ export class SupabaseAdapter implements StorageAdapter {
       .from("meses")
       .select("*")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === "PGRST116") return null;
       throw new Error(`Supabase getMonth error: ${error.message}`);
     }
     return data;
@@ -384,9 +383,9 @@ async addEgreso(mesId: string, ingreso: any, audit?: AuditInfo) {
       .from("meses")
       .select("*")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
-    if (mesError) return null;
+    if (mesError || !mes) return null;
 
 
     const { data: ingresos } = await supabase
@@ -403,7 +402,7 @@ async addEgreso(mesId: string, ingreso: any, audit?: AuditInfo) {
       .from("configuraciones_mes")
       .select("*")
       .eq("mes_id", id)
-      .single();
+      .maybeSingle();
 
     return {
       ...mes,

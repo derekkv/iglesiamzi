@@ -1,23 +1,22 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/secure-db"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useAuth } from "@/contexts/auth-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { cronogramaService, type CronogramaEntry } from "@/lib/mod/cronograma-service"
+import { nowEcuador } from "@/lib/timezone"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Lock } from "lucide-react"
+import { ArrowLeft, Lock, Calendar } from "lucide-react"
 
-// Mapa de key → label para todos los ministerios conocidos
+// Mapa de key -> label para mostrar nombres bonitos
 const MODULO_LABELS: Record<string, string> = {
   protocolo: "Protocolo",
   administracion: "Administración",
@@ -30,7 +29,6 @@ const MODULO_LABELS: Record<string, string> = {
   comunicacion: "Comunicación",
   jovenes: "Jóvenes",
   hombres: "Hombres",
-  pastoral: "Pastoral",
 }
 
 function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
@@ -38,9 +36,20 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
   const { user } = useAuth()
   const [entries, setEntries] = useState<CronogramaEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("")
-  const [filterFecha, setFilterFecha] = useState("")
-  const [modulos, setModulos] = useState<{ key: string; label: string }[]>([])
+
+  // Calcular rango de semana actual (lunes a domingo, zona Ecuador)
+  const { weekStart, weekEnd } = useMemo(() => {
+    const now = nowEcuador()
+    const day = now.getDay()
+    const diffToMonday = day === 0 ? -6 : 1 - day
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + diffToMonday)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    return { weekStart: fmt(monday), weekEnd: fmt(sunday) }
+  }, [])
 
   const loadEntries = useCallback(async (silent = false) => {
     try {
@@ -48,34 +57,19 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
       const { data, error } = await supabase
         .from("cronograma_servicio")
         .select("*")
-        .order("fecha", { ascending: false })
+        .gte("fecha", weekStart)
+        .lte("fecha", weekEnd)
+        .neq("modulo", "pastoral")
+        .order("fecha", { ascending: true })
 
       if (error) throw error
       setEntries(data || [])
-
-      // Extraer módulos únicos dinámicamente
-      if (data && data.length > 0) {
-        const uniqueModulos = Array.from(new Set(data.map((e: CronogramaEntry) => e.modulo))).filter(Boolean) as string[]
-        const sorted = uniqueModulos.sort((a, b) => {
-          const order = Object.keys(MODULO_LABELS)
-          return order.indexOf(a) - order.indexOf(b)
-        })
-        const modulosList = sorted.map((key) => ({
-          key,
-          label: MODULO_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1),
-        }))
-        setModulos(modulosList)
-        // Si no hay tab activo o el activo ya no existe, seleccionar el primero
-        if (!activeTab || !sorted.includes(activeTab)) {
-          setActiveTab(sorted[0] || "")
-        }
-      }
     } catch (error) {
       console.error("Error loading:", error)
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [])
+  }, [weekStart, weekEnd])
 
   useEffect(() => { loadEntries() }, [loadEntries])
 
@@ -92,26 +86,29 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
-  const formatDate = (dateStr: string) => {
+  const formatDateFull = (dateStr: string) => {
     const date = new Date(dateStr + "T12:00:00")
-    const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-    const day = String(date.getDate()).padStart(2, "0")
-    const month = String(date.getMonth() + 1).padStart(2, "0")
-    return `${days[date.getDay()]} ${day}/${month}`
+    const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+    const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`
   }
 
-  // Filtrar por módulo activo y fecha
-  const filteredEntries = entries.filter((e) => {
-    if (e.modulo !== activeTab) return false
-    if (filterFecha && e.fecha !== filterFecha) return false
-    return true
-  })
+  // Agrupar por fecha
+  const entriesByDate = useMemo(() => {
+    const byDate: Record<string, CronogramaEntry[]> = {}
+    for (const entry of entries) {
+      if (!byDate[entry.fecha]) byDate[entry.fecha] = []
+      byDate[entry.fecha].push(entry)
+    }
+    return byDate
+  }, [entries])
+
+  const sortedDates = Object.keys(entriesByDate).sort((a, b) => a.localeCompare(b))
 
   // Stats
-  const totalModulo = entries.filter((e) => e.modulo === activeTab).length
-  const puntuales = entries.filter((e) => e.modulo === activeTab && e.atraso === false).length
-  const tardanzas = entries.filter((e) => e.modulo === activeTab && e.atraso === true).length
-  const sinMarcar = entries.filter((e) => e.modulo === activeTab && e.atraso === null || e.atraso === undefined).length
+  const puntuales = entries.filter((e) => e.atraso === false).length
+  const tardanzas = entries.filter((e) => e.atraso === true).length
+  const sinMarcar = entries.filter((e) => e.atraso === null || e.atraso === undefined).length
 
   if (loading) {
     return (
@@ -132,14 +129,17 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
               </Button>
               <div>
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Gestión de Cronogramas</h1>
-                <p className="text-xs text-gray-500">Registrar hora de llegada y puntualidad</p>
+                <p className="text-xs text-gray-500">Semana: {weekStart.split("-").reverse().join("/")} — {weekEnd.split("-").reverse().join("/")}</p>
               </div>
             </div>
-            {!canEdit && (
-              <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1">
-                <Lock className="w-3 h-3" /> Solo lectura
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {!canEdit && (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1">
+                  <Lock className="w-3 h-3" /> Solo lectura
+                </Badge>
+              )}
+              <Badge variant="secondary">{entries.length} asignaciones</Badge>
+            </div>
           </div>
         </div>
       </header>
@@ -149,7 +149,7 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-gray-700">{totalModulo}</p>
+              <p className="text-2xl font-bold text-gray-700">{entries.length}</p>
               <p className="text-xs text-gray-500">Total</p>
             </CardContent>
           </Card>
@@ -173,147 +173,146 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className={`grid w-full`} style={{ gridTemplateColumns: `repeat(${modulos.length}, minmax(0, 1fr))` }}>
-            {modulos.map((m) => (
-              <TabsTrigger key={m.key} value={m.key} className="text-xs sm:text-sm">
-                {m.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {/* Contenido agrupado por fecha */}
+        {sortedDates.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-gray-500">
+              <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No hay servicios programados para esta semana</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {sortedDates.map((fecha) => {
+              const entriesForDate = entriesByDate[fecha]
+              return (
+                <div key={fecha} className="space-y-3">
+                  {/* Cabecera de fecha */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                      <Calendar className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900">{formatDateFull(fecha)}</h2>
+                      <p className="text-xs text-gray-500">{entriesForDate.length} persona{entriesForDate.length !== 1 ? "s" : ""}</p>
+                    </div>
+                  </div>
 
-          {modulos.map((mod) => (
-            <TabsContent key={mod.key} value={mod.key} className="space-y-4 mt-4">
-              {/* Filtro de fecha */}
-              <div className="flex items-center gap-3">
-                <Input
-                  type="date"
-                  value={filterFecha}
-                  onChange={(e) => setFilterFecha(e.target.value)}
-                  className="w-44"
-                />
-                {filterFecha && (
-                  <Button variant="ghost" size="sm" onClick={() => setFilterFecha("")}>
-                    Limpiar
-                  </Button>
-                )}
-                <Badge variant="secondary">{filteredEntries.length} registros</Badge>
-              </div>
-
-              {filteredEntries.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center text-gray-500">
-                    No hay servicios registrados{filterFecha ? " para esta fecha" : ""}
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table className="min-w-[900px]">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Fecha</TableHead>
-                        <TableHead className="text-xs">Persona</TableHead>
-                        <TableHead className="text-xs">Asignación</TableHead>
-                        <TableHead className="text-xs">H. Entrada</TableHead>
-                        <TableHead className="text-xs">H. Llegada</TableHead>
-                        <TableHead className="text-xs">¿Llegó tarde?</TableHead>
-                        <TableHead className="text-xs text-center">Acuse</TableHead>
-                        <TableHead className="text-xs text-center">Alerta 2</TableHead>
-                        <TableHead className="text-xs text-center">Alerta 1</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEntries.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell className="text-xs">{formatDate(entry.fecha)}</TableCell>
-                          <TableCell className="text-sm font-medium">{entry.user_name}</TableCell>
-                          <TableCell className="text-xs">{entry.asignacion}</TableCell>
-                          <TableCell className="text-xs">{entry.hora_entrada || "-"}</TableCell>
-                          <TableCell>
-                            {canEdit ? (
-                              <Input
-                                type="time"
-                                className="h-7 w-24 text-xs"
-                                value={entry.hora_llegada || ""}
-                                onChange={(e) => handleInlineUpdate(entry.id!, "hora_llegada", e.target.value || null)}
-                              />
-                            ) : (
-                              <span className="text-xs">{entry.hora_llegada || "-"}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {canEdit ? (
-                              <select
-                                className="h-7 text-xs border rounded px-2 bg-white"
-                                value={entry.atraso === true ? "si" : entry.atraso === false ? "no" : ""}
-                                onChange={(e) => {
-                                  const val = e.target.value === "si" ? true : e.target.value === "no" ? false : null
-                                  handleInlineUpdate(entry.id!, "atraso", val)
-                                }}
-                              >
-                                <option value="">-</option>
-                                <option value="no">No (puntual)</option>
-                                <option value="si">Sí (tarde)</option>
-                              </select>
-                            ) : (
-                              entry.atraso === false ? (
-                                <span className="inline-block w-4 h-4 rounded-full bg-green-500" title="Puntual" />
-                              ) : entry.atraso === true ? (
-                                <span className="inline-block w-4 h-4 rounded-full bg-red-500" title="Llegó tarde" />
-                              ) : (
-                                <span className="text-gray-300 text-xs">-</span>
-                              )
-                            )}
-                          </TableCell>
-                          {/* Acuse de asignación */}
-                          <TableCell className="text-center">
-                            {entry.acuse_asignacion ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_asignacion_at ? `Confirmado: ${new Date(entry.acuse_asignacion_at).toLocaleString("es-ES")}` : ""}>
-                                ✓
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full" title="Pendiente de confirmar">
-                                ⏳
-                              </span>
-                            )}
-                          </TableCell>
-                          {/* Alerta 2 (5 días) */}
-                          <TableCell className="text-center">
-                            {!entry.alerta2_enviada ? (
-                              <span className="text-[10px] text-gray-400">—</span>
-                            ) : entry.acuse_alerta2 ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_alerta2_at ? `Confirmado: ${new Date(entry.acuse_alerta2_at).toLocaleString("es-ES")}` : ""}>
-                                ✓
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded-full" title={entry.alerta2_enviada_at ? `Enviada: ${new Date(entry.alerta2_enviada_at).toLocaleString("es-ES")}` : "Enviada"}>
-                                ⏳
-                              </span>
-                            )}
-                          </TableCell>
-                          {/* Alerta 1 (1 día) */}
-                          <TableCell className="text-center">
-                            {!entry.alerta1_enviada ? (
-                              <span className="text-[10px] text-gray-400">—</span>
-                            ) : entry.acuse_alerta1 ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_alerta1_at ? `Confirmado: ${new Date(entry.acuse_alerta1_at).toLocaleString("es-ES")}` : ""}>
-                                ✓
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full" title={entry.alerta1_enviada_at ? `Enviada: ${new Date(entry.alerta1_enviada_at).toLocaleString("es-ES")}` : "Enviada"}>
-                                ⏳
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  {/* Tabla con campos de gestión */}
+                  <Card className="overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <Table className="min-w-[1000px]">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs">Ministerio</TableHead>
+                              <TableHead className="text-xs">Persona</TableHead>
+                              <TableHead className="text-xs">Asignación</TableHead>
+                              <TableHead className="text-xs">H. Entrada</TableHead>
+                              <TableHead className="text-xs">H. Llegada</TableHead>
+                              <TableHead className="text-xs">¿Llegó tarde?</TableHead>
+                              <TableHead className="text-xs text-center">Acuse</TableHead>
+                              <TableHead className="text-xs text-center">Alerta 2</TableHead>
+                              <TableHead className="text-xs text-center">Alerta 1</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {entriesForDate.map((entry) => (
+                              <TableRow key={entry.id}>
+                                <TableCell className="text-xs font-medium text-blue-700">
+                                  {MODULO_LABELS[entry.modulo] || entry.modulo}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium">{entry.user_name}</TableCell>
+                                <TableCell className="text-xs">{entry.asignacion}</TableCell>
+                                <TableCell className="text-xs">{entry.hora_entrada || "-"}</TableCell>
+                                <TableCell>
+                                  {canEdit ? (
+                                    <Input
+                                      type="time"
+                                      className="h-7 w-24 text-xs"
+                                      value={entry.hora_llegada || ""}
+                                      onChange={(e) => handleInlineUpdate(entry.id!, "hora_llegada", e.target.value || null)}
+                                    />
+                                  ) : (
+                                    <span className="text-xs">{entry.hora_llegada || "-"}</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {canEdit ? (
+                                    <select
+                                      className="h-7 text-xs border rounded px-2 bg-white"
+                                      value={entry.atraso === true ? "si" : entry.atraso === false ? "no" : ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value === "si" ? true : e.target.value === "no" ? false : null
+                                        handleInlineUpdate(entry.id!, "atraso", val)
+                                      }}
+                                    >
+                                      <option value="">-</option>
+                                      <option value="no">No (puntual)</option>
+                                      <option value="si">Sí (tarde)</option>
+                                    </select>
+                                  ) : (
+                                    entry.atraso === false ? (
+                                      <span className="inline-block w-4 h-4 rounded-full bg-green-500" title="Puntual" />
+                                    ) : entry.atraso === true ? (
+                                      <span className="inline-block w-4 h-4 rounded-full bg-red-500" title="Llegó tarde" />
+                                    ) : (
+                                      <span className="text-gray-300 text-xs">-</span>
+                                    )
+                                  )}
+                                </TableCell>
+                                {/* Acuse de asignación */}
+                                <TableCell className="text-center">
+                                  {entry.acuse_asignacion ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_asignacion_at ? `Confirmado: ${new Date(entry.acuse_asignacion_at).toLocaleString("es-ES")}` : ""}>
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full" title="Pendiente de confirmar">
+                                      ⏳
+                                    </span>
+                                  )}
+                                </TableCell>
+                                {/* Alerta 2 (5 días) */}
+                                <TableCell className="text-center">
+                                  {!entry.alerta2_enviada ? (
+                                    <span className="text-[10px] text-gray-400">—</span>
+                                  ) : entry.acuse_alerta2 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_alerta2_at ? `Confirmado: ${new Date(entry.acuse_alerta2_at).toLocaleString("es-ES")}` : ""}>
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded-full" title={entry.alerta2_enviada_at ? `Enviada: ${new Date(entry.alerta2_enviada_at).toLocaleString("es-ES")}` : "Enviada"}>
+                                      ⏳
+                                    </span>
+                                  )}
+                                </TableCell>
+                                {/* Alerta 1 (1 día) */}
+                                <TableCell className="text-center">
+                                  {!entry.alerta1_enviada ? (
+                                    <span className="text-[10px] text-gray-400">—</span>
+                                  ) : entry.acuse_alerta1 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full" title={entry.acuse_alerta1_at ? `Confirmado: ${new Date(entry.acuse_alerta1_at).toLocaleString("es-ES")}` : ""}>
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full" title={entry.alerta1_enviada_at ? `Enviada: ${new Date(entry.alerta1_enviada_at).toLocaleString("es-ES")}` : "Enviada"}>
+                                      ⏳
+                                    </span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              )}
-            </TabsContent>
-          ))}
-        </Tabs>
+              )
+            })}
+          </div>
+        )}
       </main>
     </div>
   )

@@ -169,9 +169,10 @@ export interface CensoConfiguraciones {
 export async function getMesById(mesId: string) {
 
 
-  const { data: mes, error } = await supabase.from("meses").select("*").eq("id", mesId).single()
+  const { data: mes, error } = await supabase.from("meses").select("*").eq("id", mesId).maybeSingle()
 
   if (error) throw error
+  if (!mes) throw new Error(`Mes con id "${mesId}" no encontrado`)
   return mes as Mes
 }
 

@@ -15,8 +15,10 @@ import * as fs from "fs"
 const AUTH_FOLDER = path.join(__dirname, "..", "auth_info")
 const logger = pino({ level: "silent" })
 
-const MAX_RECONNECT_ATTEMPTS = 5
-const RECONNECT_DELAY_MS = 5000
+const MAX_RECONNECT_ATTEMPTS = 8
+const BASE_RECONNECT_DELAY_MS = 2000 // 2s base, crece exponencialmente
+const MAX_RECONNECT_DELAY_MS = 60000 // máximo 60s entre reintentos
+const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutos sin evento = socket muerto
 
 export interface WAStatus {
   connected: boolean
@@ -31,6 +33,8 @@ export class WhatsAppService {
   private qrCode: string | null = null
   private reconnectAttempts = 0
   private connectingLock = false
+  private lastEventTimestamp = Date.now()
+  private watchdogInterval: NodeJS.Timeout | null = null
   private status: WAStatus = {
     connected: false,
     connecting: false,
@@ -45,6 +49,67 @@ export class WhatsAppService {
 
   getQR(): string | null {
     return this.qrCode
+  }
+
+  /**
+   * Calcula el delay de reconexión con backoff exponencial + jitter.
+   * Intento 1: ~2-3s, Intento 2: ~4-6s, Intento 3: ~8-12s, etc.
+   */
+  private getReconnectDelay(): number {
+    const exponentialDelay = BASE_RECONNECT_DELAY_MS * Math.pow(2, this.reconnectAttempts - 1)
+    const cappedDelay = Math.min(exponentialDelay, MAX_RECONNECT_DELAY_MS)
+    // Agregar jitter aleatorio (±30%) para evitar thundering herd
+    const jitter = cappedDelay * (0.7 + Math.random() * 0.6)
+    return Math.round(jitter)
+  }
+
+  /**
+   * Watchdog: si no recibimos ningún evento del socket en 5 minutos,
+   * asumimos que está congelado y matamos el proceso para que PM2 lo reinicie.
+   */
+  private startWatchdog(): void {
+    this.stopWatchdog()
+    this.lastEventTimestamp = Date.now()
+
+    this.watchdogInterval = setInterval(() => {
+      const elapsed = Date.now() - this.lastEventTimestamp
+      if (elapsed > WATCHDOG_TIMEOUT_MS) {
+        console.error(`🐕 WATCHDOG: Sin eventos por ${Math.round(elapsed / 1000)}s. Socket congelado. Terminando proceso...`)
+        process.exit(1) // PM2 lo reiniciará
+      }
+    }, 60_000) // Verificar cada 60 segundos
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogInterval) {
+      clearInterval(this.watchdogInterval)
+      this.watchdogInterval = null
+    }
+  }
+
+  /** Registra actividad para el watchdog */
+  private touchWatchdog(): void {
+    this.lastEventTimestamp = Date.now()
+  }
+
+  /**
+   * Destruye el socket actual completamente: cierra conexión,
+   * remueve todos los listeners, y libera la referencia.
+   */
+  private destroySocket(): void {
+    if (this.socket) {
+      try {
+        // Remover todos los event listeners para evitar leaks
+        this.socket.ev.removeAllListeners("connection.update")
+        this.socket.ev.removeAllListeners("creds.update")
+        this.socket.ev.removeAllListeners("messages.upsert")
+        // Cerrar el socket
+        this.socket.end(undefined)
+      } catch (err) {
+        // Ignorar errores al destruir — el socket puede ya estar muerto
+      }
+      this.socket = null
+    }
   }
 
   async connect(): Promise<void> {
@@ -63,14 +128,17 @@ export class WhatsAppService {
     this.qrCode = null
 
     try {
+      // Destruir socket anterior si existe (evitar listeners duplicados)
+      this.destroySocket()
+
       // Asegurar que existe la carpeta de auth
       if (!fs.existsSync(AUTH_FOLDER)) {
         fs.mkdirSync(AUTH_FOLDER, { recursive: true })
       }
 
-      // Obtener la versión más reciente del protocolo
+      // Obtener la versión más reciente del protocolo — siempre fresca, sin cache
       const { version, isLatest } = await fetchLatestBaileysVersion()
-      console.log(`📋 Usando versión WA: ${version.join(".")} (${isLatest ? "última" : "cache"})`)
+      console.log(`📋 Usando versión WA: ${version.join(".")} (${isLatest ? "última" : "actualizada"})`)
 
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER)
 
@@ -79,10 +147,16 @@ export class WhatsAppService {
         logger,
         version,
         browser: ["IglesiaRegaloDeDios", "Chrome", "1.0.0"],
+        // No cachear la versión — fetchLatestBaileysVersion ya nos da la más reciente
+        printQRInTerminal: false,
       })
+
+      // Iniciar watchdog
+      this.startWatchdog()
 
       // Manejar actualizaciones de conexión
       this.socket.ev.on("connection.update", async (update: Partial<ConnectionState>) => {
+        this.touchWatchdog()
         const { connection, lastDisconnect, qr } = update
 
         if (qr) {
@@ -113,28 +187,38 @@ export class WhatsAppService {
           // Si las credenciales son inválidas (401, 403, 405), limpiar y empezar de cero
           if (statusCode === 401 || statusCode === 403 || statusCode === 405) {
             console.log("🗑️  Credenciales inválidas. Limpiando...")
+            this.destroySocket()
             this.cleanAuthFolder()
-            // Solo reconectar una vez con credenciales limpias
             if (this.reconnectAttempts < 2) {
               this.reconnectAttempts++
-              setTimeout(() => this.connect(), 3000)
+              const delay = this.getReconnectDelay()
+              console.log(`🔄 Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${Math.round(delay / 1000)}s...`)
+              setTimeout(() => this.connect(), delay)
             } else {
               console.log("⛔ Múltiples fallos con credenciales limpias. Detenido.")
               this.reconnectAttempts = 0
+              this.stopWatchdog()
             }
             return
           }
 
           if (shouldReconnect && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             this.reconnectAttempts++
-            console.log(`🔄 Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`)
-            setTimeout(() => this.connect(), RECONNECT_DELAY_MS)
+            const delay = this.getReconnectDelay()
+            console.log(`🔄 Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${Math.round(delay / 1000)}s (backoff)...`)
+            // Destruir el socket viejo antes de reconectar
+            this.destroySocket()
+            setTimeout(() => this.connect(), delay)
           } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.log("⛔ Máximo de reintentos alcanzado.")
-            this.reconnectAttempts = 0
+            console.error(`⛔ Máximo de reintentos (${MAX_RECONNECT_ATTEMPTS}) alcanzado. Matando proceso para reinicio limpio...`)
+            this.stopWatchdog()
+            // Dar un momento para que los logs se escriban
+            setTimeout(() => process.exit(1), 1000)
           } else {
             // Logout intencional
+            this.destroySocket()
             this.cleanAuthFolder()
+            this.stopWatchdog()
           }
         }
 
@@ -143,7 +227,7 @@ export class WhatsAppService {
           this.status.connecting = false
           this.qrCode = null
           this.connectingLock = false
-          this.reconnectAttempts = 0
+          this.reconnectAttempts = 0 // Reset en conexión exitosa
           this.status.lastConnected = new Date().toISOString()
 
           // Obtener info del usuario conectado
@@ -157,21 +241,38 @@ export class WhatsAppService {
         }
       })
 
-      // Guardar credenciales cuando se actualizan
-      this.socket.ev.on("creds.update", saveCreds)
+      // Guardar credenciales cuando se actualizan — SIEMPRE
+      this.socket.ev.on("creds.update", () => {
+        this.touchWatchdog()
+        saveCreds()
+      })
+
+      // Escuchar mensajes para mantener vivo el watchdog
+      this.socket.ev.on("messages.upsert", () => {
+        this.touchWatchdog()
+      })
     } catch (err: any) {
       console.error("❌ Error iniciando conexión:", err.message)
       this.status.connecting = false
       this.connectingLock = false
+
+      // Si falla la conexión inicial, intentar reconectar con backoff
+      if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        this.reconnectAttempts++
+        const delay = this.getReconnectDelay()
+        console.log(`🔄 Error en connect(). Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${Math.round(delay / 1000)}s...`)
+        setTimeout(() => this.connect(), delay)
+      } else {
+        console.error("⛔ Error persistente en connect(). Matando proceso...")
+        setTimeout(() => process.exit(1), 1000)
+      }
     }
   }
 
   async disconnect(): Promise<void> {
     this.reconnectAttempts = MAX_RECONNECT_ATTEMPTS // evitar reconexión
-    if (this.socket) {
-      this.socket.end(undefined)
-      this.socket = null
-    }
+    this.stopWatchdog()
+    this.destroySocket()
     this.status.connected = false
     this.status.connecting = false
     this.qrCode = null
@@ -180,14 +281,15 @@ export class WhatsAppService {
 
   async logout(): Promise<void> {
     this.reconnectAttempts = MAX_RECONNECT_ATTEMPTS
+    this.stopWatchdog()
     if (this.socket) {
       try {
         await this.socket.logout()
       } catch (err) {
         // Si falla el logout, igual limpiamos
       }
-      this.socket = null
     }
+    this.destroySocket()
     this.status = {
       connected: false,
       connecting: false,
@@ -212,6 +314,7 @@ export class WhatsAppService {
       : `${cleanPhone}@s.whatsapp.net`
 
     const result = await this.socket.sendMessage(jid, { text: message })
+    this.touchWatchdog()
     console.log(`📤 Mensaje enviado a ${cleanPhone}`)
     return result!
   }
@@ -253,6 +356,7 @@ export class WhatsAppService {
     }
 
     const result = await this.socket.sendMessage(jid, messageContent)
+    this.touchWatchdog()
     console.log(`📤 Media (${mediaType}) enviado a ${cleanPhone}`)
     return result!
   }
