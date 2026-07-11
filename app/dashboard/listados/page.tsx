@@ -17,6 +17,7 @@ import { generateBautizoPDF } from "@/lib/generate-bautizo-pdf"
 import { generateMatrimonioPDF } from "@/lib/generate-matrimonio-pdf"
 import { generateMatrimonioPDFv2 } from "@/lib/generate-matrimonio-pdf-v2"
 import { generateCertificadosPDF } from "@/lib/generate-certificados"
+import { generatePresentacionNinoPDF } from "@/lib/generate-presentacion-ninos-pdf"
 import { PDFDocument } from "pdf-lib"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import type { CicloTipo } from "@/lib/mod/discipulado-ciclos-service"
@@ -162,6 +163,45 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
     } catch (error) {
       console.error("Error generando discipulado:", error)
       toast.error("Error al generar certificados de discipulado")
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // ========== PRESENTACIÓN DE NIÑOS ==========
+  async function handleGeneratePresentacion() {
+    setGenerating(true)
+    try {
+      const { data, error } = await supabase
+        .from("presentacion_ninos")
+        .select("*")
+        .order("fecha", { ascending: false })
+
+      if (error) throw error
+      if (!data || data.length === 0) { toast.error("No hay presentaciones registradas"); setGenerating(false); return }
+
+      const mergedDoc = await PDFDocument.create()
+      for (const record of data) {
+        const pdfBytes = await generatePresentacionNinoPDF({
+          nombre_presentado: record.nombre_presentado,
+          nombre_padre: record.nombre_padre,
+          nombre_madre: record.nombre_madre,
+          fecha: record.fecha,
+          nombre_pastor: record.nombre_pastor || "",
+          testigo1: record.testigo1 || "",
+          testigo2: record.testigo2 || "",
+        })
+        const singleDoc = await PDFDocument.load(pdfBytes)
+        const [page] = await mergedDoc.copyPages(singleDoc, [0])
+        mergedDoc.addPage(page)
+      }
+
+      const mergedBytes = await mergedDoc.save()
+      downloadBlob(mergedBytes, `Presentacion_Ninos_${todayStr()}.pdf`)
+      toast.success(`PDF generado con ${data.length} certificados de dedicación`)
+    } catch (error) {
+      console.error("Error generando presentación:", error)
+      toast.error("Error al generar PDFs de presentación")
     } finally {
       setGenerating(false)
     }
@@ -465,6 +505,7 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
               <TabsList className="flex flex-wrap h-auto gap-1">
                 <TabsTrigger value="bautizos">Bautizos</TabsTrigger>
                 <TabsTrigger value="matrimonios">Matrimonios</TabsTrigger>
+                <TabsTrigger value="presentacion">Presentación</TabsTrigger>
                 <TabsTrigger value="discipulado">Discipulado</TabsTrigger>
                 <TabsTrigger value="censo">Censo Excel</TabsTrigger>
               </TabsList>
@@ -501,6 +542,21 @@ function ListadosContent({ canEdit }: { canEdit: boolean }) {
                       {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</> : <><Download className="w-4 h-4 mr-2" />Simple (nombres, ofició, fecha)</>}
                     </Button>
                   </div>
+                </div>
+              </TabsContent>
+
+              {/* === PRESENTACIÓN DE NIÑOS === */}
+              <TabsContent value="presentacion" className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-amber-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5" /> Certificados de Dedicación de Niños
+                  </h3>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Genera un PDF con todos los certificados de dedicación/presentación de niños registrados.
+                  </p>
+                  <Button className="mt-3 bg-amber-600 hover:bg-amber-700" onClick={handleGeneratePresentacion} disabled={generating}>
+                    {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</> : <><Download className="w-4 h-4 mr-2" />Generar todos los certificados</>}
+                  </Button>
                 </div>
               </TabsContent>
 
