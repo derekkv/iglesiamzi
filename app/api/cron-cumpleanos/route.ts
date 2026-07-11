@@ -327,6 +327,163 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// IDs de admins que reciben notificación de cumpleaños
+const ADMIN_BIRTHDAY_NOTIFY_IDS = [
+  "bb4dce93-0345-4203-8e8a-76b6d58490e8",
+  "5047fe7d-0e7b-4752-b25a-ae3b9bbac009",
+]
+
+// Enviar WhatsApp texto simple
+async function sendWhatsAppText(phone: string, message: string): Promise<boolean> {
+  try {
+    const formatted = formatPhoneForWhatsApp(phone)
+    const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: formatted, message }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+// Enviar email simple HTML
+async function sendSimpleEmail(to: string, subject: string, html: string): Promise<boolean> {
+  try {
+    const nodemailer = require("nodemailer")
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.hostinger.com",
+      port: parseInt(process.env.SMTP_PORT || "465"),
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER || "notificaciones@iglesiaregalodedios.com",
+        pass: process.env.SMTP_PASS,
+      },
+    })
+    await transporter.sendMail({
+      from: `"Iglesia Regalo de Dios" <${process.env.SMTP_USER || "notificaciones@iglesiaregalodedios.com"}>`,
+      to,
+      subject,
+      html,
+    })
+    return true
+  } catch (err) {
+    console.error("Error enviando email admin:", err)
+    return false
+  }
+}
+
+/**
+ * Notifica a los admins configurados sobre los cumpleañeros del día.
+ * Canales: WhatsApp (texto + imágenes), Email, Push, Buzón (modal in-app)
+ */
+async function notifyAdminsBirthdays(
+  cumpleaneros: Array<{ id: number; nombre: string; edad: number; celular: string | null; fuente: string }>,
+  dia: number,
+  mes: number,
+  anio: number
+) {
+  const fechaHoy = `${dia}/${String(mes).padStart(2, "0")}/${anio}`
+  const lista = cumpleaneros.map((c) => `• ${c.nombre} (${c.edad} años)`).join("\n")
+  const listaHtml = cumpleaneros.map((c) => `<li><strong>${c.nombre}</strong> — ${c.edad} años</li>`).join("")
+
+  const waMessage = `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n_Total: ${cumpleaneros.length} persona(s)_`
+
+  const emailSubject = `🎂 Cumpleaños de hoy (${fechaHoy}) — ${cumpleaneros.length} persona(s)`
+  const emailHtml = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #f9fafb;">
+  <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+    <div style="background: linear-gradient(135deg, #7c3aed, #ec4899); padding: 24px; text-align: center;">
+      <h2 style="color: white; margin: 0;">🎂 Cumpleaños de Hoy</h2>
+      <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">${fechaHoy}</p>
+    </div>
+    <div style="padding: 24px;">
+      <p style="color: #374151; font-size: 15px; margin-bottom: 12px;">Hoy cumplen años las siguientes personas:</p>
+      <ul style="color: #374151; font-size: 15px; line-height: 2;">${listaHtml}</ul>
+      <p style="color: #6b7280; font-size: 13px; margin-top: 16px;">Total: ${cumpleaneros.length} persona(s)</p>
+    </div>
+  </div>
+</body></html>`
+
+  const pushTitle = `🎂 Cumpleaños hoy (${cumpleaneros.length})`
+  const pushBody = cumpleaneros.length <= 3
+    ? cumpleaneros.map((c) => c.nombre).join(", ")
+    : `${cumpleaneros.slice(0, 2).map((c) => c.nombre).join(", ")} y ${cumpleaneros.length - 2} más`
+
+  const buzonMensaje = `Hoy cumplen años:\n${lista}`
+
+  // Pre-generar las imágenes de cada cumpleañero para enviar a admins
+  const imagenesGeneradas: Array<{ nombre: string; media: { buffer: Buffer; type: string; filename: string } }> = []
+  for (const c of cumpleaneros) {
+    try {
+      const media = await getBirthdayImage(c.nombre)
+      if (media) {
+        imagenesGeneradas.push({ nombre: c.nombre, media })
+      }
+    } catch {}
+  }
+
+  for (const adminId of ADMIN_BIRTHDAY_NOTIFY_IDS) {
+    try {
+      // Obtener datos del admin
+      const { data: adminUser } = await supabase
+        .from("users")
+        .select("id, email, phone")
+        .eq("id", adminId)
+        .single()
+
+      if (!adminUser) continue
+
+      // 1. Buzón (modal in-app)
+      await supabase.from("buzon_mensajes").insert({
+        user_id: adminId,
+        titulo: `🎂 Cumpleaños de hoy — ${fechaHoy}`,
+        mensaje: buzonMensaje,
+        tipo: "info",
+        referencia_tipo: "cumpleanos",
+      })
+
+      // 2. Push
+      await sendPush(adminId, pushTitle, pushBody)
+
+      // 3. WhatsApp — primero el resumen en texto
+      if (adminUser.phone) {
+        await sendWhatsAppText(adminUser.phone, waMessage)
+        await new Promise((r) => setTimeout(r, 1500))
+
+        // Enviar cada imagen de cumpleañero
+        for (const img of imagenesGeneradas) {
+          try {
+            const formatted = formatPhoneForWhatsApp(adminUser.phone)
+            const blob = new Blob([new Uint8Array(img.media.buffer)], { type: img.media.type })
+            const formData = new FormData()
+            formData.append("phone", formatted)
+            formData.append("file", blob, img.media.filename)
+            formData.append("caption", `🎂 ${img.nombre}`)
+            formData.append("mediaType", "image")
+
+            await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
+              method: "POST",
+              body: formData,
+            })
+            await new Promise((r) => setTimeout(r, 2000))
+          } catch {}
+        }
+      }
+
+      // 4. Email
+      if (adminUser.email) {
+        await sendSimpleEmail(adminUser.email, emailSubject, emailHtml)
+      }
+    } catch (err) {
+      console.error(`Error notificando admin ${adminId}:`, err)
+    }
+  }
+}
+
 /**
  * GET: Cron automático — envía felicitaciones a todos los cumpleañeros de hoy que no hayan sido felicitados.
  * Protegido por CRON_SECRET.
@@ -478,6 +635,11 @@ export async function GET(request: NextRequest) {
       } catch {}
 
       enviados++
+    }
+
+    // === NOTIFICAR A ADMINS sobre los cumpleañeros de hoy ===
+    if (cumpleanosHoy.length > 0) {
+      await notifyAdminsBirthdays(cumpleanosHoy, dia, mes, anio)
     }
 
     return NextResponse.json({
