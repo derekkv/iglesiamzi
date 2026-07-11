@@ -7,6 +7,8 @@ export interface PresentacionNinoPDFData {
   nombre_madre: string
   fecha: string
   nombre_pastor: string
+  testigo1: string
+  testigo2: string
 }
 
 const MESES_ES = [
@@ -102,8 +104,9 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
     // Si no se puede cargar el logo, continuar sin él
   }
 
-  // Centrar contenido verticalmente
-  let yPos = height - 135
+  // Centrar contenido verticalmente — ajustar este valor para subir/bajar todo el texto
+  const contentOffset = 80 // Aumentar para bajar, disminuir para subir
+  let yPos = height - contentOffset
 
   // === ENCABEZADO ===
   // "CERTIFICADO DE" — serif regular, mayúsculas, 16pt
@@ -133,6 +136,15 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   drawCenteredLine(page, yPos, 0.55, 0.75)
   yPos -= 12
   drawCentered(page, "NOMBRES DE LOS PADRES", yPos, serifRegular, 9, grayText)
+  yPos -= 48
+
+  // === TESTIGOS ===
+  const testigosText = `${data.testigo1 || "—"} y ${data.testigo2 || "—"}`
+  drawCentered(page, testigosText, yPos, scriptFont, 24, textColor)
+  yPos -= 14
+  drawCenteredLine(page, yPos, 0.55, 0.75)
+  yPos -= 12
+  drawCentered(page, "TESTIGOS", yPos, serifRegular, 9, grayText)
   yPos -= 56
 
   // === TEXTO CENTRAL ===
@@ -177,15 +189,14 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
     page.drawText(part.text, { x: xPos2, y: yPos, size: part.size, font: part.font, color: textColor })
     xPos2 += part.font.widthOfTextAtSize(part.text, part.size)
   }
-  yPos -= 76
+  yPos -= 72
 
-  // === FIRMA ===
+  // === FIRMA PASTOR (centrada) ===
   drawCenteredLine(page, yPos, 0.40, 0.75)
-  yPos -= 18
-  // "Pastor [Nombre]"
+  yPos -= 16
   const pastorText = `Pastor ${data.nombre_pastor}`
-  drawCentered(page, pastorText, yPos, serifRegular, 12, textColor)
-  yPos -= 62
+  drawCentered(page, pastorText, yPos, serifRegular, 11, textColor)
+  yPos -= 55
 
   // === VERSÍCULO — con la fuente Bemdayni ===
   const versLine1 = "Él les dijo: \"Dejen que los niños vengan a mí,"

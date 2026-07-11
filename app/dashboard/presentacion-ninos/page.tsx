@@ -46,6 +46,8 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
     nombre_madre: "",
     fecha: "",
     nombre_pastor: "",
+    testigo1: "",
+    testigo2: "",
   })
   const [saving, setSaving] = useState(false)
 
@@ -90,7 +92,7 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
   // === CREAR / EDITAR ===
   const openCreateModal = () => {
     setEditingRecord(null)
-    setFormData({ nombre_presentado: "", nombre_padre: "", nombre_madre: "", fecha: "", nombre_pastor: "" })
+    setFormData({ nombre_presentado: "", nombre_padre: "", nombre_madre: "", fecha: "", nombre_pastor: "", testigo1: "", testigo2: "" })
     setShowFormModal(true)
   }
 
@@ -103,6 +105,8 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
         nombre_madre: record.nombre_madre,
         fecha: record.fecha || "",
         nombre_pastor: record.nombre_pastor || "",
+        testigo1: record.testigo1 || "",
+        testigo2: record.testigo2 || "",
       })
       setShowFormModal(true)
     })
@@ -165,6 +169,8 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
         nombre_madre: record.nombre_madre,
         fecha: record.fecha,
         nombre_pastor: record.nombre_pastor || "Pastor",
+        testigo1: record.testigo1 || "",
+        testigo2: record.testigo2 || "",
       })
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
@@ -210,6 +216,8 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
           nombre_madre: r.nombre_madre,
           fecha: r.fecha,
           nombre_pastor: r.nombre_pastor || "Pastor",
+          testigo1: r.testigo1 || "",
+          testigo2: r.testigo2 || "",
         }))
       )
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" })
@@ -403,8 +411,26 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
               <Input
                 value={formData.nombre_pastor}
                 onChange={(e) => setFormData({ ...formData, nombre_pastor: e.target.value })}
-                placeholder="Ej: Pastor David Koop"
+                placeholder="Ej: David Koop"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Testigo 1</Label>
+                <Input
+                  value={formData.testigo1}
+                  onChange={(e) => setFormData({ ...formData, testigo1: e.target.value })}
+                  placeholder="Nombre del testigo"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Testigo 2</Label>
+                <Input
+                  value={formData.testigo2}
+                  onChange={(e) => setFormData({ ...formData, testigo2: e.target.value })}
+                  placeholder="Nombre del testigo"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

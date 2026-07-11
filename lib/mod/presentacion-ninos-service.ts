@@ -8,6 +8,8 @@ export interface PresentacionNino {
   nombre_madre: string
   fecha: string
   nombre_pastor: string
+  testigo1: string
+  testigo2: string
   created_at: string
   updated_at: string
 }
@@ -18,6 +20,8 @@ export interface PresentacionNinoInput {
   nombre_madre: string
   fecha: string
   nombre_pastor: string
+  testigo1: string
+  testigo2: string
 }
 
 export const presentacionNinosService = {
@@ -43,6 +47,8 @@ export const presentacionNinosService = {
         nombre_madre: input.nombre_madre.trim(),
         fecha: input.fecha,
         nombre_pastor: input.nombre_pastor.trim(),
+        testigo1: input.testigo1.trim(),
+        testigo2: input.testigo2.trim(),
       })
       .select()
       .single()
@@ -74,6 +80,8 @@ export const presentacionNinosService = {
     if (input.nombre_madre !== undefined) updateData.nombre_madre = input.nombre_madre.trim()
     if (input.fecha !== undefined) updateData.fecha = input.fecha
     if (input.nombre_pastor !== undefined) updateData.nombre_pastor = input.nombre_pastor.trim()
+    if (input.testigo1 !== undefined) updateData.testigo1 = input.testigo1.trim()
+    if (input.testigo2 !== undefined) updateData.testigo2 = input.testigo2.trim()
 
     const { data, error } = await supabase
       .from("presentacion_ninos")
