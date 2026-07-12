@@ -160,7 +160,13 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   discipulado_ciclos: {
     modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
+  discipulado_ciclo_participantes: {
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
+  },
   discipulado_ciclo_fechas: {
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
+  },
+  discipulado_ciclo_asistencia: {
     modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
   discipulado_asistencia: {

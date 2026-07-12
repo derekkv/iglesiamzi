@@ -110,6 +110,13 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   // Ver gestión (solo lectura)
   const [viewingGestion, setViewingGestion] = useState<GestionCelula | null>(null)
 
+  // CRUD miembros manuales
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [addMemberForm, setAddMemberForm] = useState({ nombre: "", celular: "" })
+  const [editingMember, setEditingMember] = useState<MiembroCelula | null>(null)
+  const [editMemberForm, setEditMemberForm] = useState({ nombre: "", celular: "" })
+  const [savingMember, setSavingMember] = useState(false)
+
   // Ofrendas
   const [ofrendas, setOfrendas] = useState<OfrendaCelula[]>([])
   const [ofrendaHistorial, setOfrendaHistorial] = useState<OfrendaCelula[]>([])
@@ -306,6 +313,79 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   }
 
 
+  // ========== CRUD MIEMBROS MANUALES ==========
+  const handleAddMember = async () => {
+    if (!addMemberForm.nombre.trim() || !selectedCelula) return
+    setSavingMember(true)
+    try {
+      const { error } = await supabase.from("censo").insert({
+        apellidos_nombres: addMemberForm.nombre.trim(),
+        celular: addMemberForm.celular.trim() || null,
+        celula_nombre: selectedCelula,
+        celula_asiste: true,
+      })
+      if (error) throw error
+      toast.success("Persona agregada")
+      setShowAddMember(false)
+      setAddMemberForm({ nombre: "", celular: "" })
+      loadMiembros()
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || "Error al agregar persona")
+    } finally { setSavingMember(false) }
+  }
+
+  const handleOpenEditMember = (m: MiembroCelula) => {
+    setEditingMember(m)
+    setEditMemberForm({ nombre: m.apellidos_nombres, celular: m.celular || "" })
+  }
+
+  const handleSaveEditMember = async () => {
+    if (!editingMember || !editMemberForm.nombre.trim()) return
+    setSavingMember(true)
+    try {
+      const tabla = editingMember.fuente === "protocolo" ? "censo" : "censo_mdg"
+      const { error } = await supabase.from(tabla).update({
+        apellidos_nombres: editMemberForm.nombre.trim(),
+        celular: editMemberForm.celular.trim() || null,
+      }).eq("id", editingMember.id)
+      if (error) throw error
+      toast.success("Persona actualizada")
+      setEditingMember(null)
+      loadMiembros()
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || "Error al actualizar")
+    } finally { setSavingMember(false) }
+  }
+
+  const handleDeleteMember = async (m: MiembroCelula) => {
+    if (!confirm(`¿Eliminar a "${m.apellidos_nombres}" de la célula?`)) return
+    try {
+      const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+      const { error } = await supabase.from(tabla).update({ celula_nombre: null, celula_asiste: false }).eq("id", m.id)
+      if (error) throw error
+      toast.success("Persona eliminada de la célula")
+      loadMiembros()
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || "Error al eliminar")
+    }
+  }
+
+  const handleHideMember = async (m: MiembroCelula) => {
+    try {
+      const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+      const { error } = await supabase.from(tabla).update({ celula_asiste: false }).eq("id", m.id)
+      if (error) throw error
+      toast.success(`${m.apellidos_nombres} pasó a posibles`)
+      loadMiembros()
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || "Error al ocultar")
+    }
+  }
+
   const handleInlineGestion = async (m: MiembroCelula, asistio: boolean, gestionado: boolean) => {
     if (!user || tieneRegistroSemana(m)) return
     setIsSaving(true)
@@ -438,6 +518,19 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                       <Button variant="outline" size="sm" className="text-xs" onClick={() => handleOpenHistorial(m)}>
                         <History className="w-3 h-3 mr-1" /> Ver historial
                       </Button>
+                      {canEdit && (
+                        <>
+                          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-blue-600" title="Editar" onClick={() => handleOpenEditMember(m)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-amber-600" title="Ocultar (pasar a posibles)" onClick={() => handleHideMember(m)}>
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-red-600" title="Eliminar de célula" onClick={() => handleDeleteMember(m)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -528,7 +621,16 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
             </TabsList>
             <TabsContent value="activos">
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-base">Miembros que asisten a esta célula</CardTitle></CardHeader>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Miembros que asisten a esta célula</CardTitle>
+                    {canEdit && (
+                      <Button size="sm" onClick={() => setShowAddMember(true)} className="flex items-center gap-1">
+                        <UserPlus className="w-4 h-4" /> Agregar
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
                 <CardContent>{renderMiembrosTable(activosPorCelula(selectedCelula), "No hay miembros activos en esta célula")}</CardContent>
               </Card>
             </TabsContent>
@@ -883,6 +985,78 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               </Table>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Agregar Miembro Manual */}
+      <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Persona a {selectedCelula}</DialogTitle>
+            <DialogDescription>Se agregará como miembro activo de esta célula.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Nombre completo *</Label>
+              <Input
+                value={addMemberForm.nombre}
+                onChange={(e) => setAddMemberForm({ ...addMemberForm, nombre: e.target.value })}
+                placeholder="Nombres y apellidos"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Celular</Label>
+              <Input
+                value={addMemberForm.celular}
+                onChange={(e) => setAddMemberForm({ ...addMemberForm, celular: e.target.value })}
+                placeholder="0999999999"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMember(false)} disabled={savingMember}>Cancelar</Button>
+            <Button onClick={handleAddMember} disabled={savingMember || !addMemberForm.nombre.trim()}>
+              {savingMember ? "Guardando..." : "Agregar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Editar Miembro */}
+      <Dialog open={!!editingMember} onOpenChange={() => setEditingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Persona</DialogTitle>
+            <DialogDescription>Modifique los datos de {editingMember?.apellidos_nombres}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Nombre completo *</Label>
+              <Input
+                value={editMemberForm.nombre}
+                onChange={(e) => setEditMemberForm({ ...editMemberForm, nombre: e.target.value })}
+                placeholder="Nombres y apellidos"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Celular</Label>
+              <Input
+                value={editMemberForm.celular}
+                onChange={(e) => setEditMemberForm({ ...editMemberForm, celular: e.target.value })}
+                placeholder="0999999999"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMember(null)} disabled={savingMember}>Cancelar</Button>
+            <Button onClick={handleSaveEditMember} disabled={savingMember || !editMemberForm.nombre.trim()}>
+              {savingMember ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
