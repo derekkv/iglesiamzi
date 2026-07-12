@@ -19,6 +19,7 @@ const MODULO_CONFIG: Record<string, { permiso: string; titulo: string }> = {
   "jovenes": { permiso: "requerimientos-jovenes", titulo: "Requerimientos de Bienes y Servicios - Jóvenes" },
   "hombres": { permiso: "requerimientos-hombres", titulo: "Requerimientos de Bienes y Servicios - Hombres" },
   "pastoral": { permiso: "requerimientos-pastoral", titulo: "Requerimientos de Bienes y Servicios - Pastoral" },
+  "celulas": { permiso: "requerimientos-celulas", titulo: "Requerimientos de Bienes y Servicios - Somos Uno (Células)" },
 }
 
 function RequerimientosContent({ modulo, titulo, canEdit }: { modulo: string; titulo: string; canEdit: boolean }) {

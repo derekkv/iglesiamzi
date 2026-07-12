@@ -231,6 +231,10 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                     <div>
                       <p className="text-xs text-purple-700">Asistencia Total</p>
                       <p className="text-xl font-bold text-purple-700">{totalAsistencia}</p>
+                      <div className="flex gap-3 mt-1">
+                        <p className="text-[10px] text-purple-600">{asistenciaColumns.length} días registrados</p>
+                        <p className="text-[10px] text-purple-600">Promedio: {asistenciaColumns.length > 0 ? Math.round(totalAsistencia / asistenciaColumns.length) : 0}/día</p>
+                      </div>
                     </div>
                     <Users className="w-6 h-6 text-purple-400" />
                   </div>

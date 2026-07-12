@@ -14,6 +14,7 @@ import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
 import { ServiceAcknowledgeModal } from "@/components/ServiceAcknowledgeModal";
 import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
 import { NotificacionModal } from "@/components/NotificacionModal";
+import { ErrorReporter } from "@/components/ErrorReporter";
 
 export const metadata: Metadata = {
   title: "Regalo de Dios",
@@ -47,6 +48,7 @@ export default function RootLayout({
           </AuthProvider>
           <Toaster />
           <ServiceWorkerUpdater />
+          <ErrorReporter />
         </Suspense>
       </body>
     </html>

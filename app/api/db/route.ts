@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { verifyToken } from "@/lib/jwt"
 import { TABLE_ACCESS_MAP, checkTableAccess } from "@/lib/module-table-map"
+import { notifyError } from "@/lib/error-notifier"
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://servidor.iglesiaregalodedios.com"
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -247,6 +248,7 @@ export async function POST(request: NextRequest) {
     // 5. RETORNAR RESULTADO (sin campos bloqueados)
     if (result.error) {
       console.error(`[/api/db] 500 DB ERROR — table: ${table}, action: ${action}, error:`, result.error.message, result.error.details || "", result.error.hint || "")
+      notifyError({ context: "API /api/db", error: result.error.message, details: result.error.details || result.error.hint || "", userId, table })
       return NextResponse.json({ error: result.error.message, details: result.error }, { status: 500 })
     }
 
@@ -255,6 +257,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: cleanData, count: result.count })
   } catch (error: any) {
     console.error("[/api/db] 500 CATCH ERROR:", error.message, error.stack?.split("\n").slice(0, 3).join(" | "))
+    notifyError({ context: "API /api/db (catch)", error: error.message || "Error interno", details: error.stack?.split("\n").slice(0, 3).join(" | ") })
     return NextResponse.json({ error: error.message || "Error interno" }, { status: 500 })
   }
 }

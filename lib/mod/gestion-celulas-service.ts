@@ -5,7 +5,7 @@ import { auditService } from "./audit-service"
 export interface GestionCelula {
   id: number
   miembro_id: number
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
   celula_nombre: string
   semana_inicio: string
   gestionado: boolean
@@ -38,7 +38,7 @@ export function getLunesSemanaActual(): string {
  */
 export async function yaGestionadoEstaSemana(
   miembroId: number,
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
 ): Promise<boolean> {
   const semana = getLunesSemanaActual()
   const { data } = await supabase
@@ -56,7 +56,7 @@ export async function yaGestionadoEstaSemana(
  */
 export async function registrarGestion(params: {
   miembroId: number
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
   celulaNombre: string
   gestionado: boolean
   respuesta: string
@@ -115,7 +115,7 @@ export async function editarGestion(
  */
 export async function getHistorialGestiones(
   miembroId: number,
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
 ): Promise<GestionCelula[]> {
   const { data, error } = await supabase
     .from("gestion_celulas")

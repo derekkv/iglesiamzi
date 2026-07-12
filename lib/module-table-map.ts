@@ -96,6 +96,9 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   gestion_celulas: {
     modules: ["celulas", "ofrenda-celulas"],
   },
+  miembros_celulas: {
+    modules: ["celulas"],
+  },
 
   // === CRONOGRAMA Y ASISTENCIA ===
   cronograma_servicio: {
@@ -104,6 +107,13 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "cronograma-alabanza", "cronograma-comunicacion", "cronograma-herederos",
       "cronograma-intercesion", "cronograma-mdg", "cronograma-redil",
       "cronograma-hombres", "cronograma-jovenes", "cronograma-pastoral",
+      "cronograma-celulas", "cronograma-eventos-celulas",
+      "cronograma-eventos-protocolo", "cronograma-eventos-administracion",
+      "cronograma-eventos-discipulado", "cronograma-eventos-alabanza",
+      "cronograma-eventos-comunicacion", "cronograma-eventos-herederos",
+      "cronograma-eventos-intercesion", "cronograma-eventos-mdg",
+      "cronograma-eventos-redil", "cronograma-eventos-hombres",
+      "cronograma-eventos-jovenes", "cronograma-eventos-pastoral",
       "gestion-cronogramas",
     ],
   },
@@ -113,6 +123,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "cronograma-alabanza", "cronograma-comunicacion", "cronograma-herederos",
       "cronograma-intercesion", "cronograma-mdg", "cronograma-redil",
       "cronograma-hombres", "cronograma-jovenes", "cronograma-pastoral",
+      "cronograma-celulas",
       "gestion-cronogramas",
     ],
   },
@@ -126,6 +137,19 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   },
   asistencia_datos: {
     modules: ["asistencia", "control_mensual"],
+  },
+
+  // === ASISTENCIA SERVIDORES ===
+  asistencia_servidores: {
+    modules: [
+      "asistencia-servidores-protocolo", "asistencia-servidores-administracion",
+      "asistencia-servidores-discipulado", "asistencia-servidores-alabanza",
+      "asistencia-servidores-comunicacion", "asistencia-servidores-herederos",
+      "asistencia-servidores-intercesion", "asistencia-servidores-mdg",
+      "asistencia-servidores-redil", "asistencia-servidores-hombres",
+      "asistencia-servidores-jovenes", "asistencia-servidores-pastoral",
+      "asistencia-servidores-celulas",
+    ],
   },
 
   // === DATOS PERSONALES ===
@@ -144,7 +168,13 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   bautizos: {
     modules: ["bautizo"],
   },
+  bautizos_manual: {
+    modules: ["bautizo"],
+  },
   matrimonios: {
+    modules: ["matrimonio"],
+  },
+  matrimonios_manual: {
     modules: ["matrimonio"],
   },
   presentacion_ninos: {
@@ -186,6 +216,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "mensajes-alabanza", "mensajes-comunicacion", "mensajes-herederos",
       "mensajes-intercesion", "mensajes-mdg", "mensajes-redil",
       "mensajes-hombres", "mensajes-jovenes", "mensajes-pastoral",
+      "mensajes-celulas",
     ],
   },
   mensajes_citaciones_recibidos: {
@@ -194,6 +225,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "mensajes-alabanza", "mensajes-comunicacion", "mensajes-herederos",
       "mensajes-intercesion", "mensajes-mdg", "mensajes-redil",
       "mensajes-hombres", "mensajes-jovenes", "mensajes-pastoral",
+      "mensajes-celulas",
     ],
   },
 
@@ -204,6 +236,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "requerimientos-mdg", "requerimientos-alabanza", "requerimientos-intercesion",
       "requerimientos-herederos", "requerimientos-redil", "requerimientos-comunicacion",
       "requerimientos-jovenes", "requerimientos-hombres", "requerimientos-pastoral",
+      "requerimientos-celulas",
     ],
   },
 

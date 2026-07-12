@@ -560,6 +560,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
                           const q = searchFilter.toLowerCase()
                           return u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)
                         })
+                        .sort((a, b) => a.displayName.localeCompare(b.displayName, "es"))
                         .map((user) => {
                           const isLeader = !!allLeaders[user.id]?.length
                           const leaderGroupNames = isLeader ? moduleGroups.filter((g) => allLeaders[user.id]?.includes(g.id)).map((g) => g.display_name) : []

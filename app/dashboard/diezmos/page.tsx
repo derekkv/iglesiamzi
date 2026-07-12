@@ -126,7 +126,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
     try {
       setSearchLoading(true)
       const results = await diezmosService.searchDiezmos(searchFilters)
-      setSearchResults(results)
+      setSearchResults(results.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()))
     } catch (error) {
       console.error("Error buscando:", error)
     } finally { setSearchLoading(false) }
@@ -138,7 +138,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
     if (filterTipo !== "todos" && r.tipo_ofrenda !== filterTipo) return false
     if (filterTransaccion !== "todos" && r.transaccion !== filterTransaccion) return false
     return true
-  })
+  }).sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
 
   // Totales
   const totalDiezmoTransf = records.filter(r => (r.tipo_ofrenda === "diezmo" || !r.tipo_ofrenda) && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)

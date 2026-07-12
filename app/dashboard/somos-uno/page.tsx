@@ -68,7 +68,7 @@ interface MiembroCelula {
   hijos?: { nombre: string; edad: string }[]
   celula_asiste: boolean
   celula_nombre: string
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "manual"
   // Campos extra del censo para el detalle
   cedula?: string
   fecha_nacimiento?: string
@@ -112,10 +112,11 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   // CRUD miembros manuales
   const [showAddMember, setShowAddMember] = useState(false)
-  const [addMemberForm, setAddMemberForm] = useState({ nombre: "", celular: "" })
+  const [addMemberForm, setAddMemberForm] = useState({ nombre: "", cedula: "" })
   const [editingMember, setEditingMember] = useState<MiembroCelula | null>(null)
-  const [editMemberForm, setEditMemberForm] = useState({ nombre: "", celular: "" })
+  const [editMemberForm, setEditMemberForm] = useState({ nombre: "", cedula: "" })
   const [savingMember, setSavingMember] = useState(false)
+  const [deletingMember, setDeletingMember] = useState<MiembroCelula | null>(null)
 
   // Ofrendas
   const [ofrendas, setOfrendas] = useState<OfrendaCelula[]>([])
@@ -124,17 +125,20 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   const loadMiembros = useCallback(async () => {
     try {
-      const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+      const [{ data: protocolo }, { data: mdg }, { data: manuales }] = await Promise.all([
         supabase.from("censo")
           .select("id, apellidos_nombres, celular, convencional, conyuge, hijos, celula_asiste, celula_nombre, cedula, fecha_nacimiento, edad, estado_civil, sexo, direccion, correo")
           .not("celula_nombre", "is", null),
         supabase.from("censo_mdg")
           .select("id, apellidos_nombres, celular, convencional, conyuge, hijos, celula_asiste, celula_nombre, cedula, fecha_nacimiento, edad, estado_civil, sexo, direccion, correo")
           .not("celula_nombre", "is", null),
+        supabase.from("miembros_celulas")
+          .select("id, apellidos_nombres, cedula, celula_nombre, celula_asiste"),
       ])
       const all: MiembroCelula[] = [
         ...(protocolo || []).map((r: any) => ({ ...r, fuente: "protocolo" as const })),
         ...(mdg || []).map((r: any) => ({ ...r, fuente: "mdg" as const })),
+        ...(manuales || []).map((r: any) => ({ ...r, fuente: "manual" as const })),
       ]
       setMiembros(all)
     } catch (error) {
@@ -147,6 +151,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   useEffect(() => { loadMiembros() }, [loadMiembros])
   useRealtime({ table: "censo", onChange: () => loadMiembros() })
   useRealtime({ table: "censo_mdg", onChange: () => loadMiembros() })
+  useRealtime({ table: "miembros_celulas", onChange: () => loadMiembros() })
   useRealtime({ table: "gestion_celulas", onChange: () => { if (selectedCelula) loadGestionesSemana(selectedCelula) } })
   useRealtime({ table: "ofrendas_celulas", onChange: () => { if (selectedCelula) loadOfrendas(selectedCelula) } })
 
@@ -318,16 +323,16 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
     if (!addMemberForm.nombre.trim() || !selectedCelula) return
     setSavingMember(true)
     try {
-      const { error } = await supabase.from("censo").insert({
+      const { error } = await supabase.from("miembros_celulas").insert({
         apellidos_nombres: addMemberForm.nombre.trim(),
-        celular: addMemberForm.celular.trim() || null,
+        cedula: addMemberForm.cedula.trim() || null,
         celula_nombre: selectedCelula,
         celula_asiste: true,
       })
       if (error) throw error
       toast.success("Persona agregada")
       setShowAddMember(false)
-      setAddMemberForm({ nombre: "", celular: "" })
+      setAddMemberForm({ nombre: "", cedula: "" })
       loadMiembros()
     } catch (error: any) {
       console.error(error)
@@ -337,17 +342,18 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   const handleOpenEditMember = (m: MiembroCelula) => {
     setEditingMember(m)
-    setEditMemberForm({ nombre: m.apellidos_nombres, celular: m.celular || "" })
+    setEditMemberForm({ nombre: m.apellidos_nombres, cedula: m.cedula || "" })
   }
 
   const handleSaveEditMember = async () => {
     if (!editingMember || !editMemberForm.nombre.trim()) return
     setSavingMember(true)
     try {
-      const tabla = editingMember.fuente === "protocolo" ? "censo" : "censo_mdg"
+      const tabla = editingMember.fuente === "manual" ? "miembros_celulas"
+        : editingMember.fuente === "protocolo" ? "censo" : "censo_mdg"
       const { error } = await supabase.from(tabla).update({
         apellidos_nombres: editMemberForm.nombre.trim(),
-        celular: editMemberForm.celular.trim() || null,
+        cedula: editMemberForm.cedula.trim() || null,
       }).eq("id", editingMember.id)
       if (error) throw error
       toast.success("Persona actualizada")
@@ -360,12 +366,18 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const handleDeleteMember = async (m: MiembroCelula) => {
-    if (!confirm(`¿Eliminar a "${m.apellidos_nombres}" de la célula?`)) return
     try {
-      const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
-      const { error } = await supabase.from(tabla).update({ celula_nombre: null, celula_asiste: false }).eq("id", m.id)
-      if (error) throw error
+      if (m.fuente === "manual") {
+        // Los manuales se eliminan completamente de la tabla
+        const { error } = await supabase.from("miembros_celulas").delete().eq("id", m.id)
+        if (error) throw error
+      } else {
+        const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+        const { error } = await supabase.from(tabla).update({ celula_nombre: null, celula_asiste: false }).eq("id", m.id)
+        if (error) throw error
+      }
       toast.success("Persona eliminada de la célula")
+      setDeletingMember(null)
       loadMiembros()
     } catch (error: any) {
       console.error(error)
@@ -373,9 +385,16 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  const handleConfirmDelete = (m: MiembroCelula) => {
+    checkAndExecute(new Date().toISOString(), () => {
+      setDeletingMember(m)
+    })
+  }
+
   const handleHideMember = async (m: MiembroCelula) => {
     try {
-      const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+      const tabla = m.fuente === "manual" ? "miembros_celulas"
+        : m.fuente === "protocolo" ? "censo" : "censo_mdg"
       const { error } = await supabase.from(tabla).update({ celula_asiste: false }).eq("id", m.id)
       if (error) throw error
       toast.success(`${m.apellidos_nombres} pasó a posibles`)
@@ -405,7 +424,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
       // Si un "posible" asistió → pasarlo a activo
       if (asistio && !m.celula_asiste) {
-        const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+        const tabla = m.fuente === "manual" ? "miembros_celulas"
+          : m.fuente === "protocolo" ? "censo" : "censo_mdg"
         await supabase.from(tabla).update({ celula_asiste: true }).eq("id", m.id)
         toast.success(`${m.apellidos_nombres} ahora es miembro activo`)
         loadMiembros()
@@ -416,7 +436,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
         const historial = await getHistorialGestiones(m.id, m.fuente)
         const ultimasFaltas = historial.filter((g) => !g.asistio).length
         if (ultimasFaltas >= 3) {
-          const tabla = m.fuente === "protocolo" ? "censo" : "censo_mdg"
+          const tabla = m.fuente === "manual" ? "miembros_celulas"
+            : m.fuente === "protocolo" ? "censo" : "censo_mdg"
           await supabase.from(tabla).update({ celula_asiste: false }).eq("id", m.id)
           toast.info(`${m.apellidos_nombres} pasó a posibles (3+ faltas)`)
           loadMiembros()
@@ -440,7 +461,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
             <TableRow>
               <TableHead className="text-xs">#</TableHead>
               <TableHead className="text-xs">Nombre</TableHead>
-              <TableHead className="text-xs">Celular</TableHead>
+              <TableHead className="text-xs">Cédula</TableHead>
               <TableHead className="text-xs">Asistió</TableHead>
               <TableHead className="text-xs">Gestionado</TableHead>
               <TableHead className="text-xs text-right">Acciones</TableHead>
@@ -455,7 +476,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                 <TableRow key={`${m.fuente}-${m.id}`}>
                   <TableCell className="text-xs">{idx + 1}</TableCell>
                   <TableCell className="text-xs font-medium">{m.apellidos_nombres}</TableCell>
-                  <TableCell className="text-xs">{m.celular || "-"}</TableCell>
+                  <TableCell className="text-xs">{m.cedula || "-"}</TableCell>
                   <TableCell className="text-xs">
                     {tieneRegistro ? (
                       <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
@@ -526,7 +547,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                           <Button variant="ghost" size="sm" className="h-7 px-1.5 text-amber-600" title="Ocultar (pasar a posibles)" onClick={() => handleHideMember(m)}>
                             <Eye className="w-3.5 h-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-red-600" title="Eliminar de célula" onClick={() => handleDeleteMember(m)}>
+                          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-red-600" title="Eliminar de célula" onClick={() => handleConfirmDelete(m)}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </>
@@ -739,7 +760,6 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                 <div><span className="text-gray-500">Edad:</span> <span className="font-medium">{detailMember.edad || "-"}</span></div>
                 <div><span className="text-gray-500">Sexo:</span> <span className="font-medium">{detailMember.sexo || "-"}</span></div>
                 <div><span className="text-gray-500">Estado Civil:</span> <span className="font-medium">{detailMember.estado_civil || "-"}</span></div>
-                <div><span className="text-gray-500">Celular:</span> <span className="font-medium">{detailMember.celular || "-"}</span></div>
                 <div><span className="text-gray-500">Tel. Convencional:</span> <span className="font-medium">{detailMember.convencional || "-"}</span></div>
                 <div><span className="text-gray-500">Correo:</span> <span className="font-medium">{detailMember.correo || "-"}</span></div>
                 <div><span className="text-gray-500">Cónyuge:</span> <span className="font-medium">{detailMember.conyuge || "-"}</span></div>
@@ -1006,10 +1026,10 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               />
             </div>
             <div>
-              <Label>Celular</Label>
+              <Label>Cédula</Label>
               <Input
-                value={addMemberForm.celular}
-                onChange={(e) => setAddMemberForm({ ...addMemberForm, celular: e.target.value })}
+                value={addMemberForm.cedula}
+                onChange={(e) => setAddMemberForm({ ...addMemberForm, cedula: e.target.value })}
                 placeholder="0999999999"
                 className="mt-1"
               />
@@ -1042,10 +1062,10 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               />
             </div>
             <div>
-              <Label>Celular</Label>
+              <Label>Cédula</Label>
               <Input
-                value={editMemberForm.celular}
-                onChange={(e) => setEditMemberForm({ ...editMemberForm, celular: e.target.value })}
+                value={editMemberForm.cedula}
+                onChange={(e) => setEditMemberForm({ ...editMemberForm, cedula: e.target.value })}
                 placeholder="0999999999"
                 className="mt-1"
               />
@@ -1055,6 +1075,31 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
             <Button variant="outline" onClick={() => setEditingMember(null)} disabled={savingMember}>Cancelar</Button>
             <Button onClick={handleSaveEditMember} disabled={savingMember || !editMemberForm.nombre.trim()}>
               {savingMember ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Confirmar Eliminación */}
+      <Dialog open={!!deletingMember} onOpenChange={() => setDeletingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar de la célula</DialogTitle>
+            <DialogDescription>
+              ¿Está seguro que desea eliminar a <span className="font-semibold text-gray-900">{deletingMember?.apellidos_nombres}</span> de la célula?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">
+              {deletingMember?.fuente === "manual"
+                ? "Este registro se eliminará permanentemente."
+                : "Se removerá de la célula pero seguirá en el censo general."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingMember(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => deletingMember && handleDeleteMember(deletingMember)}>
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

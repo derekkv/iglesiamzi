@@ -195,7 +195,7 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                             <TableCell key={j} className={`text-center px-1 py-1 ${o.recibido ? "bg-green-50" : "bg-amber-50"}`}>
                               <div className="flex items-center justify-center gap-1.5">
                                 <Checkbox checked={o.recibido} disabled={!canEdit} onCheckedChange={() => handleToggleRecibido(o)} className={`h-4 w-4 ${o.recibido ? "data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600" : "border-amber-400"}`} />
-                                <span className={`text-[11px] font-semibold ${o.recibido ? "text-green-700" : "text-amber-600"}`}>${Number(o.valor).toFixed(0)}</span>
+                                <span className={`text-[11px] font-semibold ${o.recibido ? "text-green-700" : "text-amber-600"}`}>${Number(o.valor)}</span>
                               </div>
                             </TableCell>
                           )
@@ -220,7 +220,7 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                         const total = getTotalJueves(j)
                         return (
                           <TableCell key={j} className={`text-[10px] text-center font-bold py-1 ${allRecibidas ? "text-green-800 bg-green-100" : colOfrendas.length > 0 ? "text-amber-700 bg-amber-50" : "text-gray-400"}`}>
-                            ${total.toFixed(0)}
+                            ${total}
                           </TableCell>
                         )
                       })}

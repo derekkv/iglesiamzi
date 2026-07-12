@@ -55,8 +55,8 @@ const REQUIRED_FIELDS = [
   { key: "hora_matrimonio", label: "Hora de la Ceremonia" },
   { key: "oficio_matrimonio", label: "Quién ofició la ceremonia" },
   { key: "conyuge", label: "Nombre del Cónyuge" },
-  { key: "padrino1_matrimonio", label: "Padrino 1" },
-  { key: "padrino2_matrimonio", label: "Padrino 2" },
+  { key: "padrino1_matrimonio", label: "Testigo 1" },
+  { key: "padrino2_matrimonio", label: "Testigo 2" },
 ]
 
 const MANUAL_FIELDS = [
@@ -67,8 +67,8 @@ const MANUAL_FIELDS = [
   { key: "fecha_matrimonio", label: "Fecha del Matrimonio", required: false, type: "date" },
   { key: "hora_matrimonio", label: "Hora de la Ceremonia", required: false, placeholder: "HH:MM" },
   { key: "oficio_matrimonio", label: "Quién ofició la ceremonia", required: false },
-  { key: "padrino1_matrimonio", label: "Padrino 1", required: false },
-  { key: "padrino2_matrimonio", label: "Padrino 2", required: false },
+  { key: "padrino1_matrimonio", label: "Testigo 1", required: false },
+  { key: "padrino2_matrimonio", label: "Testigo 2", required: false },
   { key: "celular", label: "Celular", required: false },
 ]
 

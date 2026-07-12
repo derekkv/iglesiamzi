@@ -370,6 +370,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                     <table className="w-full border-collapse border border-gray-300 text-sm">
                       <thead>
                         <tr className="bg-gray-50">
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">N° Reg.</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Beneficiario</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Ministerio</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Detalle</th>
@@ -381,6 +382,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                       <tbody>
                         {todayRecords.map((r) => (
                           <tr key={r.id} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-3 py-1.5 text-xs text-gray-500">{r.id}</td>
                             <td className="border border-gray-300 px-3 py-1.5 font-medium">{r.nombre}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-xs">{r.detalle}</td>
@@ -401,7 +403,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                       </tbody>
                       <tfoot>
                         <tr className="bg-purple-50 font-bold">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-2 text-right">TOTAL HOY:</td>
+                          <td colSpan={5} className="border border-gray-300 px-3 py-2 text-right">TOTAL HOY:</td>
                           <td className="border border-gray-300 px-3 py-2 text-right">${totalToday.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
@@ -431,6 +433,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                     <table className="w-full border-collapse border border-gray-300 text-sm">
                       <thead>
                         <tr className="bg-gray-50">
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">N° Reg.</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Fecha</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Beneficiario</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Ministerio</th>
@@ -441,8 +444,9 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {records.map((r) => (
+                        {[...records].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()).map((r) => (
                           <tr key={r.id} className={`hover:bg-gray-50 ${r.fecha?.substring(0, 10) === today ? "bg-purple-50/50" : ""}`}>
+                            <td className="border border-gray-300 px-3 py-1.5 text-xs text-gray-500">{r.id}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{formatDate(r.fecha)}</td>
                             <td className="border border-gray-300 px-3 py-1.5 font-medium">{r.nombre}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
@@ -464,7 +468,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                       </tbody>
                       <tfoot>
                         <tr className="bg-purple-50 font-bold">
-                          <td colSpan={5} className="border border-gray-300 px-3 py-2 text-right">TOTAL MES:</td>
+                          <td colSpan={6} className="border border-gray-300 px-3 py-2 text-right">TOTAL MES:</td>
                           <td className="border border-gray-300 px-3 py-2 text-right">${totalMonth.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
@@ -515,6 +519,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                     <table className="w-full border-collapse border border-gray-300 text-sm">
                       <thead>
                         <tr className="bg-gray-50">
+                          <th className="border border-gray-300 px-3 py-2 text-left font-semibold">N° Reg.</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Fecha</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Beneficiario</th>
                           <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Ministerio</th>
@@ -524,8 +529,9 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {searchResults.map((r) => (
+                        {[...searchResults].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()).map((r) => (
                           <tr key={r.id} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-3 py-1.5 text-xs text-gray-500">{r.id}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{formatDate(r.fecha)}</td>
                             <td className="border border-gray-300 px-3 py-1.5 font-medium">{r.nombre}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
