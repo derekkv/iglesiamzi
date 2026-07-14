@@ -23,7 +23,7 @@ webpush.setVapidDetails(
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 // Archivos de media para WhatsApp
-const BIRTHDAY_AUDIO_PATH = path.join(process.cwd(), "public", "Cumpleaños Feliz  Happy Birthday  Queremos que Partan la Torta.mp3")
+const BIRTHDAY_AUDIO_PATH = path.join(process.cwd(), "public", "cumpleanos-feliz.ogg")
 
 function generarMensajeCumple(nombre: string, edad: number): string {
   return `🎉🎂 *¡Feliz cumpleaños, hermano/a ${nombre}!* 🎂🎉\n\n` +
@@ -156,11 +156,11 @@ async function sendWhatsAppAudio(phone: string): Promise<boolean> {
     }
 
     const fileBuffer = fs.readFileSync(BIRTHDAY_AUDIO_PATH)
-    const blob = new Blob([fileBuffer], { type: "audio/mpeg" })
+    const blob = new Blob([fileBuffer], { type: "audio/ogg; codecs=opus" })
 
     const formData = new FormData()
     formData.append("phone", formatted)
-    formData.append("file", blob, "Cumpleanos Feliz.mp3")
+    formData.append("file", blob, "cumpleanos-feliz.ogg")
     formData.append("mediaType", "audio")
 
     const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {

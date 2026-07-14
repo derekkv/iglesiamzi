@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, DollarSign, History, Plus } from "lucide-react"
 import { toast } from "sonner"
+import { useSortOrder } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import {
   getJuevesDelMes, getMesOfrendaActual, getTodasOfrendasMes,
   toggleRecibido, type OfrendaCelula,
@@ -40,6 +42,7 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
   const [ofrendas, setOfrendas] = useState<OfrendaCelula[]>([])
   const [alfoli, setAlfoli] = useState<AlfoliRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
   const [showHistorial, setShowHistorial] = useState(false)
   const [historial, setHistorial] = useState<AlfoliRecord[]>([])
   const [mdgFecha, setMdgFecha] = useState("")
@@ -168,7 +171,10 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
           {/* TABLA IZQUIERDA: Ofrendas de Células */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2"><DollarSign className="w-4 h-4 text-green-600" /> Ofrenda Células (Jueves)</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2"><DollarSign className="w-4 h-4 text-green-600" /> Ofrenda Células (Jueves)</CardTitle>
+                <SortToggleButton ascending={sortAsc} onToggle={toggleSort} />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -176,7 +182,7 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-[10px] font-semibold">Célula</TableHead>
-                      {jueves.map((j) => (
+                      {(sortAsc ? jueves : [...jueves].reverse()).map((j) => (
                         <TableHead key={j} className="text-[10px] text-center px-1">
                           {new Date(j + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}
                         </TableHead>
@@ -188,7 +194,7 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                     {CELULAS.map((celula) => (
                       <TableRow key={celula}>
                         <TableCell className="text-[10px] font-medium py-1">{celula}</TableCell>
-                        {jueves.map((j) => {
+                        {(sortAsc ? jueves : [...jueves].reverse()).map((j) => {
                           const o = getOfrenda(celula, j)
                           if (!o) return <TableCell key={j} className="text-center px-1 py-1"><span className="text-gray-300">—</span></TableCell>
                           return (
@@ -214,7 +220,7 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                     ))}
                     <TableRow className="bg-green-50/50">
                       <TableCell className="text-[10px] font-bold py-1">TOTAL</TableCell>
-                      {jueves.map((j) => {
+                      {(sortAsc ? jueves : [...jueves].reverse()).map((j) => {
                         const colOfrendas = ofrendas.filter((o) => o.fecha === j)
                         const allRecibidas = colOfrendas.length > 0 && colOfrendas.every((o) => o.recibido)
                         const total = getTotalJueves(j)

@@ -21,6 +21,8 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/secure-db"
 import { toast } from "sonner"
+import { useSortOrder } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import { generateMatrimonioPDF } from "@/lib/generate-matrimonio-pdf"
 import { generateMatrimonioPDFv2 } from "@/lib/generate-matrimonio-pdf-v2"
 import { PDFDocument } from "pdf-lib"
@@ -81,6 +83,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
   const [records, setRecords] = useState<MatrimonioCenso[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   // Modal de edición para campos faltantes / edición completa
   const [editingRecord, setEditingRecord] = useState<MatrimonioCenso | null>(null)
@@ -153,7 +156,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
       filtered.sort((a, b) => {
         if (!a.fecha_matrimonio) return 1
         if (!b.fecha_matrimonio) return -1
-        return b.fecha_matrimonio.localeCompare(a.fecha_matrimonio)
+        return sortAsc ? a.fecha_matrimonio.localeCompare(b.fecha_matrimonio) : b.fecha_matrimonio.localeCompare(a.fecha_matrimonio)
       })
 
       setRecords(filtered)
@@ -515,6 +518,7 @@ function MatrimonioContent({ canEdit }: { canEdit: boolean }) {
               <h1 className="text-xl font-semibold text-gray-900">Registro de Matrimonios</h1>
             </div>
             <div className="flex items-center gap-2">
+              <SortToggleButton ascending={sortAsc} onToggle={toggleSort} />
               {canEdit && (
                 <Button size="sm" variant="ghost" onClick={() => openManualModal()}
                   className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 opacity-60 hover:opacity-100 transition-opacity">

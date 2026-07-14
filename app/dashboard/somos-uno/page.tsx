@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Users, UserPlus, Lock, Eye, ClipboardCheck, History, DollarSign, Trash2, Pencil } from "lucide-react"
 import { toast } from "sonner"
+import { useSortOrder, sortByName } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import {
   registrarGestion,
   editarGestion,
@@ -117,6 +119,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const [editMemberForm, setEditMemberForm] = useState({ nombre: "", telefono: "" })
   const [savingMember, setSavingMember] = useState(false)
   const [deletingMember, setDeletingMember] = useState<MiembroCelula | null>(null)
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   // Ofrendas
   const [ofrendas, setOfrendas] = useState<OfrendaCelula[]>([])
@@ -209,8 +212,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   const miembrosActivos = miembros.filter((m) => m.celula_asiste)
   const posiblesMiembros = miembros.filter((m) => !m.celula_asiste)
-  const activosPorCelula = (celula: string) => miembrosActivos.filter((m) => m.celula_nombre === celula)
-  const posiblesPorCelula = (celula: string) => posiblesMiembros.filter((m) => m.celula_nombre === celula)
+  const activosPorCelula = (celula: string) => sortByName(miembrosActivos.filter((m) => m.celula_nombre === celula), "apellidos_nombres", sortAsc)
+  const posiblesPorCelula = (celula: string) => sortByName(posiblesMiembros.filter((m) => m.celula_nombre === celula), "apellidos_nombres", sortAsc)
 
   const isGestionadoEstaSemana = (m: MiembroCelula) => {
     const g = gestionesSemana.find((g) => g.miembro_id === m.id && g.fuente === m.fuente)
@@ -647,11 +650,14 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">Miembros que asisten a esta célula</CardTitle>
-                    {canEdit && (
-                      <Button size="sm" onClick={() => setShowAddMember(true)} className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <SortToggleButton ascending={sortAsc} onToggle={toggleSort} label={sortAsc ? "A → Z" : "Z → A"} />
+                      {canEdit && (
+                        <Button size="sm" onClick={() => setShowAddMember(true)} className="flex items-center gap-1">
                         <UserPlus className="w-4 h-4" /> Agregar
                       </Button>
                     )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>{renderMiembrosTable(activosPorCelula(selectedCelula), "No hay miembros activos en esta célula")}</CardContent>

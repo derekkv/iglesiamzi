@@ -22,6 +22,8 @@ import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useRealtime } from "@/hooks/use-realtime"
+import { useSortOrder } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import { pagoDiarioService, type PagoDiarioRecord } from "@/lib/mod/pago-diario-service"
 import { getGlobalConfig } from "@/lib/globalConfig"
 import { supabase } from "@/lib/secure-db"
@@ -37,6 +39,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
   const [records, setRecords] = useState<PagoDiarioRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   // Modals
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -335,6 +338,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              <SortToggleButton ascending={sortAsc} onToggle={toggleSort} />
               {!canEdit && <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo lectura</Badge>}
               {canEdit && (
                 <Button size="sm" onClick={() => { resetForm(); setShowAddDialog(true) }}>
@@ -447,7 +451,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...records].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()).map((r) => (
+                        {[...records].sort((a, b) => { const diff = new Date(a.fecha).getTime() - new Date(b.fecha).getTime(); return sortAsc ? diff : -diff }).map((r) => (
                           <tr key={r.id} className={`hover:bg-gray-50 ${r.fecha?.substring(0, 10) === today ? "bg-purple-50/50" : ""}`}>
                             <td className="border border-gray-300 px-3 py-1.5 text-xs text-gray-500">{r.id}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{formatDate(r.fecha)}</td>

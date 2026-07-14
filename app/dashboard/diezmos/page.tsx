@@ -23,6 +23,8 @@ import { ArrowLeft, Plus, Trash2, Edit2, Search, Lock } from "lucide-react"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useSortOrder } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
 import { todayEcuador } from "@/lib/timezone"
 
@@ -49,6 +51,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
   // Filtros
   const [filterTipo, setFilterTipo] = useState<string>("todos")
   const [filterTransaccion, setFilterTransaccion] = useState<string>("todos")
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   // Search
   const [searchResults, setSearchResults] = useState<DiezmoWithMonth[]>([])
@@ -138,7 +141,10 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
     if (filterTipo !== "todos" && r.tipo_ofrenda !== filterTipo) return false
     if (filterTransaccion !== "todos" && r.transaccion !== filterTransaccion) return false
     return true
-  }).sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+  }).sort((a, b) => {
+    const diff = new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+    return sortAsc ? diff : -diff
+  })
 
   // Totales
   const totalDiezmoTransf = records.filter(r => (r.tipo_ofrenda === "diezmo" || !r.tipo_ofrenda) && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
@@ -179,6 +185,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              <SortToggleButton ascending={sortAsc} onToggle={toggleSort} />
               {!canEdit && (<Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo lectura</Badge>)}
               {canEdit && (<Button size="sm" onClick={() => { setForm({ fecha: todayEcuador(), donador: "", valor: "", tipo_ofrenda: "diezmo", transaccion: "transferencia" }); setShowAddDialog(true) }}><Plus className="w-4 h-4 mr-1" /> Registrar</Button>)}
             </div>

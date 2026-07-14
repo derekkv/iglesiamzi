@@ -23,6 +23,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useSecurityCheck } from "@/contexts/security-context"
+import { useSortOrder, sortByName } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import { storage } from "@/lib/storage"
 import { toast } from "sonner"
 import { auditService } from "@/lib/mod/audit-service"
@@ -69,6 +71,7 @@ export function NominaSection() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteRecordId, setDeleteRecordId] = useState<number | null>(null)
   const hasSyncedRef = { current: false }
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   const emptyForm = {
     cedula: "", nombre: "", telefono: "", email: "",
@@ -762,6 +765,7 @@ export function NominaSection() {
               <CardDescription>Gestión de pagos — {currentMonth?.name}</CardDescription>
             </div>
             <div className="flex gap-2">
+              <SortToggleButton ascending={sortAsc} onToggle={toggleSort} label={sortAsc ? "A → Z" : "Z → A"} />
               <Button size="sm" onClick={() => { resetForm(); setShowAddModal(true) }}><Plus className="w-4 h-4 mr-1" /> Agregar</Button>
             </div>
           </div>
@@ -833,7 +837,7 @@ export function NominaSection() {
                       </tr>
                     </thead>
                     <tbody>
-                      {records.map((r) => {
+                      {sortByName(records, "nombre", sortAsc).map((r) => {
                         const tieneTransporte = r.movilizacion_pagada || (r.movilizacion_valor && Number(r.movilizacion_valor) > 0)
                         const movTotalPagado = Number(r.movilizacion_valor || 0) + Number(r.movilizacion_segunda_valor || 0)
                         const movCompleta = r.movilizacion_con_quincenas

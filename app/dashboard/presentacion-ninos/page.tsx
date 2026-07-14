@@ -19,6 +19,8 @@ import {
   ArrowLeft, Search, FileText, Plus, Pencil, Trash2, Lock, Loader2, Download, Files,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useSortOrder, sortByDate } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import {
   presentacionNinosService,
   type PresentacionNino,
@@ -36,6 +38,7 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
   const [records, setRecords] = useState<PresentacionNino[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   // Modal crear/editar
   const [showFormModal, setShowFormModal] = useState(false)
@@ -88,6 +91,7 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
       r.nombre_madre.toLowerCase().includes(q)
     )
   })
+  const sortedFiltered = sortByDate(filtered, "fecha", sortAsc)
 
   // === CREAR / EDITAR ===
   const openCreateModal = () => {
@@ -302,6 +306,7 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
                     <Plus className="w-4 h-4 mr-1" /> Nuevo
                   </Button>
                 )}
+                <SortToggleButton ascending={sortAsc} onToggle={toggleSort} />
               </div>
             </div>
           </CardHeader>
@@ -324,7 +329,7 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((record, idx) => (
+                    {sortedFiltered.map((record, idx) => (
                       <TableRow key={record.id}>
                         <TableCell className="text-xs">{idx + 1}</TableCell>
                         <TableCell className="text-xs font-medium">{record.nombre_presentado}</TableCell>

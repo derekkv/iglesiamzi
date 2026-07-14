@@ -121,5 +121,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    text-transform: uppercase;
+  }
+  /* Excepciones: passwords, emails internos, y código no deben ser uppercase */
+  input[type="password"],
+  input[type="email"],
+  code, pre {
+    text-transform: none;
   }
 }

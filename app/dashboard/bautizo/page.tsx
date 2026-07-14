@@ -21,6 +21,8 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/secure-db"
 import { toast } from "sonner"
+import { useSortOrder } from "@/hooks/use-sort-order"
+import { SortToggleButton } from "@/components/SortToggleButton"
 import { generateBautizoPDF } from "@/lib/generate-bautizo-pdf"
 import { PDFDocument } from "pdf-lib"
 
@@ -63,6 +65,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
   const [records, setRecords] = useState<BautizoCenso[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   // Modal de edición para campos faltantes
   const [editingRecord, setEditingRecord] = useState<BautizoCenso | null>(null)
@@ -130,7 +133,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
       filtered.sort((a, b) => {
         if (!a.fecha_bautizo) return 1
         if (!b.fecha_bautizo) return -1
-        return b.fecha_bautizo.localeCompare(a.fecha_bautizo)
+        return sortAsc ? a.fecha_bautizo.localeCompare(b.fecha_bautizo) : b.fecha_bautizo.localeCompare(a.fecha_bautizo)
       })
 
       setRecords(filtered)
@@ -446,6 +449,7 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
               <h1 className="text-xl font-semibold text-gray-900">Registro de Bautizos</h1>
             </div>
             <div className="flex items-center gap-2">
+              <SortToggleButton ascending={sortAsc} onToggle={toggleSort} />
               {canEdit && (
                 <Button size="sm" variant="ghost" onClick={() => openManualModal()}
                   className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 opacity-60 hover:opacity-100 transition-opacity">

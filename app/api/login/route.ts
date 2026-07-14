@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const trimmedId = identifier.trim()
+    const trimmedId = identifier.trim().toLowerCase()
 
-    // Buscar usuario por username, email o phone
+    // Buscar usuario por username, email o phone (case-insensitive)
     const { data: user, error } = await supabaseServer
       .from("users")
       .select("*")
       .eq("is_active", true)
-      .or(`username.eq.${trimmedId},email.eq.${trimmedId},phone.eq.${trimmedId}`)
+      .or(`username.ilike.${trimmedId},email.ilike.${trimmedId},phone.eq.${trimmedId}`)
       .single()
 
     if (error || !user) {
