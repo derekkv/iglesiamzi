@@ -66,15 +66,12 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   // === FINANCIERO (muy sensible) ===
   nomina: {
     modules: ["flujo_pago"],
-    requireAdminForDelete: true,
   },
   payment_tables: {
     modules: ["flujo_pago"],
-    requireAdminForDelete: true,
   },
   payment_rows: {
     modules: ["flujo_pago"],
-    requireAdminForDelete: true,
   },
   ingresos: {
     modules: ["ingresos_egresos", "diezmos"],
@@ -263,6 +260,23 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["pago_diario", "ingresos_egresos"],
   },
 
+  // === INVENTARIO (movimientos) ===
+  inventory_movements: {
+    modules: ["inventario"],
+  },
+
+  // === WHATSAPP ===
+  whatsapp_messages: {
+    modules: ["administracion"],
+    requireEditForWrite: false,
+  },
+
+  // === NOTIFICACIONES ===
+  service_notifications_log: {
+    modules: "any",
+    requireEditForWrite: false,
+  },
+
   // === AUDITORÍA (solo lectura + insert, nunca delete/update) ===
   audit_logs: {
     modules: "any",
@@ -280,6 +294,19 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   user_sessions: {
     modules: [], // Solo server
   },
+
+  // === POS / VENTAS (no accesible desde cliente) ===
+  account_types: { modules: [] },
+  cash_registers: { modules: [] },
+  ingredients: { modules: [] },
+  product_ingredients: { modules: [] },
+  products: { modules: [] },
+  sale_items: { modules: [] },
+  sales: { modules: [] },
+
+  // === VISTAS / AUXILIARES ===
+  users_2: { modules: [] },
+  users_safe: { modules: [] },
 }
 
 /**

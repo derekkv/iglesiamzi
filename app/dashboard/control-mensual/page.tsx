@@ -351,23 +351,85 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                   </button>
                   {openNomina && (
                     <CardContent className="pt-0 pb-4 border-t">
-                      <div className="grid grid-cols-3 gap-3 mt-3">
-                        <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
-                          <p className="text-xs text-amber-600">Total a Pagar</p>
-                          <p className="text-lg font-bold text-amber-800">${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                        </div>
-                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                          <p className="text-xs text-green-600">Pagado</p>
-                          <p className="text-lg font-bold text-green-800">${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                        </div>
-                        <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
-                          <p className="text-xs text-red-600">Pendiente</p>
-                          <p className="text-lg font-bold text-red-800">${(totalNominaAPagar - totalNominaPagado).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" className="mt-3 text-amber-700" onClick={() => router.push("/dashboard/flujo-pago")}>
-                        <ExternalLink className="w-3 h-3 mr-1" /> Ir a Flujo de Pago
-                      </Button>
+                      {(() => {
+                        const pendientes1ra = nominaRecords.filter((r: any) => !r.primera_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
+                        const pendientes2da = nominaRecords.filter((r: any) => !r.segunda_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
+                        const pendientesTransporte = nominaRecords.filter((r: any) => (Number(r.movilizacion_valor || 0) > 0 || r.movilizacion_pagada) && !r.movilizacion_pagada)
+                        const totalTransportePagado = nominaRecords.reduce((s: number, r: any) => s + (r.movilizacion_pagada ? Number(r.movilizacion_valor || 0) : 0) + (r.movilizacion_segunda_pagada ? Number(r.movilizacion_segunda_valor || 0) : 0), 0)
+                        return (
+                          <>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                              <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                <p className="text-xs text-amber-600">Total a Pagar</p>
+                                <p className="text-lg font-bold text-amber-800">${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                              </div>
+                              <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                                <p className="text-xs text-green-600">Pagado Quincenas</p>
+                                <p className="text-lg font-bold text-green-800">${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                              </div>
+                              <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                <p className="text-xs text-purple-600">Transporte Pagado</p>
+                                <p className="text-lg font-bold text-purple-800">${totalTransportePagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                              </div>
+                              <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                                <p className="text-xs text-red-600">Pendiente Total</p>
+                                <p className="text-lg font-bold text-red-800">${(totalNominaAPagar - totalNominaPagado).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                              </div>
+                            </div>
+
+                            {/* Pendientes por categoría */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                              {pendientes1ra.length > 0 && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <p className="text-xs font-semibold text-blue-700 mb-2">Falta 1ra Quincena ({pendientes1ra.length})</p>
+                                  <div className="space-y-1">
+                                    {pendientes1ra.map((r: any) => (
+                                      <div key={r.id} className="flex justify-between text-xs">
+                                        <span className="text-gray-700 truncate">{r.nombre}</span>
+                                        <span className="text-blue-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {pendientes2da.length > 0 && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                  <p className="text-xs font-semibold text-green-700 mb-2">Falta 2da Quincena ({pendientes2da.length})</p>
+                                  <div className="space-y-1">
+                                    {pendientes2da.map((r: any) => (
+                                      <div key={r.id} className="flex justify-between text-xs">
+                                        <span className="text-gray-700 truncate">{r.nombre}</span>
+                                        <span className="text-green-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {pendientesTransporte.length > 0 && (
+                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                  <p className="text-xs font-semibold text-purple-700 mb-2">Falta Transporte ({pendientesTransporte.length})</p>
+                                  <div className="space-y-1">
+                                    {pendientesTransporte.map((r: any) => (
+                                      <div key={r.id} className="flex justify-between text-xs">
+                                        <span className="text-gray-700 truncate">{r.nombre}</span>
+                                        <span className="text-purple-700 font-medium">${Number(r.movilizacion_valor || 0).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {pendientes1ra.length === 0 && pendientes2da.length === 0 && pendientesTransporte.length === 0 && (
+                              <p className="text-sm text-green-600 text-center mt-4 font-medium">Toda la nómina está al día</p>
+                            )}
+
+                            <Button variant="ghost" size="sm" className="mt-3 text-amber-700" onClick={() => router.push("/dashboard/flujo-pago")}>
+                              <ExternalLink className="w-3 h-3 mr-1" /> Ir a Flujo de Pago
+                            </Button>
+                          </>
+                        )
+                      })()}
                     </CardContent>
                   )}
                 </Card>

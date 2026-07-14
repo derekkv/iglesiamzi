@@ -113,6 +113,23 @@ export const pagoDiarioService = {
 
   // === EGRESO SYNC ===
 
+  async syncMissingEgresos(mesId: string) {
+    // Obtener todos los pagos diarios del mes
+    const { data: pagos } = await supabase.from("pago_diario").select("*").eq("mes_id", mesId)
+    if (!pagos || pagos.length === 0) return
+
+    // Obtener egresos sincronizados existentes
+    const { data: egresosExistentes } = await supabase.from("egresos").select("detalle, monto, observacion").eq("mes_id", mesId).eq("concepto", "auto-pago-diario")
+    const existingSet = new Set((egresosExistentes || []).map((e: any) => `${e.detalle}|${e.monto}|${e.observacion}`))
+
+    for (const record of pagos) {
+      const key = `Pago diario - ${record.nombre}|${record.valor}|${record.detalle}`
+      if (!existingSet.has(key)) {
+        await this._syncEgresoCreate(record)
+      }
+    }
+  },
+
   async _syncEgresoCreate(record: PagoDiarioRecord) {
     await supabase.from("egresos").insert({
       mes_id: record.mes_id,

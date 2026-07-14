@@ -78,6 +78,9 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
       const data = await pagoDiarioService.getByMonth(currentMonth.id)
       setRecords(data)
 
+      // Sincronizar egresos faltantes (solo en carga inicial)
+      if (!silent) await pagoDiarioService.syncMissingEgresos(currentMonth.id)
+
       // Extraer beneficiarios únicos (nombre más reciente con sus datos)
       const map = new Map<string, { nombre: string; telefono: string | null; email: string | null }>()
       for (const r of data) {
