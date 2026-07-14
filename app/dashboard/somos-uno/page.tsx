@@ -112,9 +112,9 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   // CRUD miembros manuales
   const [showAddMember, setShowAddMember] = useState(false)
-  const [addMemberForm, setAddMemberForm] = useState({ nombre: "", cedula: "" })
+  const [addMemberForm, setAddMemberForm] = useState({ nombre: "", telefono: "", tipo: "activo" as "activo" | "posible" })
   const [editingMember, setEditingMember] = useState<MiembroCelula | null>(null)
-  const [editMemberForm, setEditMemberForm] = useState({ nombre: "", cedula: "" })
+  const [editMemberForm, setEditMemberForm] = useState({ nombre: "", telefono: "" })
   const [savingMember, setSavingMember] = useState(false)
   const [deletingMember, setDeletingMember] = useState<MiembroCelula | null>(null)
 
@@ -325,14 +325,14 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
     try {
       const { error } = await supabase.from("miembros_celulas").insert({
         apellidos_nombres: addMemberForm.nombre.trim(),
-        cedula: addMemberForm.cedula.trim() || null,
+        cedula: addMemberForm.telefono.trim() || null,
         celula_nombre: selectedCelula,
-        celula_asiste: true,
+        celula_asiste: addMemberForm.tipo === "activo",
       })
       if (error) throw error
-      toast.success("Persona agregada")
+      toast.success(`Persona agregada como ${addMemberForm.tipo === "activo" ? "activo" : "posible"}`)
       setShowAddMember(false)
-      setAddMemberForm({ nombre: "", cedula: "" })
+      setAddMemberForm({ nombre: "", telefono: "", tipo: "activo" })
       loadMiembros()
     } catch (error: any) {
       console.error(error)
@@ -342,7 +342,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
 
   const handleOpenEditMember = (m: MiembroCelula) => {
     setEditingMember(m)
-    setEditMemberForm({ nombre: m.apellidos_nombres, cedula: m.cedula || "" })
+    setEditMemberForm({ nombre: m.apellidos_nombres, telefono: m.cedula || "" })
   }
 
   const handleSaveEditMember = async () => {
@@ -353,7 +353,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
         : editingMember.fuente === "protocolo" ? "censo" : "censo_mdg"
       const { error } = await supabase.from(tabla).update({
         apellidos_nombres: editMemberForm.nombre.trim(),
-        cedula: editMemberForm.cedula.trim() || null,
+        cedula: editMemberForm.telefono.trim() || null,
       }).eq("id", editingMember.id)
       if (error) throw error
       toast.success("Persona actualizada")
@@ -461,7 +461,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
             <TableRow>
               <TableHead className="text-xs">#</TableHead>
               <TableHead className="text-xs">Nombre</TableHead>
-              <TableHead className="text-xs">Cédula</TableHead>
+              <TableHead className="text-xs">Celular</TableHead>
+              <TableHead className="text-xs">Convencional</TableHead>
               <TableHead className="text-xs">Asistió</TableHead>
               <TableHead className="text-xs">Gestionado</TableHead>
               <TableHead className="text-xs text-right">Acciones</TableHead>
@@ -476,7 +477,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                 <TableRow key={`${m.fuente}-${m.id}`}>
                   <TableCell className="text-xs">{idx + 1}</TableCell>
                   <TableCell className="text-xs font-medium">{m.apellidos_nombres}</TableCell>
-                  <TableCell className="text-xs">{m.cedula || "-"}</TableCell>
+                  <TableCell className="text-xs">{m.celular || m.cedula || "-"}</TableCell>
+                  <TableCell className="text-xs">{m.convencional || "-"}</TableCell>
                   <TableCell className="text-xs">
                     {tieneRegistro ? (
                       <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
@@ -756,7 +758,8 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
           {detailMember && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <div><span className="text-gray-500">Cédula:</span> <span className="font-medium">{detailMember.cedula || "-"}</span></div>
+                <div><span className="text-gray-500">Celular:</span> <span className="font-medium">{detailMember.celular || detailMember.cedula || "-"}</span></div>
+                <div><span className="text-gray-500">Convencional:</span> <span className="font-medium">{detailMember.convencional || "-"}</span></div>
                 <div><span className="text-gray-500">Edad:</span> <span className="font-medium">{detailMember.edad || "-"}</span></div>
                 <div><span className="text-gray-500">Sexo:</span> <span className="font-medium">{detailMember.sexo || "-"}</span></div>
                 <div><span className="text-gray-500">Estado Civil:</span> <span className="font-medium">{detailMember.estado_civil || "-"}</span></div>
@@ -1013,7 +1016,7 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Agregar Persona a {selectedCelula}</DialogTitle>
-            <DialogDescription>Se agregará como miembro activo de esta célula.</DialogDescription>
+            <DialogDescription>Se agregará como miembro de esta célula.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -1026,13 +1029,26 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               />
             </div>
             <div>
-              <Label>Cédula</Label>
+              <Label>Teléfono</Label>
               <Input
-                value={addMemberForm.cedula}
-                onChange={(e) => setAddMemberForm({ ...addMemberForm, cedula: e.target.value })}
-                placeholder="0999999999"
+                value={addMemberForm.telefono}
+                onChange={(e) => setAddMemberForm({ ...addMemberForm, telefono: e.target.value })}
+                placeholder="0980000000"
                 className="mt-1"
               />
+            </div>
+            <div>
+              <Label>Tipo *</Label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="tipo_miembro" checked={addMemberForm.tipo === "activo"} onChange={() => setAddMemberForm({ ...addMemberForm, tipo: "activo" })} />
+                  Activo
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="tipo_miembro" checked={addMemberForm.tipo === "posible"} onChange={() => setAddMemberForm({ ...addMemberForm, tipo: "posible" })} />
+                  Posible
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -1062,11 +1078,11 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
               />
             </div>
             <div>
-              <Label>Cédula</Label>
+              <Label>Teléfono</Label>
               <Input
-                value={editMemberForm.cedula}
-                onChange={(e) => setEditMemberForm({ ...editMemberForm, cedula: e.target.value })}
-                placeholder="0999999999"
+                value={editMemberForm.telefono}
+                onChange={(e) => setEditMemberForm({ ...editMemberForm, telefono: e.target.value })}
+                placeholder="0980000000"
                 className="mt-1"
               />
             </div>
