@@ -346,7 +346,7 @@ export class WhatsAppService {
         messageContent = { video: mediaBuffer, caption: caption || undefined, mimetype: mimetype || "video/mp4" }
         break
       case "audio":
-        messageContent = { audio: mediaBuffer, mimetype: mimetype || "audio/ogg; codecs=opus", ptt: true }
+        messageContent = { audio: mediaBuffer, mimetype: mimetype || "audio/mpeg", ptt: false }
         break
       case "document":
         messageContent = { document: mediaBuffer, mimetype: mimetype || "application/pdf", fileName: fileName || "archivo", caption: caption || undefined }
