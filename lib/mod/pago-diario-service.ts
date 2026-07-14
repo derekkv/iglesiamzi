@@ -146,14 +146,14 @@ export const pagoDiarioService = {
   },
 
   async _syncEgresoUpdate(antes: PagoDiarioRecord, despues: PagoDiarioRecord) {
-    // Find linked egreso
+    // Find linked egreso by concepto + detalle + mes_id (sin monto para soportar ediciones previas)
     const { data: egreso } = await supabase
       .from("egresos")
       .select("id")
       .eq("concepto", "auto-pago-diario")
       .eq("detalle", `Pago diario - ${antes.nombre}`)
       .eq("mes_id", antes.mes_id)
-      .eq("monto", antes.valor)
+      .eq("observacion", antes.detalle)
       .limit(1)
       .single()
 
@@ -162,6 +162,7 @@ export const pagoDiarioService = {
         monto: despues.valor,
         fecha: despues.fecha,
         ministerio: despues.ministerio,
+        categoria_principal: despues.categoria,
         detalle: `Pago diario - ${despues.nombre}`,
         observacion: despues.detalle,
         metodo_pago: despues.metodo_pago,
@@ -176,7 +177,6 @@ export const pagoDiarioService = {
       .eq("concepto", "auto-pago-diario")
       .eq("detalle", `Pago diario - ${record.nombre}`)
       .eq("mes_id", record.mes_id)
-      .eq("monto", record.valor)
   },
 
   // === NOTIFICATIONS ===

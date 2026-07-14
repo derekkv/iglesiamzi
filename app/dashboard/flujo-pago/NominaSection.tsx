@@ -68,6 +68,7 @@ export function NominaSection() {
   const [loadingHistorial, setLoadingHistorial] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteRecordId, setDeleteRecordId] = useState<number | null>(null)
+  const hasSyncedRef = { current: false }
 
   const emptyForm = {
     cedula: "", nombre: "", telefono: "", email: "",
@@ -119,8 +120,11 @@ export function NominaSection() {
       if (error) throw error
       if (data && data.length > 0) {
         setRecords(data)
-        // Sincronizar egresos faltantes (solo en carga inicial)
-        if (!silent) syncEgresosFromNomina(data)
+        // Sincronizar egresos faltantes (solo una vez al montar)
+        if (!silent && !hasSyncedRef.current) {
+          hasSyncedRef.current = true
+          syncEgresosFromNomina(data)
+        }
       } else {
         setRecords([])
         if (!silent) await autoCopyFromPreviousMonth()
@@ -451,78 +455,60 @@ export function NominaSection() {
       }).eq("id", editingRecord.id)
       if (error) throw error
 
-      // --- Sync egresos: primera quincena ---
-      if (formData.primera_quincena_pagada && !editingRecord.primera_quincena_pagada) {
-        const v = parseFloat(formData.primera_quincena_valor) || 0
-        await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.primera_quincena_metodo, "primera")
-        await registerEgreso(formData.nombre, v, formData.primera_quincena_fecha || new Date().toISOString().split("T")[0], formData.primera_quincena_metodo, "1ra quincena", formData.detalle)
-      } else if (formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
-        const oldV = editingRecord.primera_quincena_valor || 0
-        const newV = parseFloat(formData.primera_quincena_valor) || 0
-        if (oldV !== newV || editingRecord.primera_quincena_fecha !== formData.primera_quincena_fecha || editingRecord.nombre !== formData.nombre) {
-          const { data: egreso } = await supabase.from("egresos").select("id").eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`).limit(1).single()
-          if (egreso) await supabase.from("egresos").update({ monto: newV, fecha: formData.primera_quincena_fecha || undefined, observacion: `1ra quincena de ${formData.nombre} — ${formData.primera_quincena_metodo}`, metodo_pago: formData.primera_quincena_metodo }).eq("id", egreso.id)
+      // --- Sync egresos: solo cuando CAMBIA el estado de pagado ---
+      // Primera quincena: solo si no es transporte
+      if (!esTransporte) {
+        if (formData.primera_quincena_pagada && !editingRecord.primera_quincena_pagada) {
+          // Marcó como pagada → crear egreso
+          const v = parseFloat(formData.primera_quincena_valor) || 0
+          await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.primera_quincena_metodo, "primera")
+          await registerEgreso(formData.nombre, v, formData.primera_quincena_fecha || new Date().toISOString().split("T")[0], formData.primera_quincena_metodo, "1ra quincena", formData.detalle)
+        } else if (!formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
+          // Desmarcó pagada → eliminar egreso
+          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
         }
-      } else if (!formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
-        await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
       }
 
-      // --- Sync egresos: segunda quincena ---
-      if (formData.segunda_quincena_pagada && !editingRecord.segunda_quincena_pagada) {
-        const v = parseFloat(formData.segunda_quincena_valor) || 0
-        await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.segunda_quincena_metodo, "segunda")
-        await registerEgreso(formData.nombre, v, formData.segunda_quincena_fecha || new Date().toISOString().split("T")[0], formData.segunda_quincena_metodo, "2da quincena", formData.detalle)
-      } else if (formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
-        const oldV = editingRecord.segunda_quincena_valor || 0
-        const newV = parseFloat(formData.segunda_quincena_valor) || 0
-        if (oldV !== newV || editingRecord.segunda_quincena_fecha !== formData.segunda_quincena_fecha || editingRecord.nombre !== formData.nombre) {
-          const { data: egreso } = await supabase.from("egresos").select("id").eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`).limit(1).single()
-          if (egreso) await supabase.from("egresos").update({ monto: newV, fecha: formData.segunda_quincena_fecha || undefined, observacion: `2da quincena de ${formData.nombre} — ${formData.segunda_quincena_metodo}`, metodo_pago: formData.segunda_quincena_metodo }).eq("id", egreso.id)
+      // Segunda quincena: solo si no es transporte
+      if (!esTransporte) {
+        if (formData.segunda_quincena_pagada && !editingRecord.segunda_quincena_pagada) {
+          const v = parseFloat(formData.segunda_quincena_valor) || 0
+          await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.segunda_quincena_metodo, "segunda")
+          await registerEgreso(formData.nombre, v, formData.segunda_quincena_fecha || new Date().toISOString().split("T")[0], formData.segunda_quincena_metodo, "2da quincena", formData.detalle)
+        } else if (!formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
+          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
         }
-      } else if (!formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
-        await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
       }
 
-      // --- Sync egresos: transporte (pago único o 1ra quincena legacy) ---
-      const movLabel1 = (formData.movilizacion_con_quincenas) ? "1ra quincena movilización" : "Transporte del mes"
-      // Para buscar egresos existentes, el registro pudo haberse guardado con "Movilización del mes" o "Transporte del mes"
-      const movOldLabel1 = (editingRecord.movilizacion_con_quincenas) ? "1ra quincena movilización" : "ovilizaci" // busca tanto "Movilización" como "Transporte" via fallback
+      // Si cambió a transporte y antes tenía quincenas pagadas → eliminar egresos de quincena
+      const antesTeniaTransporte = Number(editingRecord.movilizacion_valor || 0) > 0 && !editingRecord.movilizacion_con_quincenas
+      if (esTransporte && !antesTeniaTransporte) {
+        if (editingRecord.primera_quincena_pagada) {
+          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
+        }
+        if (editingRecord.segunda_quincena_pagada) {
+          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
+        }
+      }
+
+      // Transporte: solo cuando cambia estado de pagado
       if (formData.movilizacion_pagada && !editingRecord.movilizacion_pagada) {
+        // Marcó transporte como pagado → crear egreso
         const v = parseFloat(formData.movilizacion_valor) || 0
+        const label = formData.movilizacion_con_quincenas ? "1ra quincena movilización" : "Transporte del mes"
         await sendMovilizacionNotification(formData.nombre, formData.telefono, formData.email, v, formData.movilizacion_metodo, "primera", formData.movilizacion_con_quincenas)
-        await registerEgreso(formData.nombre, v, formData.movilizacion_fecha || new Date().toISOString().split("T")[0], formData.movilizacion_metodo, movLabel1, formData.detalle)
-      } else if (formData.movilizacion_pagada && editingRecord.movilizacion_pagada) {
-        const oldV = editingRecord.movilizacion_valor || 0
-        const newV = parseFloat(formData.movilizacion_valor) || 0
-        if (oldV !== newV || editingRecord.movilizacion_fecha !== formData.movilizacion_fecha || editingRecord.nombre !== formData.nombre) {
-          // Buscar por el label antiguo "Movilización del mes" O el nuevo "Transporte del mes"
-          let egreso: { id: number } | null = null
-          const { data: e1 } = await supabase.from("egresos").select("id").eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%Movilización del mes de ${editingRecord.nombre}%`).limit(1).single()
-          egreso = e1
-          if (!egreso) {
-            const { data: e2 } = await supabase.from("egresos").select("id").eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%Transporte del mes de ${editingRecord.nombre}%`).limit(1).single()
-            egreso = e2
-          }
-          if (egreso) await supabase.from("egresos").update({ monto: newV, fecha: formData.movilizacion_fecha || undefined, observacion: `${movLabel1} de ${formData.nombre} — ${formData.movilizacion_metodo}`, metodo_pago: formData.movilizacion_metodo }).eq("id", egreso.id)
-        }
+        await registerEgreso(formData.nombre, v, formData.movilizacion_fecha || new Date().toISOString().split("T")[0], formData.movilizacion_metodo, label, formData.detalle)
       } else if (!formData.movilizacion_pagada && editingRecord.movilizacion_pagada) {
-        // Eliminar egreso buscando ambos labels posibles
+        // Desmarcó transporte pagado → eliminar egreso
         await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%Movilización del mes de ${editingRecord.nombre}%`)
         await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%Transporte del mes de ${editingRecord.nombre}%`)
       }
 
-      // --- Sync egresos: movilización 2da quincena ---
+      // Movilización 2da quincena (legacy)
       if (formData.movilizacion_con_quincenas && formData.movilizacion_segunda_pagada && !editingRecord.movilizacion_segunda_pagada) {
         const v = parseFloat(formData.movilizacion_segunda_valor) || 0
         await sendMovilizacionNotification(formData.nombre, formData.telefono, formData.email, v, formData.movilizacion_segunda_metodo, "segunda", true)
         await registerEgreso(formData.nombre, v, formData.movilizacion_segunda_fecha || new Date().toISOString().split("T")[0], formData.movilizacion_segunda_metodo, "2da quincena movilización", formData.detalle)
-      } else if (formData.movilizacion_con_quincenas && formData.movilizacion_segunda_pagada && editingRecord.movilizacion_segunda_pagada) {
-        const oldV = editingRecord.movilizacion_segunda_valor || 0
-        const newV = parseFloat(formData.movilizacion_segunda_valor) || 0
-        if (oldV !== newV || editingRecord.movilizacion_segunda_fecha !== formData.movilizacion_segunda_fecha || editingRecord.nombre !== formData.nombre) {
-          const { data: egreso } = await supabase.from("egresos").select("id").eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena movilización de ${editingRecord.nombre}%`).limit(1).single()
-          if (egreso) await supabase.from("egresos").update({ monto: newV, fecha: formData.movilizacion_segunda_fecha || undefined, observacion: `2da quincena movilización de ${formData.nombre} — ${formData.movilizacion_segunda_metodo}`, metodo_pago: formData.movilizacion_segunda_metodo }).eq("id", egreso.id)
-        }
       } else if ((!formData.movilizacion_con_quincenas || !formData.movilizacion_segunda_pagada) && editingRecord.movilizacion_segunda_pagada) {
         await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena movilización de ${editingRecord.nombre}%`)
       }
