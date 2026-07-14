@@ -260,49 +260,60 @@ function OfrendaCelulasContent({ canEdit }: { canEdit: boolean }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {/* Domingos */}
-                    {domingos.map((dom) => {
-                      const record = getAlfoliRecord(dom, "domingo")
-                      return (
-                        <TableRow key={dom}>
-                          <TableCell className="text-[10px] py-1">{new Date(dom + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}</TableCell>
-                          <TableCell className="text-[10px] py-1"><Badge variant="outline" className="text-[9px] px-1">Domingo</Badge></TableCell>
-                          <TableCell className="text-center py-1">
-                            {record ? (
-                              <span className="text-[11px] font-semibold text-blue-700">${Number(record.valor).toFixed(2)}</span>
-                            ) : canEdit ? (
-                              <Input type="number" step="0.01" min="0" placeholder="0.00" className="h-6 w-20 text-[10px] mx-auto"
-                                onBlur={(e) => { if (e.target.value && parseFloat(e.target.value) > 0) handleAlfoliSave(dom, "domingo", e.target.value) }}
-                                onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value; if (v && parseFloat(v) > 0) handleAlfoliSave(dom, "domingo", v) } }}
-                              />
-                            ) : <span className="text-gray-300">—</span>}
-                          </TableCell>
-                          <TableCell className="text-right py-1">
-                            {record && canEdit && <Button variant="ghost" size="sm" className="h-5 text-[9px] text-red-500" onClick={() => handleAlfoliDelete(record)}>X</Button>}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                    {/* Fechas MDG */}
-                    {alfoli.filter((a) => a.tipo === "mdg").map((record) => (
-                      <TableRow key={record.id} className="bg-purple-50/30">
-                        <TableCell className="text-[10px] py-1">{new Date(record.fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}</TableCell>
-                        <TableCell className="text-[10px] py-1"><Badge className="bg-purple-100 text-purple-700 text-[9px] px-1">MDG</Badge></TableCell>
-                        <TableCell className="text-center py-1">
-                          {record.valor > 0 ? (
-                            <span className="text-[11px] font-semibold text-purple-700">${Number(record.valor).toFixed(2)}</span>
-                          ) : canEdit ? (
-                            <Input type="number" step="0.01" min="0" placeholder="0.00" className="h-6 w-20 text-[10px] mx-auto"
-                              onBlur={(e) => { if (e.target.value && parseFloat(e.target.value) > 0) handleAlfoliSave(record.fecha, "mdg", e.target.value) }}
-                              onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value; if (v && parseFloat(v) > 0) handleAlfoliSave(record.fecha, "mdg", v) } }}
-                            />
-                          ) : <span className="text-gray-300">—</span>}
-                        </TableCell>
-                        <TableCell className="text-right py-1">
-                          {canEdit && <Button variant="ghost" size="sm" className="h-5 text-[9px] text-red-500" onClick={() => handleAlfoliDelete(record)}>X</Button>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {/* Todas las fechas (domingos + MDG) ordenadas por fecha */}
+                    {(() => {
+                      const allEntries: { fecha: string; tipo: "domingo" | "mdg"; record?: any }[] = [
+                        ...domingos.map((dom) => ({ fecha: dom, tipo: "domingo" as const, record: getAlfoliRecord(dom, "domingo") })),
+                        ...alfoli.filter((a) => a.tipo === "mdg").map((a) => ({ fecha: a.fecha, tipo: "mdg" as const, record: a })),
+                      ]
+                      allEntries.sort((a, b) => a.fecha.localeCompare(b.fecha))
+
+                      return allEntries.map((entry) => {
+                        if (entry.tipo === "domingo") {
+                          const record = entry.record
+                          return (
+                            <TableRow key={entry.fecha}>
+                              <TableCell className="text-[10px] py-1">{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}</TableCell>
+                              <TableCell className="text-[10px] py-1"><Badge variant="outline" className="text-[9px] px-1">Domingo</Badge></TableCell>
+                              <TableCell className="text-center py-1">
+                                {record ? (
+                                  <span className="text-[11px] font-semibold text-blue-700">${Number(record.valor).toFixed(2)}</span>
+                                ) : canEdit ? (
+                                  <Input type="number" step="0.01" min="0" placeholder="0.00" className="h-6 w-20 text-[10px] mx-auto"
+                                    onBlur={(e) => { if (e.target.value && parseFloat(e.target.value) > 0) handleAlfoliSave(entry.fecha, "domingo", e.target.value) }}
+                                    onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value; if (v && parseFloat(v) > 0) handleAlfoliSave(entry.fecha, "domingo", v) } }}
+                                  />
+                                ) : <span className="text-gray-300">—</span>}
+                              </TableCell>
+                              <TableCell className="text-right py-1">
+                                {record && canEdit && <Button variant="ghost" size="sm" className="h-5 text-[9px] text-red-500" onClick={() => handleAlfoliDelete(record)}>X</Button>}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        } else {
+                          const record = entry.record
+                          return (
+                            <TableRow key={record.id} className="bg-purple-50/30">
+                              <TableCell className="text-[10px] py-1">{new Date(record.fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}</TableCell>
+                              <TableCell className="text-[10px] py-1"><Badge className="bg-purple-100 text-purple-700 text-[9px] px-1">MDG</Badge></TableCell>
+                              <TableCell className="text-center py-1">
+                                {record.valor > 0 ? (
+                                  <span className="text-[11px] font-semibold text-purple-700">${Number(record.valor).toFixed(2)}</span>
+                                ) : canEdit ? (
+                                  <Input type="number" step="0.01" min="0" placeholder="0.00" className="h-6 w-20 text-[10px] mx-auto"
+                                    onBlur={(e) => { if (e.target.value && parseFloat(e.target.value) > 0) handleAlfoliSave(record.fecha, "mdg", e.target.value) }}
+                                    onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value; if (v && parseFloat(v) > 0) handleAlfoliSave(record.fecha, "mdg", v) } }}
+                                  />
+                                ) : <span className="text-gray-300">—</span>}
+                              </TableCell>
+                              <TableCell className="text-right py-1">
+                                {canEdit && <Button variant="ghost" size="sm" className="h-5 text-[9px] text-red-500" onClick={() => handleAlfoliDelete(record)}>X</Button>}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        }
+                      })
+                    })()}
                   </TableBody>
                 </Table>
               </div>

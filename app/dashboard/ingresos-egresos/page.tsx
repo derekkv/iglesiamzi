@@ -1032,7 +1032,7 @@ function formatDateForTable(dateString: string) {
             <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t">
               <div className="flex-1 min-w-[180px]">
                 <Input
-                  placeholder="Buscar por centro de gasto, ministerio..."
+                  placeholder="Buscar por N° registro, centro de gasto, ministerio..."
                   value={filterText}
                   onChange={(e) => setFilterText(e.target.value)}
                   className="h-9"
@@ -1104,6 +1104,7 @@ function formatDateForTable(dateString: string) {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b">
+                      <th className="text-left p-3 font-medium">N°</th>
                       <th className="text-left p-3 font-medium">Fecha</th>
                       <th className="text-left p-3 font-medium">Tipo</th>
                       <th className="text-left p-3 font-medium">Ministerio</th>
@@ -1128,6 +1129,7 @@ function formatDateForTable(dateString: string) {
                       if (filterText) {
                         const search = filterText.toLowerCase()
                         const matchesText =
+                          String(record.id).includes(search) ||
                           (record.observacion || "").toLowerCase().includes(search) ||
                           (record.ministerio || "").toLowerCase().includes(search) ||
                           (record.categoria_principal || "").toLowerCase().includes(search)
@@ -1140,6 +1142,7 @@ function formatDateForTable(dateString: string) {
                       return sortDesc ? -diff : diff;
                     }).map((record) => (
                       <tr key={record.id + "-" + record.tipo} className="border-b hover:bg-gray-50">
+                        <td className="p-3 text-xs text-gray-500 font-mono">{record.id}</td>
                         <td className="p-3">
                         {formatDateForTable(record.fecha)}
                      

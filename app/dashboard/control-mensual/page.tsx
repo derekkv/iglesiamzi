@@ -13,6 +13,7 @@ import { supabase } from "@/lib/secure-db"
 import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 import { currentMonthNameEcuador, todayEcuador, currentMonthEcuador, currentYearEcuador } from "@/lib/timezone"
+import { getAlfoliMes } from "@/lib/mod/alfoli-service"
 
 import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
 
@@ -29,6 +30,8 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
   const [asistenciaData, setAsistenciaData] = useState<any[]>([])
   const [nominaRecords, setNominaRecords] = useState<any[]>([])
   const [pagoDiarioRecords, setPagoDiarioRecords] = useState<any[]>([])
+  const [totalCelulas, setTotalCelulas] = useState(0)
+  const [totalAlfoli, setTotalAlfoli] = useState(0)
   const { hasAccess: hasNominaAccess } = useRestrictedAccess("nomina")
 
   // Acordeones
@@ -99,6 +102,21 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
       setAsistenciaData(datRes.data || [])
       setNominaRecords(nomRes.data || [])
       setPagoDiarioRecords(pdRes.data || [])
+
+      // Cargar totales consolidados (células + alfolí)
+      const monthNum = currentMonth.month
+      const yearNum = currentMonth.year
+
+      const alfoliRecords = await getAlfoliMes(monthNum, yearNum)
+      setTotalAlfoli(alfoliRecords.reduce((sum, r) => sum + Number(r.valor), 0))
+
+      const { data: celulasData } = await supabase
+        .from("ofrendas_celulas")
+        .select("valor")
+        .eq("mes", monthNum)
+        .eq("anio", yearNum)
+        .eq("recibido", true)
+      setTotalCelulas((celulasData || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0))
     } catch (error) {
       console.error("Error cargando resumen:", error)
     }
@@ -107,7 +125,8 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
   useRealtimeMultiple(["ingresos", "egresos", "asistencia_columnas", "asistencia_datos", "nomina", "pago_diario"], () => loadSummary())
 
   // Cálculos
-  const totalIngresos = ingresos.reduce((sum, r) => sum + Number(r.monto || 0), 0)
+  const totalIngresosModulo = ingresos.reduce((sum, r) => sum + Number(r.monto || 0), 0)
+  const totalIngresos = totalIngresosModulo + totalCelulas + totalAlfoli
   const totalEgresos = egresos.reduce((sum, r) => sum + Number(r.monto || 0), 0)
   const totalPagoDiario = pagoDiarioRecords.reduce((sum: number, r: any) => sum + Number(r.valor || 0), 0)
   const totalNominaAPagar = nominaRecords.reduce((s: number, r: any) => s + Number(r.valor_a_pagar || 0), 0)
@@ -195,6 +214,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                     <div>
                       <p className="text-xs text-green-700">Ingresos</p>
                       <p className="text-xl font-bold text-green-700">${totalIngresos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[9px] text-green-600 mt-0.5">Incluye células, alfolí y diezmos</p>
                     </div>
                     <TrendingUp className="w-6 h-6 text-green-400" />
                   </div>

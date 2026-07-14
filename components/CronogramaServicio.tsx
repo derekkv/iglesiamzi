@@ -96,6 +96,42 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
   })
   const [isUpdating, setIsUpdating] = useState(false)
 
+  // Tabs de vista
+  const [viewTab, setViewTab] = useState<"semana" | "proximos" | "historial">("semana")
+  const [searchHistorial, setSearchHistorial] = useState("")
+
+  // Calcular semana actual (lunes a domingo)
+  const getWeekRange = () => {
+    const now = new Date()
+    const day = now.getDay()
+    const diffToMonday = day === 0 ? -6 : 1 - day
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + diffToMonday)
+    monday.setHours(0, 0, 0, 0)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    sunday.setHours(23, 59, 59, 999)
+    const monStr = monday.toISOString().split("T")[0]
+    const sunStr = sunday.toISOString().split("T")[0]
+    return { monStr, sunStr }
+  }
+
+  const { monStr: weekStart, sunStr: weekEnd } = getWeekRange()
+
+  const entriesThisWeek = entries.filter((e) => e.fecha >= weekStart && e.fecha <= weekEnd)
+  const entriesUpcoming = entries.filter((e) => e.fecha > weekEnd)
+  const entriesHistory = entries.filter((e) => e.fecha < weekStart)
+    .filter((e) => {
+      if (!searchHistorial.trim()) return true
+      const q = searchHistorial.toLowerCase()
+      return (e.user_name || "").toLowerCase().includes(q) ||
+        (e.asignacion || "").toLowerCase().includes(q) ||
+        (e.evento || "").toLowerCase().includes(q) ||
+        (e.ministerio || "").toLowerCase().includes(q)
+    })
+
+  const activeEntries = viewTab === "semana" ? entriesThisWeek : viewTab === "proximos" ? entriesUpcoming : entriesHistory
+
   // Modal de conflicto
   const [conflictMessage, setConflictMessage] = useState("")
 
@@ -547,11 +583,37 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
 
         <Card>
           <CardHeader>
-            <CardTitle>Servicios Asignados</CardTitle>
-            <CardDescription>{entries.length} servicio{entries.length !== 1 ? "s" : ""} registrado{entries.length !== 1 ? "s" : ""}</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Servicios Asignados</CardTitle>
+                <CardDescription>{activeEntries.length} servicio{activeEntries.length !== 1 ? "s" : ""}</CardDescription>
+              </div>
+            </div>
+            {/* Tabs de vista */}
+            <div className="flex gap-2 mt-3 border-b">
+              <button className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewTab === "semana" ? "border-blue-500 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`} onClick={() => setViewTab("semana")}>
+                Esta Semana ({entriesThisWeek.length})
+              </button>
+              <button className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewTab === "proximos" ? "border-blue-500 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`} onClick={() => setViewTab("proximos")}>
+                Próximos ({entriesUpcoming.length})
+              </button>
+              <button className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewTab === "historial" ? "border-blue-500 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`} onClick={() => setViewTab("historial")}>
+                Historial ({entriesHistory.length})
+              </button>
+            </div>
+            {viewTab === "historial" && (
+              <div className="mt-3">
+                <Input
+                  placeholder="Buscar en historial..."
+                  value={searchHistorial}
+                  onChange={(e) => setSearchHistorial(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            {entries.length === 0 ? (
+            {activeEntries.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <p>No hay servicios asignados aún.</p>
                 {canEdit && <p className="text-sm mt-1">Usa el botón "Asignar" para agregar.</p>}
@@ -574,7 +636,7 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {entries.map((entry) => {
+                    {activeEntries.map((entry) => {
                       const isPast = new Date(entry.fecha + "T23:59:59") < new Date()
                       return (
                         <TableRow key={entry.id} className={isPast ? "opacity-50" : ""}>

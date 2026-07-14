@@ -35,7 +35,10 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
   const { user } = useAuth()
   const [entries, setEntries] = useState<CronogramaEntry[]>([])
+  const [historialEntries, setHistorialEntries] = useState<CronogramaEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewTab, setViewTab] = useState<"semana" | "historial">("semana")
+  const [searchHistorial, setSearchHistorial] = useState("")
 
   // Calcular rango de semana actual (lunes a domingo, zona Ecuador)
   const { weekStart, weekEnd } = useMemo(() => {
@@ -75,6 +78,22 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
 
   useRealtime({ table: "cronograma_servicio", onChange: () => loadEntries(true) })
 
+  const loadHistorial = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("cronograma_servicio")
+        .select("*")
+        .lt("fecha", weekStart)
+        .neq("modulo", "pastoral")
+        .order("fecha", { ascending: false })
+        .limit(200)
+      if (error) throw error
+      setHistorialEntries(data || [])
+    } catch (e) { console.error("Error loading historial:", e) }
+  }
+
+  useEffect(() => { if (viewTab === "historial" && historialEntries.length === 0) loadHistorial() }, [viewTab])
+
   const handleInlineUpdate = async (entryId: number, field: "hora_llegada" | "atraso", value: any) => {
     try {
       await cronogramaService.updateField(entryId, { [field]: value })
@@ -93,22 +112,36 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
     return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`
   }
 
-  // Agrupar por fecha
-  const entriesByDate = useMemo(() => {
-    const byDate: Record<string, CronogramaEntry[]> = {}
-    for (const entry of entries) {
-      if (!byDate[entry.fecha]) byDate[entry.fecha] = []
-      byDate[entry.fecha].push(entry)
-    }
-    return byDate
-  }, [entries])
-
-  const sortedDates = Object.keys(entriesByDate).sort((a, b) => a.localeCompare(b))
-
   // Stats
   const puntuales = entries.filter((e) => e.atraso === false).length
   const tardanzas = entries.filter((e) => e.atraso === true).length
   const sinMarcar = entries.filter((e) => e.atraso === null || e.atraso === undefined).length
+
+  // Historial filtrado
+  const filteredHistorial = historialEntries.filter((e) => {
+    if (!searchHistorial.trim()) return true
+    const q = searchHistorial.toLowerCase()
+    return (e.user_name || "").toLowerCase().includes(q) ||
+      (e.asignacion || "").toLowerCase().includes(q) ||
+      (e.ministerio || "").toLowerCase().includes(q) ||
+      (e.evento || "").toLowerCase().includes(q) ||
+      (e.fecha || "").includes(q)
+  })
+
+  // Entradas activas según tab
+  const displayEntries = viewTab === "semana" ? entries : filteredHistorial
+
+  // Agrupar por fecha (dinámico según tab)
+  const entriesByDate = useMemo(() => {
+    const byDate: Record<string, CronogramaEntry[]> = {}
+    for (const entry of displayEntries) {
+      if (!byDate[entry.fecha]) byDate[entry.fecha] = []
+      byDate[entry.fecha].push(entry)
+    }
+    return byDate
+  }, [displayEntries])
+
+  const sortedDates = Object.keys(entriesByDate).sort((a, b) => viewTab === "semana" ? a.localeCompare(b) : b.localeCompare(a))
 
   if (loading) {
     return (
@@ -172,6 +205,25 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
             </CardContent>
           </Card>
         </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 border-b">
+          <button className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewTab === "semana" ? "border-blue-500 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`} onClick={() => setViewTab("semana")}>
+            Esta Semana ({entries.length})
+          </button>
+          <button className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewTab === "historial" ? "border-blue-500 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`} onClick={() => setViewTab("historial")}>
+            Historial ({filteredHistorial.length})
+          </button>
+        </div>
+
+        {viewTab === "historial" && (
+          <Input
+            placeholder="Buscar por persona, ministerio, asignación, fecha..."
+            value={searchHistorial}
+            onChange={(e) => setSearchHistorial(e.target.value)}
+            className="max-w-md"
+          />
+        )}
 
         {/* Contenido agrupado por fecha */}
         {sortedDates.length === 0 ? (
@@ -248,8 +300,8 @@ function GestionCronogramasContent({ canEdit }: { canEdit: boolean }) {
                                       }}
                                     >
                                       <option value="">-</option>
-                                      <option value="no">No (puntual)</option>
-                                      <option value="si">Sí (tarde)</option>
+                                      <option value="no">Llegó puntual</option>
+                                      <option value="si">Llegó tarde</option>
                                     </select>
                                   ) : (
                                     entry.atraso === false ? (
