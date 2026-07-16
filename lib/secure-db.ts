@@ -67,6 +67,9 @@ const NO_UPPERCASE_FIELDS = [
   // Campos con CHECK constraints — gestion_celulas, cumpleanos_enviados, bautizos, matrimonios
   "fuente", // 'protocolo' | 'mdg' | 'manual'
 
+  // Campos que se comparan con valores hardcoded en el frontend (case-sensitive match)
+  "celula_nombre", // 'Carlos y Ruth', 'Sarita y Lady', etc. — se usa en filtros === exactos
+
   // Campos con CHECK constraints — nomina (métodos de pago por quincena)
   "primera_quincena_metodo", // 'Transferencia' | 'Efectivo'
   "segunda_quincena_metodo", // 'Transferencia' | 'Efectivo'
