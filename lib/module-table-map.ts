@@ -86,7 +86,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["administracion", "control_mensual"],
   },
   ofrendas_celulas: {
-    modules: ["ofrenda-celulas"],
+    modules: ["ofrenda-celulas", "celulas"],
   },
 
   // === GESTIÓN DE CÉLULAS ===
@@ -154,7 +154,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados"],
   },
   censo_mdg: {
-    modules: ["censo-mdg", "bautizo", "matrimonio", "cumpleanos-comunicacion", "listados"],
+    modules: ["censo-mdg", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados"],
   },
   censo_catalogos: {
     modules: ["censo", "censo-mdg"],
