@@ -184,7 +184,18 @@ export const cajaChicaService = {
     }
   },
 
-  // --- GESTIÓN DE EFECTIVO (auto-inserta como Ingreso en caja chica) ---
+  // --- GESTIÓN DE EFECTIVO (sincronizado con ingresos) ---
+
+  async getGestionEfectivo(mesId: string): Promise<CajaChicaMovimiento[]> {
+    const { data, error } = await supabase
+      .from("caja_chica_movimientos")
+      .select("*")
+      .eq("mes_id", mesId)
+      .eq("concepto", "Gestion de Efectivo")
+      .order("fecha", { ascending: false })
+    if (error) throw error
+    return data || []
+  },
 
   async registrarGestionEfectivo(
     input: GestionEfectivoInput,
@@ -194,7 +205,7 @@ export const cajaChicaService = {
     const movimiento = await this.createMovimiento({
       fecha: input.fecha,
       tipo: "Ingreso",
-      concepto: "Gestión de Efectivo",
+      concepto: "Gestion de Efectivo",
       detalle: input.detalle,
       monto: input.valor,
       metodo_pago: input.metodo_pago,
@@ -202,7 +213,7 @@ export const cajaChicaService = {
       mes_id: input.mes_id,
     }, audit)
 
-    // 2. También registrar en tabla general de ingresos para que aparezca en el flujo financiero
+    // 2. Sincronizar con tabla de ingresos
     await supabase.from("ingresos").insert({
       mes_id: input.mes_id,
       concepto: "auto-caja-chica",
@@ -217,6 +228,89 @@ export const cajaChicaService = {
     })
 
     return movimiento
+  },
+
+  async updateGestionEfectivo(
+    id: number,
+    input: GestionEfectivoInput,
+    audit?: AuditInfo
+  ): Promise<CajaChicaMovimiento> {
+    // Obtener datos anteriores para buscar el ingreso vinculado
+    const { data: antes } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).single()
+
+    // 1. Actualizar en caja_chica_movimientos
+    const { data, error } = await supabase
+      .from("caja_chica_movimientos")
+      .update({
+        fecha: input.fecha,
+        detalle: input.detalle,
+        monto: input.valor,
+        metodo_pago: input.metodo_pago,
+        responsable: input.responsable,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single()
+    if (error) throw error
+
+    if (audit) {
+      auditService.log({
+        ...audit, module: "caja_chica", action: "editar",
+        description: `Gestion editada: ${input.responsable} - $${input.valor}`,
+        details: { id, antes: { responsable: antes?.responsable, monto: antes?.monto }, despues: { responsable: input.responsable, monto: input.valor } },
+      })
+    }
+
+    // 2. Sincronizar con ingreso vinculado
+    if (antes) {
+      const { data: ingresoVinculado } = await supabase
+        .from("ingresos")
+        .select("id")
+        .eq("concepto", "auto-caja-chica")
+        .eq("detalle", `Gestion de Efectivo - ${antes.responsable}`)
+        .eq("mes_id", antes.mes_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (ingresoVinculado) {
+        await supabase.from("ingresos").update({
+          monto: input.valor,
+          fecha: input.fecha,
+          detalle: `Gestion de Efectivo - ${input.responsable}`,
+          observacion: `${input.detalle} (${input.metodo_pago})`,
+        }).eq("id", ingresoVinculado.id)
+      }
+    }
+
+    return data
+  },
+
+  async deleteGestionEfectivo(id: number, audit?: AuditInfo): Promise<void> {
+    // Obtener datos antes de eliminar
+    const { data } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).single()
+
+    // 1. Eliminar de caja_chica_movimientos
+    const { error } = await supabase.from("caja_chica_movimientos").delete().eq("id", id)
+    if (error) throw error
+
+    if (audit) {
+      auditService.log({
+        ...audit, module: "caja_chica", action: "eliminar",
+        description: `Gestion eliminada: ${data?.responsable} - $${data?.monto}`,
+        details: { id, responsable: data?.responsable, monto: data?.monto },
+      })
+    }
+
+    // 2. Eliminar ingreso vinculado
+    if (data) {
+      await supabase
+        .from("ingresos")
+        .delete()
+        .eq("concepto", "auto-caja-chica")
+        .eq("detalle", `Gestion de Efectivo - ${data.responsable}`)
+        .eq("mes_id", data.mes_id)
+    }
   },
 
   // --- ARQUEOS ---

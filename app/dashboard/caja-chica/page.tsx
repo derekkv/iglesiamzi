@@ -28,6 +28,7 @@ import {
   METODOS_PAGO_CAJA,
   RESPONSABLES_ARQUEO,
   DENOMINACIONES,
+  type CajaChicaMovimiento,
   type CajaChicaArqueo,
   type MetodoPagoCaja,
 } from "@/lib/mod/caja-chica-service"
@@ -49,6 +50,8 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
     fecha: todayEcuador(), responsable: "", valor: "", detalle: "", metodo_pago: "" as MetodoPagoCaja | "",
   })
   const [savingGestion, setSavingGestion] = useState(false)
+  const [gestiones, setGestiones] = useState<CajaChicaMovimiento[]>([])
+  const [editingGestionId, setEditingGestionId] = useState<number | null>(null)
 
   // Arqueo
   const [arqueoForm, setArqueoForm] = useState({
@@ -64,8 +67,12 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
     if (!currentMonth) return
     try {
       if (!silent) setLoading(true)
-      const arqs = await cajaChicaService.getArqueos(currentMonth.id)
+      const [arqs, gest] = await Promise.all([
+        cajaChicaService.getArqueos(currentMonth.id),
+        cajaChicaService.getGestionEfectivo(currentMonth.id),
+      ])
       setArqueos(arqs)
+      setGestiones(gest)
     } catch (error: any) {
       console.error("Error cargando caja chica:", error)
       if (!silent) toast.error("Error al cargar datos")
@@ -75,6 +82,7 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   }, [currentMonth])
 
   useEffect(() => { loadData() }, [loadData])
+  useRealtime({ table: "caja_chica_movimientos", onChange: () => loadData(true) })
   useRealtime({ table: "caja_chica_arqueos", onChange: () => loadData(true) })
 
   // Arqueo total calculado
@@ -105,6 +113,50 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
     } catch (error: any) {
       toast.error(error.message || "Error al registrar")
     } finally { setSavingGestion(false) }
+  }
+
+  const handleEditGestion = (g: CajaChicaMovimiento) => {
+    checkAndExecute(g.created_at, () => {
+      setEditingGestionId(g.id)
+      setGestionForm({
+        fecha: g.fecha, responsable: g.responsable,
+        valor: String(g.monto), detalle: g.detalle,
+        metodo_pago: g.metodo_pago as MetodoPagoCaja,
+      })
+    })
+  }
+
+  const handleUpdateGestion = async () => {
+    if (!currentMonth || !editingGestionId || !gestionForm.responsable || !gestionForm.valor || !gestionForm.detalle || !gestionForm.metodo_pago) {
+      toast.error("Complete todos los campos"); return
+    }
+    setSavingGestion(true)
+    try {
+      await cajaChicaService.updateGestionEfectivo(editingGestionId, {
+        fecha: gestionForm.fecha, responsable: gestionForm.responsable,
+        valor: Number(gestionForm.valor), detalle: gestionForm.detalle,
+        metodo_pago: gestionForm.metodo_pago as MetodoPagoCaja,
+        mes_id: currentMonth.id,
+      }, audit)
+      toast.success("Registro actualizado")
+      setEditingGestionId(null)
+      setGestionForm({ fecha: todayEcuador(), responsable: "", valor: "", detalle: "", metodo_pago: "" })
+      loadData(true)
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar")
+    } finally { setSavingGestion(false) }
+  }
+
+  const handleDeleteGestion = (g: CajaChicaMovimiento) => {
+    checkAndExecute(g.created_at, async () => {
+      try {
+        await cajaChicaService.deleteGestionEfectivo(g.id, audit)
+        toast.success("Registro eliminado")
+        loadData(true)
+      } catch (error: any) {
+        toast.error(error.message || "Error al eliminar")
+      }
+    })
   }
 
   const handleGuardarArqueo = async () => {
@@ -327,46 +379,100 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
                 {!canEdit ? (
                   <p className="text-center text-gray-500 py-8">No tiene permisos de edicion</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-                    <div>
-                      <Label className="text-sm">Fecha *</Label>
-                      <Input type="date" value={gestionForm.fecha}
-                        onChange={(e) => setGestionForm({ ...gestionForm, fecha: e.target.value })} className="mt-1" />
+                  <div className="space-y-6">
+                    {/* Formulario */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                      <div>
+                        <Label className="text-sm">Fecha *</Label>
+                        <Input type="date" value={gestionForm.fecha}
+                          onChange={(e) => setGestionForm({ ...gestionForm, fecha: e.target.value })} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Nombre del Responsable *</Label>
+                        <Input value={gestionForm.responsable}
+                          onChange={(e) => setGestionForm({ ...gestionForm, responsable: e.target.value })}
+                          placeholder="Nombre completo" className="mt-1" />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Valor ($) *</Label>
+                        <Input type="number" step="0.01" min="0" value={gestionForm.valor}
+                          onChange={(e) => setGestionForm({ ...gestionForm, valor: e.target.value })}
+                          placeholder="0.00" className="mt-1" />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Metodo de Pago *</Label>
+                        <Select value={gestionForm.metodo_pago} onValueChange={(v) => setGestionForm({ ...gestionForm, metodo_pago: v as MetodoPagoCaja })}>
+                          <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                          <SelectContent>
+                            {METODOS_PAGO_CAJA.map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-sm">Detalle *</Label>
+                        <Textarea value={gestionForm.detalle}
+                          onChange={(e) => setGestionForm({ ...gestionForm, detalle: e.target.value })}
+                          placeholder="Descripcion del movimiento..." className="mt-1" rows={2} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Button onClick={editingGestionId ? handleUpdateGestion : handleGestionEfectivo} disabled={savingGestion} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                          {savingGestion ? "Guardando..." : editingGestionId ? "Actualizar Registro" : "Registrar Gestion de Efectivo"}
+                        </Button>
+                        {editingGestionId && (
+                          <Button variant="outline" className="w-full mt-2" onClick={() => { setEditingGestionId(null); setGestionForm({ fecha: todayEcuador(), responsable: "", valor: "", detalle: "", metodo_pago: "" }) }}>
+                            Cancelar Edicion
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-sm">Nombre del Responsable *</Label>
-                      <Input value={gestionForm.responsable}
-                        onChange={(e) => setGestionForm({ ...gestionForm, responsable: e.target.value })}
-                        placeholder="Nombre completo" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Valor ($) *</Label>
-                      <Input type="number" step="0.01" min="0" value={gestionForm.valor}
-                        onChange={(e) => setGestionForm({ ...gestionForm, valor: e.target.value })}
-                        placeholder="0.00" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Metodo de Pago *</Label>
-                      <Select value={gestionForm.metodo_pago} onValueChange={(v) => setGestionForm({ ...gestionForm, metodo_pago: v as MetodoPagoCaja })}>
-                        <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          {METODOS_PAGO_CAJA.map((m) => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label className="text-sm">Detalle *</Label>
-                      <Textarea value={gestionForm.detalle}
-                        onChange={(e) => setGestionForm({ ...gestionForm, detalle: e.target.value })}
-                        placeholder="Descripcion del movimiento..." className="mt-1" rows={3} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Button onClick={handleGestionEfectivo} disabled={savingGestion} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                        {savingGestion ? "Guardando..." : "Registrar Gestion de Efectivo"}
-                      </Button>
-                    </div>
+
+                    {/* Tabla de registros */}
+                    {gestiones.length > 0 && (
+                      <div className="border-t pt-4">
+                        <h3 className="text-sm font-semibold mb-3">Registros del mes</h3>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha</TableHead>
+                                <TableHead className="text-xs">Responsable</TableHead>
+                                <TableHead className="text-xs">Detalle</TableHead>
+                                <TableHead className="text-xs">Metodo</TableHead>
+                                <TableHead className="text-xs text-right">Valor</TableHead>
+                                <TableHead className="text-xs text-right">Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {gestiones.map((g) => (
+                                <TableRow key={g.id}>
+                                  <TableCell className="text-xs">{g.fecha}</TableCell>
+                                  <TableCell className="text-xs font-medium">{g.responsable}</TableCell>
+                                  <TableCell className="text-xs max-w-[200px] truncate">{g.detalle}</TableCell>
+                                  <TableCell className="text-xs">{g.metodo_pago}</TableCell>
+                                  <TableCell className="text-xs text-right font-semibold text-emerald-600">${Number(g.monto).toFixed(2)}</TableCell>
+                                  <TableCell className="text-xs text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Button variant="ghost" size="sm" className="h-7 px-2 text-blue-600" onClick={() => handleEditGestion(g)}>
+                                        Editar
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="h-7 px-2 text-red-600" onClick={() => handleDeleteGestion(g)}>
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <div className="mt-3 p-3 bg-emerald-50 rounded-lg text-center">
+                          <p className="text-xs text-gray-500">Total Gestion del Mes</p>
+                          <p className="text-xl font-bold text-emerald-700">${gestiones.reduce((s, g) => s + Number(g.monto), 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
