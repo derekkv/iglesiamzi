@@ -12,15 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "@/components/ui/dialog"
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  ArrowLeft, Wallet, Plus, Trash2, Lock, DollarSign, Calculator, ClipboardList,
-} from "lucide-react"
+import { ArrowLeft, Wallet, Lock, DollarSign, Calculator, Trash2 } from "lucide-react"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -33,7 +28,6 @@ import {
   METODOS_PAGO_CAJA,
   RESPONSABLES_ARQUEO,
   DENOMINACIONES,
-  type CajaChicaMovimiento,
   type CajaChicaArqueo,
   type MetodoPagoCaja,
 } from "@/lib/mod/caja-chica-service"
@@ -47,18 +41,10 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   const audit = user ? { user_id: user.id, user_name: user.username } : undefined
 
   // Estado
-  const [movimientos, setMovimientos] = useState<CajaChicaMovimiento[]>([])
   const [arqueos, setArqueos] = useState<CajaChicaArqueo[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modal agregar movimiento
-  const [showAddMov, setShowAddMov] = useState(false)
-  const [movForm, setMovForm] = useState({
-    fecha: todayEcuador(), tipo: "Egreso" as "Ingreso" | "Egreso",
-    concepto: "", detalle: "", monto: "", metodo_pago: "Efectivo", responsable: "",
-  })
-
-  // Form Gestión de Efectivo
+  // Form Gestion de Efectivo
   const [gestionForm, setGestionForm] = useState({
     fecha: todayEcuador(), responsable: "", valor: "", detalle: "", metodo_pago: "" as MetodoPagoCaja | "",
   })
@@ -73,17 +59,12 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   })
   const [savingArqueo, setSavingArqueo] = useState(false)
 
-
   // Carga de datos
   const loadData = useCallback(async (silent = false) => {
     if (!currentMonth) return
     try {
       if (!silent) setLoading(true)
-      const [movs, arqs] = await Promise.all([
-        cajaChicaService.getMovimientos(currentMonth.id),
-        cajaChicaService.getArqueos(currentMonth.id),
-      ])
-      setMovimientos(movs)
+      const arqs = await cajaChicaService.getArqueos(currentMonth.id)
       setArqueos(arqs)
     } catch (error: any) {
       console.error("Error cargando caja chica:", error)
@@ -94,13 +75,7 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   }, [currentMonth])
 
   useEffect(() => { loadData() }, [loadData])
-  useRealtime({ table: "caja_chica_movimientos", onChange: () => loadData(true) })
   useRealtime({ table: "caja_chica_arqueos", onChange: () => loadData(true) })
-
-  // Saldo
-  const saldo = cajaChicaService.calcularSaldo(movimientos)
-  const totalIngresos = movimientos.filter(m => m.tipo === "Ingreso").reduce((s, m) => s + Number(m.monto), 0)
-  const totalEgresos = movimientos.filter(m => m.tipo === "Egreso").reduce((s, m) => s + Number(m.monto), 0)
 
   // Arqueo total calculado
   const arqueoTotal = cajaChicaService.calcularTotalArqueo({
@@ -112,36 +87,6 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
 
 
   // --- Handlers ---
-  const handleAddMovimiento = async () => {
-    if (!currentMonth || !movForm.concepto || !movForm.monto || !movForm.responsable) {
-      toast.error("Complete los campos obligatorios"); return
-    }
-    try {
-      await cajaChicaService.createMovimiento({
-        fecha: movForm.fecha, tipo: movForm.tipo, concepto: movForm.concepto,
-        detalle: movForm.detalle, monto: Number(movForm.monto),
-        metodo_pago: movForm.metodo_pago, responsable: movForm.responsable,
-        mes_id: currentMonth.id,
-      }, audit)
-      toast.success(`${movForm.tipo} registrado`)
-      setShowAddMov(false)
-      setMovForm({ fecha: todayEcuador(), tipo: "Egreso", concepto: "", detalle: "", monto: "", metodo_pago: "Efectivo", responsable: "" })
-      loadData(true)
-    } catch (error: any) {
-      toast.error(error.message || "Error al registrar")
-    }
-  }
-
-  const handleDeleteMovimiento = async (id: number) => {
-    try {
-      await cajaChicaService.deleteMovimiento(id, audit)
-      toast.success("Movimiento eliminado")
-      loadData(true)
-    } catch (error: any) {
-      toast.error(error.message || "Error al eliminar")
-    }
-  }
-
   const handleGestionEfectivo = async () => {
     if (!currentMonth || !gestionForm.responsable || !gestionForm.valor || !gestionForm.detalle || !gestionForm.metodo_pago) {
       toast.error("Complete todos los campos"); return
@@ -154,14 +99,13 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
         metodo_pago: gestionForm.metodo_pago as MetodoPagoCaja,
         mes_id: currentMonth.id,
       }, audit)
-      toast.success("Gestion de efectivo registrada (ingreso creado)")
+      toast.success("Gestion de efectivo registrada")
       setGestionForm({ fecha: todayEcuador(), responsable: "", valor: "", detalle: "", metodo_pago: "" })
       loadData(true)
     } catch (error: any) {
       toast.error(error.message || "Error al registrar")
     } finally { setSavingGestion(false) }
   }
-
 
   const handleGuardarArqueo = async () => {
     if (!currentMonth || !arqueoForm.contado_por) {
@@ -192,14 +136,16 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
     } finally { setSavingArqueo(false) }
   }
 
-  const handleDeleteArqueo = async (id: number) => {
-    try {
-      await cajaChicaService.deleteArqueo(id, audit)
-      toast.success("Arqueo eliminado")
-      loadData(true)
-    } catch (error: any) {
-      toast.error(error.message || "Error al eliminar")
-    }
+  const handleDeleteArqueo = (a: CajaChicaArqueo) => {
+    checkAndExecute(a.created_at, async () => {
+      try {
+        await cajaChicaService.deleteArqueo(a.id, audit)
+        toast.success("Arqueo eliminado")
+        loadData(true)
+      } catch (error: any) {
+        toast.error(error.message || "Error al eliminar")
+      }
+    })
   }
 
   if (loading) {
@@ -234,12 +180,6 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Saldo actual</p>
-                <p className={`text-lg font-bold ${saldo >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  ${saldo.toFixed(2)}
-                </p>
-              </div>
               {!canEdit && (
                 <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1">
                   <Lock className="w-3 h-3" /> Solo lectura
@@ -251,181 +191,15 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Resumen */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <Card className="border-emerald-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">Total Ingresos</p>
-              <p className="text-xl font-bold text-emerald-600">${totalIngresos.toFixed(2)}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-red-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">Total Egresos</p>
-              <p className="text-xl font-bold text-red-600">${totalEgresos.toFixed(2)}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-blue-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">Saldo</p>
-              <p className={`text-xl font-bold ${saldo >= 0 ? "text-emerald-600" : "text-red-600"}`}>${saldo.toFixed(2)}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-
-        <Tabs defaultValue="detalle" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="detalle"><ClipboardList className="w-4 h-4 mr-2" /> Detalle</TabsTrigger>
+        <Tabs defaultValue="caja" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="caja"><Wallet className="w-4 h-4 mr-2" /> Caja Chica</TabsTrigger>
             <TabsTrigger value="gestion"><DollarSign className="w-4 h-4 mr-2" /> Gestion Efectivo</TabsTrigger>
-            <TabsTrigger value="arqueo"><Calculator className="w-4 h-4 mr-2" /> Arqueo</TabsTrigger>
           </TabsList>
 
-          {/* === TAB 1: DETALLE DE INGRESOS Y EGRESOS === */}
-          <TabsContent value="detalle">
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Detalle de Ingresos y Egresos</CardTitle>
-                  {canEdit && (
-                    <Button size="sm" onClick={() => setShowAddMov(true)}>
-                      <Plus className="w-4 h-4 mr-1" /> Agregar
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {movimientos.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No hay movimientos registrados este mes</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Fecha</TableHead>
-                          <TableHead className="text-xs">Tipo</TableHead>
-                          <TableHead className="text-xs">Concepto</TableHead>
-                          <TableHead className="text-xs">Detalle</TableHead>
-                          <TableHead className="text-xs">Metodo</TableHead>
-                          <TableHead className="text-xs">Responsable</TableHead>
-                          <TableHead className="text-xs text-right">Monto</TableHead>
-                          {canEdit && <TableHead className="text-xs text-right">Accion</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {movimientos.map((mov) => (
-                          <TableRow key={mov.id}>
-                            <TableCell className="text-xs">{mov.fecha}</TableCell>
-                            <TableCell className="text-xs">
-                              <Badge className={mov.tipo === "Ingreso" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}>
-                                {mov.tipo}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs">{mov.concepto}</TableCell>
-                            <TableCell className="text-xs max-w-[200px] truncate">{mov.detalle}</TableCell>
-                            <TableCell className="text-xs">{mov.metodo_pago}</TableCell>
-                            <TableCell className="text-xs">{mov.responsable}</TableCell>
-                            <TableCell className={`text-xs text-right font-semibold ${mov.tipo === "Ingreso" ? "text-emerald-600" : "text-red-600"}`}>
-                              {mov.tipo === "Ingreso" ? "+" : "-"}${Number(mov.monto).toFixed(2)}
-                            </TableCell>
-                            {canEdit && (
-                              <TableCell className="text-xs text-right">
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="text-red-500 h-7 px-2">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Eliminar movimiento</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Se eliminara: {mov.concepto} - ${Number(mov.monto).toFixed(2)}
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction className="bg-red-600" onClick={() => handleDeleteMovimiento(mov.id)}>Eliminar</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-
-          {/* === TAB 2: GESTION DE EFECTIVO === */}
-          <TabsContent value="gestion">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-emerald-600" /> Gestion del Efectivo
-                </CardTitle>
-                <CardDescription>
-                  Registre aportes o movimientos de efectivo. Al guardar, se crea automaticamente un INGRESO en el detalle de Caja Chica.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!canEdit ? (
-                  <p className="text-center text-gray-500 py-8">No tiene permisos de edicion</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-                    <div>
-                      <Label className="text-sm">Fecha *</Label>
-                      <Input type="date" value={gestionForm.fecha}
-                        onChange={(e) => setGestionForm({ ...gestionForm, fecha: e.target.value })} className="mt-1" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Nombre del Responsable *</Label>
-                      <Input value={gestionForm.responsable}
-                        onChange={(e) => setGestionForm({ ...gestionForm, responsable: e.target.value })}
-                        placeholder="Nombre completo" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Valor ($) *</Label>
-                      <Input type="number" step="0.01" min="0" value={gestionForm.valor}
-                        onChange={(e) => setGestionForm({ ...gestionForm, valor: e.target.value })}
-                        placeholder="0.00" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Metodo de Pago *</Label>
-                      <Select value={gestionForm.metodo_pago} onValueChange={(v) => setGestionForm({ ...gestionForm, metodo_pago: v as MetodoPagoCaja })}>
-                        <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          {METODOS_PAGO_CAJA.map((m) => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label className="text-sm">Detalle *</Label>
-                      <Textarea value={gestionForm.detalle}
-                        onChange={(e) => setGestionForm({ ...gestionForm, detalle: e.target.value })}
-                        placeholder="Descripcion del movimiento..." className="mt-1" rows={3} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Button onClick={handleGestionEfectivo} disabled={savingGestion} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                        {savingGestion ? "Guardando..." : "Registrar Gestion de Efectivo"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-
-          {/* === TAB 3: ARQUEO === */}
-          <TabsContent value="arqueo">
+          {/* === TAB 1: CAJA CHICA (Arqueo) === */}
+          <TabsContent value="caja">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Formulario de conteo */}
               <Card>
@@ -505,7 +279,6 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
                 </CardContent>
               </Card>
 
-
               {/* Historial de arqueos */}
               <Card>
                 <CardHeader>
@@ -527,25 +300,9 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
                           <div className="flex items-center gap-3">
                             <p className="text-lg font-bold text-emerald-600">${Number(a.total).toFixed(2)}</p>
                             {canEdit && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-red-500 h-7 px-2">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Eliminar arqueo</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Arqueo de ${Number(a.total).toFixed(2)} por {a.contado_por}
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction className="bg-red-600" onClick={() => handleDeleteArqueo(a.id)}>Eliminar</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <Button variant="ghost" size="sm" className="text-red-500 h-7 px-2" onClick={() => handleDeleteArqueo(a)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -556,69 +313,67 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
               </Card>
             </div>
           </TabsContent>
+
+
+          {/* === TAB 2: GESTION DE EFECTIVO === */}
+          <TabsContent value="gestion">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-600" /> Gestion del Efectivo
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!canEdit ? (
+                  <p className="text-center text-gray-500 py-8">No tiene permisos de edicion</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                    <div>
+                      <Label className="text-sm">Fecha *</Label>
+                      <Input type="date" value={gestionForm.fecha}
+                        onChange={(e) => setGestionForm({ ...gestionForm, fecha: e.target.value })} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Nombre del Responsable *</Label>
+                      <Input value={gestionForm.responsable}
+                        onChange={(e) => setGestionForm({ ...gestionForm, responsable: e.target.value })}
+                        placeholder="Nombre completo" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Valor ($) *</Label>
+                      <Input type="number" step="0.01" min="0" value={gestionForm.valor}
+                        onChange={(e) => setGestionForm({ ...gestionForm, valor: e.target.value })}
+                        placeholder="0.00" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Metodo de Pago *</Label>
+                      <Select value={gestionForm.metodo_pago} onValueChange={(v) => setGestionForm({ ...gestionForm, metodo_pago: v as MetodoPagoCaja })}>
+                        <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                        <SelectContent>
+                          {METODOS_PAGO_CAJA.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="text-sm">Detalle *</Label>
+                      <Textarea value={gestionForm.detalle}
+                        onChange={(e) => setGestionForm({ ...gestionForm, detalle: e.target.value })}
+                        placeholder="Descripcion del movimiento..." className="mt-1" rows={3} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Button onClick={handleGestionEfectivo} disabled={savingGestion} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                        {savingGestion ? "Guardando..." : "Registrar Gestion de Efectivo"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
-
-
-      {/* Modal: Agregar Movimiento */}
-      <Dialog open={showAddMov} onOpenChange={setShowAddMov}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Agregar Movimiento</DialogTitle>
-            <DialogDescription>Registre un ingreso o egreso en la caja chica</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm">Fecha *</Label>
-                <Input type="date" value={movForm.fecha}
-                  onChange={(e) => setMovForm({ ...movForm, fecha: e.target.value })} className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-sm">Tipo *</Label>
-                <Select value={movForm.tipo} onValueChange={(v) => setMovForm({ ...movForm, tipo: v as "Ingreso" | "Egreso" })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Ingreso">Ingreso</SelectItem>
-                    <SelectItem value="Egreso">Egreso</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm">Concepto *</Label>
-              <Input value={movForm.concepto} onChange={(e) => setMovForm({ ...movForm, concepto: e.target.value })}
-                placeholder="Ej: Compra de insumos" className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">Detalle</Label>
-              <Textarea value={movForm.detalle} onChange={(e) => setMovForm({ ...movForm, detalle: e.target.value })}
-                placeholder="Descripcion adicional..." className="mt-1" rows={2} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm">Monto ($) *</Label>
-                <Input type="number" step="0.01" min="0" value={movForm.monto}
-                  onChange={(e) => setMovForm({ ...movForm, monto: e.target.value })} placeholder="0.00" className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-sm">Metodo de Pago</Label>
-                <Input value={movForm.metodo_pago} onChange={(e) => setMovForm({ ...movForm, metodo_pago: e.target.value })}
-                  placeholder="Efectivo" className="mt-1" />
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm">Responsable *</Label>
-              <Input value={movForm.responsable} onChange={(e) => setMovForm({ ...movForm, responsable: e.target.value })}
-                placeholder="Nombre del responsable" className="mt-1" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMov(false)}>Cancelar</Button>
-            <Button onClick={handleAddMovimiento}>Guardar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
