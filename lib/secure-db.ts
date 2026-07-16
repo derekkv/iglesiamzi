@@ -64,6 +64,9 @@ const NO_UPPERCASE_FIELDS = [
   "referencia_tipo", // 'cumpleanos' | 'cronograma' | 'mensaje_citacion' | 'requerimiento'
   "destinatario_tipo", // 'usuario' | 'modulo' | 'todos'
 
+  // Campos con CHECK constraints — gestion_celulas, cumpleanos_enviados, bautizos, matrimonios
+  "fuente", // 'protocolo' | 'mdg' | 'manual'
+
   // Campos con CHECK constraints — nomina (métodos de pago por quincena)
   "primera_quincena_metodo", // 'Transferencia' | 'Efectivo'
   "segunda_quincena_metodo", // 'Transferencia' | 'Efectivo'
