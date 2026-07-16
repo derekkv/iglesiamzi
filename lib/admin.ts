@@ -343,6 +343,80 @@ export async function getUserGroupLeaders(userId: string) {
   }
 }
 
+// Obtener TODOS los líderes de grupo en una sola query (optimización para panel de administración)
+export async function getAllGroupLeaders() {
+  try {
+    const { data, error } = await supabase
+      .from("user_group_leaders")
+      .select("user_id, group_id")
+
+    if (error) throw error
+
+    // Agrupar por user_id
+    const leadersMap: Record<string, string[]> = {}
+    for (const row of data || []) {
+      if (!leadersMap[row.user_id]) {
+        leadersMap[row.user_id] = []
+      }
+      leadersMap[row.user_id].push(row.group_id)
+    }
+
+    return { success: true, leadersMap }
+  } catch (error) {
+    console.error("Error obteniendo todos los líderes:", error)
+    return { success: false, error: "Error al obtener líderes", leadersMap: {} }
+  }
+}
+
+// Carga inicial completa del panel de administración en una sola función (reduce round-trips)
+export async function getAdminPanelData() {
+  try {
+    const [usersRes, groupsRes, modulesRes, leadersRes] = await Promise.all([
+      supabase.from("users").select("*").order("created_at", { ascending: false }),
+      supabase.from("module_groups").select("*").order("sort_order", { ascending: true }),
+      supabase.from("system_modules").select("*, group:module_groups(*)").order("sort_order", { ascending: true }),
+      supabase.from("user_group_leaders").select("user_id, group_id"),
+    ])
+
+    if (usersRes.error) throw usersRes.error
+    if (groupsRes.error) throw groupsRes.error
+    if (modulesRes.error) throw modulesRes.error
+    if (leadersRes.error) throw leadersRes.error
+
+    const users = usersRes.data || []
+    const groups = groupsRes.data || []
+    const modules = modulesRes.data || []
+
+    // Organizar módulos agrupados y sin grupo
+    const ungrouped = modules.filter((m: any) => !m.group_id)
+    const grouped = groups.map((group: any) => ({
+      ...group,
+      modules: modules.filter((m: any) => m.group_id === group.id),
+    }))
+
+    // Organizar líderes por user_id
+    const leadersMap: Record<string, string[]> = {}
+    for (const row of leadersRes.data || []) {
+      if (!leadersMap[row.user_id]) {
+        leadersMap[row.user_id] = []
+      }
+      leadersMap[row.user_id].push(row.group_id)
+    }
+
+    return {
+      success: true,
+      users,
+      modules,
+      ungrouped,
+      grouped,
+      leadersMap,
+    }
+  } catch (error) {
+    console.error("Error cargando datos del panel de administración:", error)
+    return { success: false, error: "Error al cargar datos", users: [], modules: [], ungrouped: [], grouped: [], leadersMap: {} }
+  }
+}
+
 // Asignar o quitar líder de un grupo
 export async function setGroupLeader(userId: string, groupId: string, isLeader: boolean, grantedBy: string) {
   try {

@@ -119,6 +119,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "cronograma-eventos-intercesion", "cronograma-eventos-mdg",
       "cronograma-eventos-redil", "cronograma-eventos-hombres",
       "cronograma-eventos-jovenes", "cronograma-eventos-pastoral",
+      "cronograma-proyecto-mario", "cronograma-eventos-proyecto-mario",
       "gestion-cronogramas",
     ],
   },
@@ -128,7 +129,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "cronograma-alabanza", "cronograma-comunicacion", "cronograma-herederos",
       "cronograma-intercesion", "cronograma-mdg", "cronograma-redil",
       "cronograma-hombres", "cronograma-jovenes", "cronograma-pastoral",
-      "cronograma-celulas",
+      "cronograma-celulas", "cronograma-proyecto-mario",
       "gestion-cronogramas",
     ],
   },
@@ -153,7 +154,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "asistencia-servidores-intercesion", "asistencia-servidores-mdg",
       "asistencia-servidores-redil", "asistencia-servidores-hombres",
       "asistencia-servidores-jovenes", "asistencia-servidores-pastoral",
-      "asistencia-servidores-celulas",
+      "asistencia-servidores-celulas", "asistencia-servidores-proyecto-mario",
     ],
   },
 
@@ -214,6 +215,20 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
 
+  // === PROYECTO MARIO ===
+  proyecto_mario_ciclos: {
+    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+  },
+  proyecto_mario_ciclo_participantes: {
+    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+  },
+  proyecto_mario_ciclo_fechas: {
+    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+  },
+  proyecto_mario_ciclo_asistencia: {
+    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+  },
+
   // === MENSAJES Y CITACIONES ===
   mensajes_citaciones: {
     modules: [
@@ -221,7 +236,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "mensajes-alabanza", "mensajes-comunicacion", "mensajes-herederos",
       "mensajes-intercesion", "mensajes-mdg", "mensajes-redil",
       "mensajes-hombres", "mensajes-jovenes", "mensajes-pastoral",
-      "mensajes-celulas",
+      "mensajes-celulas", "mensajes-proyecto-mario",
     ],
   },
   mensajes_citaciones_recibidos: {
@@ -230,7 +245,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "mensajes-alabanza", "mensajes-comunicacion", "mensajes-herederos",
       "mensajes-intercesion", "mensajes-mdg", "mensajes-redil",
       "mensajes-hombres", "mensajes-jovenes", "mensajes-pastoral",
-      "mensajes-celulas",
+      "mensajes-celulas", "mensajes-proyecto-mario",
     ],
   },
 
@@ -241,7 +256,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "requerimientos-mdg", "requerimientos-alabanza", "requerimientos-intercesion",
       "requerimientos-herederos", "requerimientos-redil", "requerimientos-comunicacion",
       "requerimientos-jovenes", "requerimientos-hombres", "requerimientos-pastoral",
-      "requerimientos-celulas",
+      "requerimientos-celulas", "requerimientos-proyecto-mario",
     ],
   },
 

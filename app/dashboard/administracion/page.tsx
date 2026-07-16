@@ -25,6 +25,7 @@ import {
   getAllUsers,
   getAllModules,
   getModulesGrouped,
+  getAdminPanelData,
   createUser,
   getUserPermissions,
   setUserPermission,
@@ -138,33 +139,17 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
   }, [currentUser, authLoading, router])
 
   const loadData = async () => {
-    const usersResult = await getAllUsers()
-    const modulesResult = await getAllModules()
-    const groupedResult = await getModulesGrouped()
+    const result = await getAdminPanelData()
+
+    if (result.success) {
+      setUsers(result.users || [])
+      setModules(result.modules || [])
+      setModuleGroups(result.grouped || [])
+      setUngroupedModules(result.ungrouped || [])
+      setAllLeaders(result.leadersMap || {})
+    }
+
     const keysResult = await getSecurityKeys()
-
-    if (usersResult.success) {
-      setUsers(usersResult.users || [])
-      // Cargar líderes de todos los usuarios
-      const leadersMap: Record<string, string[]> = {}
-      for (const u of (usersResult.users || [])) {
-        const lr = await getUserGroupLeaders(u.id)
-        if (lr.success && lr.groupIds.length > 0) {
-          leadersMap[u.id] = lr.groupIds
-        }
-      }
-      setAllLeaders(leadersMap)
-    }
-
-    if (modulesResult.success) {
-      setModules(modulesResult.modules || [])
-    }
-
-    if (groupedResult.success) {
-      setModuleGroups(groupedResult.grouped || [])
-      setUngroupedModules(groupedResult.ungrouped || [])
-    }
-
     if (keysResult.success) {
       setSecurityKeys(keysResult.keys || [])
     }
