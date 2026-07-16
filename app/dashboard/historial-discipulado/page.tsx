@@ -94,7 +94,8 @@ function HistorialContent({ canEdit }: { canEdit: boolean }) {
         await discipuladoCiclosService.deleteParticipante(p.id)
       }
       // Eliminar el ciclo en sí
-      const { error } = await (await import("@/lib/supabase")).supabase
+      const { supabase } = await import("@/lib/secure-db")
+      const { error } = await supabase
         .from("discipulado_ciclos")
         .delete()
         .eq("id", cicloId)

@@ -36,82 +36,6 @@ interface QueryState {
 
 type QueryResult = { data: any[] | any | null; error: any; count?: number }
 
-// Campos que NO deben convertirse a uppercase (contraseñas, tokens, IDs, fechas, campos con CHECK constraints)
-const NO_UPPERCASE_FIELDS = [
-  // Técnicos / IDs / seguridad
-  "password", "password_hash", "token", "jwt", "secret",
-  "mes_id", "id", "user_id", "created_at", "updated_at",
-  "concepto", // campo técnico de sync (auto-diezmo, auto-pago-diario, etc.)
-
-  // Campos con CHECK constraints — pago_diario, ingresos, egresos
-  "metodo_pago", // 'Efectivo' | 'Transferencia'
-  "estado", // 'Procesado' | 'Pendiente' | 'asistio' | 'falto' | 'justifico' | 'atrasado' | 'pendiente'
-
-  // Campos con CHECK constraints — audit_logs
-  "action", // 'crear' | 'editar' | 'eliminar'
-
-  // Campos con CHECK constraints — diezmos
-  "tipo_ofrenda", // 'diezmo' | 'primicia' | 'diezmo_especial'
-  "transaccion", // 'efectivo' | 'transferencia'
-
-  // Campos con CHECK constraints — discipulado
-  "estatus", // 'en_curso' | 'aprobado' | 'reprobado'
-  "status", // 'A' | 'J' | 'F' | 'AT' | 'none'
-
-  // Campos con CHECK constraints — buzon_mensajes, mensajes_citaciones, requerimientos
-  "tipo", // 'info' | 'requerimiento' | 'aprobado' | 'negado' | 'suspenso' | 'mensaje' | 'invitacion' | 'domingo' | 'mdg'
-  "respuesta", // 'pendiente' | 'aprobado' | 'negado' | 'suspenso'
-  "referencia_tipo", // 'cumpleanos' | 'cronograma' | 'mensaje_citacion' | 'requerimiento'
-  "destinatario_tipo", // 'usuario' | 'modulo' | 'todos'
-
-  // Campos con CHECK constraints — gestion_celulas, cumpleanos_enviados, bautizos, matrimonios
-  "fuente", // 'protocolo' | 'mdg' | 'manual'
-
-  // Campos que se comparan con valores hardcoded en el frontend (case-sensitive match)
-  "celula_nombre", // 'Carlos y Ruth', 'Sarita y Lady', etc. — se usa en filtros === exactos
-
-  // Campos con CHECK constraints — nomina (métodos de pago por quincena)
-  "primera_quincena_metodo", // 'Transferencia' | 'Efectivo'
-  "segunda_quincena_metodo", // 'Transferencia' | 'Efectivo'
-  "movilizacion_metodo", // 'Transferencia' | 'Efectivo'
-  "movilizacion_segunda_metodo", // 'Transferencia' | 'Efectivo'
-]
-
-/**
- * Convierte todos los valores string de un objeto/array a uppercase,
- * excepto los campos técnicos que no deben modificarse.
- */
-function uppercaseData(data: any): any {
-  if (data === null || data === undefined) return data
-  if (Array.isArray(data)) return data.map(uppercaseData)
-  if (typeof data === "object") {
-    const result: any = {}
-    for (const [key, value] of Object.entries(data)) {
-      if (NO_UPPERCASE_FIELDS.includes(key)) {
-        result[key] = value
-      } else if (typeof value === "string") {
-        // No uppercase para valores que parecen fechas, UUIDs, URLs, emails o JSON
-        if (
-          /^\d{4}-\d{2}/.test(value) || // fecha ISO
-          /^[0-9a-f]{8}-/.test(value) || // UUID
-          /^(http|https):\/\//.test(value) || // URLs
-          value.includes("@") || // emails
-          /^ey[A-Za-z0-9]/.test(value) || // JWT tokens
-          value.startsWith("{") || value.startsWith("[") // JSON
-        ) {
-          result[key] = value
-        } else {
-          result[key] = value.toUpperCase()
-        }
-      } else {
-        result[key] = value
-      }
-    }
-    return result
-  }
-  return data
-}
-
 class QueryBuilder implements PromiseLike<QueryResult> {
   private state: QueryState
 
@@ -274,7 +198,7 @@ class QueryBuilder implements PromiseLike<QueryResult> {
       }
 
       if (this.state.selectFields) body.select = this.state.selectFields
-      if (this.state.data !== undefined) body.data = uppercaseData(this.state.data)
+      if (this.state.data !== undefined) body.data = this.state.data
       if (this.state.filters.length > 0) body.filters = this.state.filters
       if (this.state.orderBy) body.order = this.state.orderBy
       if (this.state.limitCount) body.limit = this.state.limitCount
