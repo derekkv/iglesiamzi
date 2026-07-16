@@ -24,9 +24,10 @@ interface CensoDetailViewProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   record: CensoRecord | null
+  auditModule?: string
 }
 
-export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailViewProps) {
+export function CensoDetailView({ isOpen, onOpenChange, record, auditModule = "censo" }: CensoDetailViewProps) {
   const [auditInfo, setAuditInfo] = useState<AuditEntry | null>(null)
   const [lastEditInfo, setLastEditInfo] = useState<AuditEntry | null>(null)
 
@@ -36,7 +37,7 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
       supabase
         .from("audit_logs")
         .select("timestamp, user_name, action")
-        .eq("module", "censo")
+        .eq("module", auditModule)
         .eq("action", "crear")
         .ilike("description", `%${record.apellidos_nombres}%`)
         .order("timestamp", { ascending: true })
@@ -49,7 +50,7 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
       supabase
         .from("audit_logs")
         .select("timestamp, user_name, action")
-        .eq("module", "censo")
+        .eq("module", auditModule)
         .eq("action", "editar")
         .ilike("description", `%${record.apellidos_nombres}%`)
         .order("timestamp", { ascending: false })
@@ -58,7 +59,7 @@ export function CensoDetailView({ isOpen, onOpenChange, record }: CensoDetailVie
           setLastEditInfo(data && data.length > 0 ? data[0] : null)
         })
     }
-  }, [isOpen, record])
+  }, [isOpen, record, auditModule])
 
   if (!record) return null
 

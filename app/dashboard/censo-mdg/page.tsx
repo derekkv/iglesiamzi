@@ -282,7 +282,7 @@ function CensoMDGContent({ canEdit }: { canEdit: boolean }) {
           )}
         </Tabs>
 
-        <CensoDetailView isOpen={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} record={currentRecord} />
+        <CensoDetailView isOpen={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} record={currentRecord} auditModule="censo-mdg" />
 
         <AlertDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <AlertDialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">

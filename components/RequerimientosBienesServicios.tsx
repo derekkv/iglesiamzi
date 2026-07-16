@@ -8,6 +8,7 @@ import { useRealtime } from "@/hooks/use-realtime"
 import { useNotificaciones } from "@/hooks/use-notificaciones"
 import { auditService } from "@/lib/mod/audit-service"
 import { getGlobalConfig, type GlobalConfig } from "@/lib/globalConfig"
+import { authFetch } from "@/lib/auth-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -237,7 +238,7 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
         details: { id: data.id, ministerio: formData.ministerio, valor: formData.valor },
       })
 
-      // Notificar a admins
+      // Notificar a admins (buzón + push)
       await notificarAdmins({
         titulo: "Nuevo Requerimiento",
         mensaje: `${user.displayName} solicita: ${formData.requerimiento.substring(0, 80)}...`,
@@ -245,6 +246,57 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
         referenciaTipo: "requerimiento",
         referenciaId: data.id,
       })
+
+      // Enviar WhatsApp y Email a admins con delay para evitar spam
+      const { data: adminPerms } = await supabase
+        .from("user_permissions")
+        .select("user_id, module:system_modules!inner(name)")
+        .eq("can_admin", true)
+        .eq("system_modules.name", "administracion")
+      const adminIds = [...new Set((adminPerms || []).map((p: any) => p.user_id))] as string[]
+      if (adminIds.length > 0) {
+        const { data: adminUsers } = await supabase
+          .from("users")
+          .select("id, email, phone, displayName")
+          .in("id", adminIds)
+
+        const waMsg = [
+          `📋 *Nuevo Requerimiento*`,
+          ``,
+          `De: *${user.displayName}*`,
+          `Modulo: ${modulo}`,
+          ``,
+          `📝 *Detalle:*`,
+          formData.requerimiento,
+          formData.valor ? `💰 *Valor:* $${parseFloat(formData.valor).toFixed(2)}` : "",
+          `📍 *Evento/Lugar:* ${formData.evento_lugar}`,
+          formData.fecha_entrega ? `📅 *Fecha entrega:* ${formData.fecha_entrega}` : "",
+          ``,
+          `👉 Ingresa a la app para responder.`,
+        ].filter(Boolean).join("\n")
+
+        const emailHtml = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:#7c3aed;color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;"><h2 style="margin:0;">📋 Nuevo Requerimiento</h2></div><div style="background:white;border:1px solid #e5e7eb;padding:24px;border-radius:0 0 12px 12px;"><p><strong>${user.displayName}</strong> ha enviado un requerimiento:</p><div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:16px;margin:16px 0;"><p style="margin:0 0 8px;"><strong>Detalle:</strong> ${formData.requerimiento}</p>${formData.valor ? `<p style="margin:0 0 8px;"><strong>Valor:</strong> $${parseFloat(formData.valor).toFixed(2)}</p>` : ""}<p style="margin:0 0 8px;"><strong>Evento/Lugar:</strong> ${formData.evento_lugar}</p>${formData.fecha_entrega ? `<p style="margin:0;"><strong>Fecha entrega:</strong> ${formData.fecha_entrega}</p>` : ""}</div><p style="text-align:center;"><a href="https://panel.iglesiaregalodedios.com/dashboard/requerimientos-admin" style="display:inline-block;background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Responder en la App</a></p></div></div>`
+
+        // Enviar con delay de 5s entre cada admin
+        for (let i = 0; i < (adminUsers || []).length; i++) {
+          const admin = adminUsers![i]
+          if (i > 0) await new Promise(r => setTimeout(r, 5000))
+          if (admin.phone) {
+            authFetch("/api/whatsapp/send", {
+              method: "POST", body: JSON.stringify({ phone: admin.phone, message: waMsg }),
+            }).catch(() => {})
+          }
+          if (admin.email) {
+            authFetch("/api/send-email", {
+              method: "POST", body: JSON.stringify({
+                to: admin.email,
+                subject: `📋 Nuevo Requerimiento de ${user.displayName} — IRDD`,
+                html: emailHtml,
+              }),
+            }).catch(() => {})
+          }
+        }
+      }
 
       toast.success("Requerimiento enviado correctamente")
       resetForm()

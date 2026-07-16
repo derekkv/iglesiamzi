@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useNotificaciones } from "@/hooks/use-notificaciones"
+import { authFetch } from "@/lib/auth-fetch"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -133,7 +134,7 @@ export function AdminRequerimientos() {
 
       if (error) throw error
 
-      // Notificar al solicitante
+      // Notificar al solicitante (buzón + push)
       const tipoNotif = respuestaForm.respuesta as "aprobado" | "negado" | "suspenso"
       const tituloNotif = respuestaForm.respuesta === "aprobado"
         ? "Requerimiento Aprobado"
@@ -149,6 +150,48 @@ export function AdminRequerimientos() {
         referenciaTipo: "requerimiento",
         referenciaId: selectedReq.id,
       })
+
+      // Enviar WhatsApp y Email al solicitante
+      const { data: solicitante } = await supabase
+        .from("users")
+        .select("email, phone, displayName")
+        .eq("id", selectedReq.persona_id)
+        .single()
+
+      if (solicitante) {
+        const estadoEmoji = respuestaForm.respuesta === "aprobado" ? "✅" : respuestaForm.respuesta === "negado" ? "❌" : "⏸️"
+        const estadoTexto = respuestaForm.respuesta === "aprobado" ? "APROBADO" : respuestaForm.respuesta === "negado" ? "NEGADO" : "EN SUSPENSO"
+
+        const waMsg = [
+          `${estadoEmoji} *Requerimiento ${estadoTexto}*`,
+          ``,
+          `Hola *${solicitante.displayName}*,`,
+          ``,
+          `Tu requerimiento ha sido ${respuestaForm.respuesta} por ${user.displayName}.`,
+          ``,
+          `📝 *Requerimiento:* ${selectedReq.requerimiento.substring(0, 100)}`,
+          `💬 *Observacion:* ${respuestaForm.observaciones}`,
+          ``,
+          `👉 Ingresa a la app para mas detalles.`,
+        ].join("\n")
+
+        if (solicitante.phone) {
+          authFetch("/api/whatsapp/send", {
+            method: "POST", body: JSON.stringify({ phone: solicitante.phone, message: waMsg }),
+          }).catch(() => {})
+        }
+
+        if (solicitante.email) {
+          const colorBg = respuestaForm.respuesta === "aprobado" ? "#16a34a" : respuestaForm.respuesta === "negado" ? "#dc2626" : "#ea580c"
+          authFetch("/api/send-email", {
+            method: "POST", body: JSON.stringify({
+              to: solicitante.email,
+              subject: `${estadoEmoji} Requerimiento ${estadoTexto} — IRDD`,
+              html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:${colorBg};color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;"><h2 style="margin:0;">${estadoEmoji} Requerimiento ${estadoTexto}</h2></div><div style="background:white;border:1px solid #e5e7eb;padding:24px;border-radius:0 0 12px 12px;"><p>Hola <strong>${solicitante.displayName}</strong>,</p><p>Tu requerimiento ha sido <strong>${respuestaForm.respuesta}</strong> por <strong>${user.displayName}</strong>.</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;"><p style="margin:0 0 8px;"><strong>Requerimiento:</strong> ${selectedReq.requerimiento}</p><p style="margin:0;"><strong>Observacion:</strong> ${respuestaForm.observaciones}</p></div><p style="text-align:center;"><a href="https://panel.iglesiaregalodedios.com/dashboard" style="display:inline-block;background:${colorBg};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Ver en la App</a></p></div></div>`,
+            }),
+          }).catch(() => {})
+        }
+      }
 
       toast.success(`Requerimiento ${respuestaForm.respuesta} correctamente`)
       setIsRespondOpen(false)

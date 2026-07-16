@@ -6,7 +6,7 @@ import { useRealtime } from "@/hooks/use-realtime"
 import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { cronogramaService, type CronogramaEntry } from "@/lib/mod/cronograma-service"
-import { censoService } from "@/lib/mod/censo-service"
+import { supabase } from "@/lib/secure-db"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -190,8 +190,8 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
 
   const loadMinisterios = async () => {
     try {
-      const config = await censoService.getConfiguraciones()
-      if (config?.ministerios) setMinisterios(config.ministerios)
+      const { data } = await supabase.from("module_groups").select("display_name").order("sort_order", { ascending: true })
+      if (data) setMinisterios(data.map((g: any) => g.display_name))
     } catch (error) {
       console.error("Error loading ministerios:", error)
     }

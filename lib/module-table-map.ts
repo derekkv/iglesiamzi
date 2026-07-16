@@ -44,7 +44,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["administracion"],
   },
   module_groups: {
-    modules: ["administracion"],
+    modules: "any",
   },
   configuraciones_globales: {
     modules: "any",
@@ -74,10 +74,18 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["flujo_pago"],
   },
   ingresos: {
-    modules: ["ingresos_egresos", "diezmos"],
+    modules: ["ingresos_egresos", "diezmos", "caja_chica"],
   },
   egresos: {
-    modules: ["ingresos_egresos", "flujo_pago", "pago_diario"],
+    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica"],
+  },
+
+  // === CAJA CHICA ===
+  caja_chica_movimientos: {
+    modules: ["caja_chica"],
+  },
+  caja_chica_arqueos: {
+    modules: ["caja_chica"],
   },
   diezmos: {
     modules: ["diezmos", "ingresos_egresos"],
