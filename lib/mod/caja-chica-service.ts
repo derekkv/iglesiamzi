@@ -169,7 +169,7 @@ export const cajaChicaService = {
   },
 
   async deleteMovimiento(id: number, audit?: AuditInfo): Promise<void> {
-    const { data } = await supabase.from("caja_chica_movimientos").select("tipo, concepto, monto").eq("id", id).single()
+    const { data } = await supabase.from("caja_chica_movimientos").select("tipo, concepto, monto").eq("id", id).maybeSingle()
     const { error } = await supabase.from("caja_chica_movimientos").delete().eq("id", id)
     if (error) throw error
 
@@ -236,7 +236,7 @@ export const cajaChicaService = {
     audit?: AuditInfo
   ): Promise<CajaChicaMovimiento> {
     // Obtener datos anteriores para buscar el ingreso vinculado
-    const { data: antes } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).single()
+    const { data: antes } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).maybeSingle()
 
     // 1. Actualizar en caja_chica_movimientos
     const { data, error } = await supabase
@@ -288,7 +288,7 @@ export const cajaChicaService = {
 
   async deleteGestionEfectivo(id: number, audit?: AuditInfo): Promise<void> {
     // Obtener datos antes de eliminar
-    const { data } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).single()
+    const { data } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).maybeSingle()
 
     // 1. Eliminar de caja_chica_movimientos
     const { error } = await supabase.from("caja_chica_movimientos").delete().eq("id", id)
@@ -361,7 +361,7 @@ export const cajaChicaService = {
   },
 
   async deleteArqueo(id: number, audit?: AuditInfo): Promise<void> {
-    const { data } = await supabase.from("caja_chica_arqueos").select("total, contado_por, fecha").eq("id", id).single()
+    const { data } = await supabase.from("caja_chica_arqueos").select("total, contado_por, fecha").eq("id", id).maybeSingle()
     const { error } = await supabase.from("caja_chica_arqueos").delete().eq("id", id)
     if (error) throw error
 
