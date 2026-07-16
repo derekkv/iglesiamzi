@@ -47,7 +47,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["administracion"],
   },
   configuraciones_globales: {
-    modules: ["administracion"],
+    modules: "any",
   },
   configuraciones_mes: {
     modules: "any",
@@ -154,7 +154,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados"],
   },
   censo_mdg: {
-    modules: ["censo-mdg", "cumpleanos-comunicacion", "listados"],
+    modules: ["censo-mdg", "bautizo", "matrimonio", "cumpleanos-comunicacion", "listados"],
   },
   censo_catalogos: {
     modules: ["censo", "censo-mdg"],
@@ -175,7 +175,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["matrimonio"],
   },
   presentacion_ninos: {
-    modules: ["presentacion-ninos"],
+    modules: ["presentacion-ninos", "listados"],
   },
 
   // === INVENTARIO ===
