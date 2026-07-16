@@ -199,29 +199,34 @@ export async function setGroupPermissions(
       .eq("group_id", groupId)
 
     if (modulesError) throw modulesError
+    if (!modules || modules.length === 0) return { success: true }
 
-    // Aplicar permiso a cada módulo del grupo
-    for (const module of modules) {
-      if (!canView) {
-        await supabase
-          .from("user_permissions")
-          .delete()
-          .eq("user_id", userId)
-          .eq("module_id", module.id)
-      } else {
-        await supabase
-          .from("user_permissions")
-          .upsert(
-            {
-              user_id: userId,
-              module_id: module.id,
-              can_view: true,
-              can_edit: canEdit,
-              granted_by: grantedBy,
-            },
-            { onConflict: "user_id,module_id" }
-          )
-      }
+    const moduleIds = modules.map((m: any) => m.id)
+
+    if (!canView) {
+      // Eliminar todos los permisos del grupo en una sola operación
+      const { error } = await supabase
+        .from("user_permissions")
+        .delete()
+        .eq("user_id", userId)
+        .in("module_id", moduleIds)
+
+      if (error) throw error
+    } else {
+      // Upsert todos los permisos del grupo en una sola operación
+      const permissionsData = moduleIds.map((moduleId: string) => ({
+        user_id: userId,
+        module_id: moduleId,
+        can_view: true,
+        can_edit: canEdit,
+        granted_by: grantedBy,
+      }))
+
+      const { error } = await supabase
+        .from("user_permissions")
+        .upsert(permissionsData, { onConflict: "user_id,module_id" })
+
+      if (error) throw error
     }
 
     return { success: true }

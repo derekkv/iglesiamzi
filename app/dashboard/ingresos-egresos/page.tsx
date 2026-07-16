@@ -164,24 +164,20 @@ const handleDeleteClick = (record: FinancialRecord) => {
           return;
         }
 
-        // Cargar configuración global
-        const config = await getGlobalConfig();
+        // Cargar todo en paralelo para reducir tiempo de carga
+        const [config, gruposResult] = await Promise.all([
+          getGlobalConfig(),
+          supabase.from("module_groups").select("display_name").order("sort_order", { ascending: true }),
+        ])
+
         setGlobalConfig(config);
+        if (gruposResult.data) setGruposMinisterio(gruposResult.data.map((g: any) => g.display_name))
 
-        // Cargar grupos de módulos para ministerio
-        const { data: grupos } = await supabase
-          .from("module_groups")
-          .select("display_name")
-          .order("sort_order", { ascending: true })
-        if (grupos) setGruposMinisterio(grupos.map((g: any) => g.display_name))
-
-        // Cargar configuraciones del mes actual
-
-        // Cargar registros financieros
-        await loadFinancialRecords();
-
-        // Cargar totales consolidados de otros módulos
-        await loadConsolidatedTotals();
+        // Cargar registros financieros y totales consolidados en paralelo
+        await Promise.all([
+          loadFinancialRecords(),
+          loadConsolidatedTotals(),
+        ]);
       } catch (error) {
         console.error("Error initializing page:", error);
       } finally {
@@ -204,36 +200,41 @@ const handleDeleteClick = (record: FinancialRecord) => {
       const monthNum = currentMonth.month
       const yearNum = currentMonth.year
 
-      // Total Alfolí del mes (se suma todo)
-      const alfoliRecords = await getAlfoliMes(monthNum, yearNum)
+      // Cargar todos los totales en paralelo
+      const [alfoliRecords, celulasResult, diezmosResult] = await Promise.all([
+        getAlfoliMes(monthNum, yearNum),
+        supabase
+          .from("ofrendas_celulas")
+          .select("valor")
+          .eq("mes", monthNum)
+          .eq("anio", yearNum)
+          .eq("recibido", true),
+        supabase
+          .from("diezmos")
+          .select("valor, tipo_ofrenda")
+          .eq("mes_id", currentMonth.id)
+          .eq("transaccion", "transferencia"),
+      ])
+
+      // Total Alfolí del mes
       const alfoliTotal = alfoliRecords.reduce((sum, r) => sum + Number(r.valor), 0)
       setTotalAlfoli(alfoliTotal)
 
-      // Total Ofrendas de Células del mes (solo las marcadas como recibidas)
-      const { data: celulasData } = await supabase
-        .from("ofrendas_celulas")
-        .select("valor")
-        .eq("mes", monthNum)
-        .eq("anio", yearNum)
-        .eq("recibido", true)
-      const celulasTotal = (celulasData || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      // Total Ofrendas de Células del mes
+      const celulasTotal = (celulasResult.data || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalCelulas(celulasTotal)
 
-      // Total Diezmos solo transferencia del mes (tipo_ofrenda = diezmo o null para compatibilidad)
-      const { data: diezmosData } = await supabase
-        .from("diezmos")
-        .select("valor, tipo_ofrenda")
-        .eq("mes_id", currentMonth.id)
-        .eq("transaccion", "transferencia")
-      const diezmosTotal = (diezmosData || []).filter((r: any) => !r.tipo_ofrenda || r.tipo_ofrenda === "diezmo").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      // Total Diezmos solo transferencia del mes
+      const diezmosData = diezmosResult.data || []
+      const diezmosTotal = diezmosData.filter((r: any) => !r.tipo_ofrenda || r.tipo_ofrenda === "diezmo").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalDiezmosTransferencia(diezmosTotal)
 
       // Total Primicias (transferencia) del mes
-      const primiciasTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "primicia").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      const primiciasTotal = diezmosData.filter((r: any) => r.tipo_ofrenda === "primicia").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalPrimicias(primiciasTotal)
 
       // Total Ofrenda Especial (transferencia) del mes
-      const especialTotal = (diezmosData || []).filter((r: any) => r.tipo_ofrenda === "diezmo_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
+      const especialTotal = diezmosData.filter((r: any) => r.tipo_ofrenda === "diezmo_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalDiezmoEspecial(especialTotal)
     } catch (error) {
       console.error("Error loading consolidated totals:", error)

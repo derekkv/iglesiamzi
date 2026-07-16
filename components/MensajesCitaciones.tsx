@@ -259,16 +259,20 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
         }))
         await supabase.from("buzon_mensajes").insert(buzonInserts)
 
-        for (const dest of (destUsers || [])) {
+        // Enviar notificaciones en paralelo (fire-and-forget, no bloquea el UI)
+        const notificationPromises = (destUsers || []).flatMap((dest: any) => {
+          const promises: Promise<any>[] = []
+
           // Email
           if (dest.email) {
-            authFetch("/api/send-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: dest.email,
-                subject: `📩 ${asunto} - ${title} | Iglesia Regalo de Dios`,
-                html: `
+            promises.push(
+              authFetch("/api/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: dest.email,
+                  subject: `📩 ${asunto} - ${title} | Iglesia Regalo de Dios`,
+                  html: `
                   <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#f3f4f6;padding:32px 16px;">
                     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
                       <div style="background:${tipoMensaje === "invitacion" ? "#7c3aed" : "#2563eb"};padding:28px 32px;text-align:center;">
@@ -312,29 +316,41 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
                       </div>
                     </div>
                   </div>`,
-              }),
-            }).catch(() => {})
+                }),
+              }).catch(() => {})
+            )
           }
+
           // WhatsApp
           if (dest.phone) {
-            authFetch("/api/whatsapp/send", {
+            promises.push(
+              authFetch("/api/whatsapp/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: dest.phone, message: whatsappMsg }),
+              }).catch(() => {})
+            )
+          }
+
+          // Push
+          promises.push(
+            authFetch("/api/send-notification", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ phone: dest.phone, message: whatsappMsg }),
+              body: JSON.stringify({
+                user_id: dest.id,
+                title: `📩 ${asunto} - ${title}`,
+                body: `${user.displayName}: ${detalle.trim().slice(0, 80)}${fecha ? ` | ${fechaFormateada}` : ""}`,
+                url: "/dashboard",
+              }),
             }).catch(() => {})
-          }
-          // Push
-          authFetch("/api/send-notification", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: dest.id,
-              title: `📩 ${asunto} - ${title}`,
-              body: `${user.displayName}: ${detalle.trim().slice(0, 80)}${fecha ? ` | ${fechaFormateada}` : ""}`,
-              url: "/dashboard",
-            }),
-          }).catch(() => {})
-        }
+          )
+
+          return promises
+        })
+
+        // Ejecutar todas las notificaciones en paralelo (no bloquea)
+        Promise.allSettled(notificationPromises).catch(() => {})
       }
 
       toast.success(`Mensaje enviado a ${destinatarioIds.length} destinatario(s)`)
