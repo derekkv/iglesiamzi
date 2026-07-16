@@ -36,11 +36,39 @@ interface QueryState {
 
 type QueryResult = { data: any[] | any | null; error: any; count?: number }
 
-// Campos que NO deben convertirse a uppercase (contraseñas, tokens, IDs, fechas, etc.)
+// Campos que NO deben convertirse a uppercase (contraseñas, tokens, IDs, fechas, campos con CHECK constraints)
 const NO_UPPERCASE_FIELDS = [
+  // Técnicos / IDs / seguridad
   "password", "password_hash", "token", "jwt", "secret",
   "mes_id", "id", "user_id", "created_at", "updated_at",
-  "concepto", // campo técnico de sync
+  "concepto", // campo técnico de sync (auto-diezmo, auto-pago-diario, etc.)
+
+  // Campos con CHECK constraints — pago_diario, ingresos, egresos
+  "metodo_pago", // 'Efectivo' | 'Transferencia'
+  "estado", // 'Procesado' | 'Pendiente' | 'asistio' | 'falto' | 'justifico' | 'atrasado' | 'pendiente'
+
+  // Campos con CHECK constraints — audit_logs
+  "action", // 'crear' | 'editar' | 'eliminar'
+
+  // Campos con CHECK constraints — diezmos
+  "tipo_ofrenda", // 'diezmo' | 'primicia' | 'diezmo_especial'
+  "transaccion", // 'efectivo' | 'transferencia'
+
+  // Campos con CHECK constraints — discipulado
+  "estatus", // 'en_curso' | 'aprobado' | 'reprobado'
+  "status", // 'A' | 'J' | 'F' | 'AT' | 'none'
+
+  // Campos con CHECK constraints — buzon_mensajes, mensajes_citaciones, requerimientos
+  "tipo", // 'info' | 'requerimiento' | 'aprobado' | 'negado' | 'suspenso' | 'mensaje' | 'invitacion' | 'domingo' | 'mdg'
+  "respuesta", // 'pendiente' | 'aprobado' | 'negado' | 'suspenso'
+  "referencia_tipo", // 'cumpleanos' | 'cronograma' | 'mensaje_citacion' | 'requerimiento'
+  "destinatario_tipo", // 'usuario' | 'modulo' | 'todos'
+
+  // Campos con CHECK constraints — nomina (métodos de pago por quincena)
+  "primera_quincena_metodo", // 'Transferencia' | 'Efectivo'
+  "segunda_quincena_metodo", // 'Transferencia' | 'Efectivo'
+  "movilizacion_metodo", // 'Transferencia' | 'Efectivo'
+  "movilizacion_segunda_metodo", // 'Transferencia' | 'Efectivo'
 ]
 
 /**
