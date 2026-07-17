@@ -33,25 +33,18 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: false, // Cualquiera puede insertar/marcar leído
   },
   user_permissions: {
-    modules: [
-      "administracion",
-      "asistencia-servidores-protocolo", "asistencia-servidores-administracion",
-      "asistencia-servidores-discipulado", "asistencia-servidores-alabanza",
-      "asistencia-servidores-comunicacion", "asistencia-servidores-herederos",
-      "asistencia-servidores-intercesion", "asistencia-servidores-mdg",
-      "asistencia-servidores-redil", "asistencia-servidores-hombres",
-      "asistencia-servidores-jovenes", "asistencia-servidores-pastoral",
-      "asistencia-servidores-celulas", "asistencia-servidores-proyecto-mario",
-    ],
-    requireEditForWrite: true,
+    modules: "any", // Lectura abierta: muchos módulos necesitan consultar permisos (cronogramas, mensajes, asistencia, notificaciones)
+    requireEditForWrite: true, // Solo admins con can_edit pueden modificar permisos
     requireAdminForDelete: true,
   },
   user_group_leaders: {
-    modules: ["administracion"],
+    modules: "any", // Lectura abierta: gestion-atrasados-service necesita buscar líderes para notificar
+    requireEditForWrite: true,
     requireAdminForDelete: true,
   },
   system_modules: {
-    modules: ["administracion"],
+    modules: "any", // Lectura abierta: gestion-atrasados-service necesita resolver group_id del módulo
+    requireEditForWrite: true,
   },
   module_groups: {
     modules: "any",
@@ -296,6 +289,24 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   // === INVENTARIO (movimientos) ===
   inventory_movements: {
     modules: ["inventario"],
+  },
+
+  // === REDIL - AYUDA SOCIAL ===
+  casos_redil: {
+    modules: ["redil_ayuda_social"],
+    requireEditForWrite: true,
+  },
+  solicitudes_redil: {
+    modules: ["redil_ayuda_social"],
+    requireEditForWrite: true,
+  },
+  visitas_tecnicas: {
+    modules: ["redil_ayuda_social"],
+    requireEditForWrite: true,
+  },
+  entregas_redil: {
+    modules: ["redil_ayuda_social"],
+    requireEditForWrite: true,
   },
 
   // === WHATSAPP ===

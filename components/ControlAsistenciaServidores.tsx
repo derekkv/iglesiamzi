@@ -6,6 +6,7 @@ import { supabase } from "@/lib/secure-db"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useAuth } from "@/contexts/auth-context"
 import { registrarAtraso, eliminarAtraso, notificarLiderAtraso } from "@/lib/mod/gestion-atrasados-service"
+import { EXCLUDED_USER_IDS } from "@/lib/excluded-users"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -121,7 +122,7 @@ export function ControlAsistenciaServidores({ moduloKey, moduleName, title, canE
         .order("displayName", { ascending: true })
 
       if (usersError) throw usersError
-      setUsers(usersData || [])
+      setUsers((usersData || []).filter((u: any) => !EXCLUDED_USER_IDS.includes(u.id)))
     } catch (error) {
       console.error("Error loading users:", error)
     }

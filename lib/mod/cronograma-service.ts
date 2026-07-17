@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 import { getInternalHeaders } from "@/lib/auth-fetch"
+import { EXCLUDED_USER_IDS } from "@/lib/excluded-users"
 
 export interface CronogramaEntry {
   id?: number
@@ -330,7 +331,7 @@ export const cronogramaService = {
       .limit(10)
 
     if (error) return []
-    return data || []
+    return (data || []).filter((u) => !EXCLUDED_USER_IDS.includes(u.id))
   },
 
   // Buscar todos los usuarios activos sin filtro de permisos
@@ -343,7 +344,7 @@ export const cronogramaService = {
       .limit(10)
 
     if (error) return []
-    return data || []
+    return (data || []).filter((u) => !EXCLUDED_USER_IDS.includes(u.id))
   },
 
   // Buscar usuarios que tengan permiso en el módulo dado
@@ -360,7 +361,7 @@ export const cronogramaService = {
 
     if (permError || !permissions) return []
 
-    const userIds = permissions.map((p: any) => p.user_id)
+    const userIds = permissions.map((p: any) => p.user_id).filter((id: string) => !EXCLUDED_USER_IDS.includes(id))
     if (userIds.length === 0) return []
 
     // Buscar usuarios que coincidan con la query

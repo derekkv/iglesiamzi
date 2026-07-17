@@ -6,7 +6,7 @@ import { auditService, type AuditInfo } from "./audit-service"
 export type ProyectoMarioCicloTipo = "belleza_integral" | "belleza_cejas" | "gastronomia"
 
 // === VARIABLES DE CONFIGURACIÓN (modificar número de clases aquí) ===
-const TOTAL_CLASES_BELLEZA_INTEGRAL = 10
+const TOTAL_CLASES_BELLEZA_INTEGRAL = 12
 const TOTAL_CLASES_BELLEZA_CEJAS = 8
 const TOTAL_CLASES_GASTRONOMIA = 12
 
