@@ -15,9 +15,10 @@ import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 import { currentMonthNameEcuador, todayEcuador, currentMonthEcuador, currentYearEcuador } from "@/lib/timezone"
 import { getAlfoliMes } from "@/lib/mod/alfoli-service"
 
-import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, ExternalLink, BookOpen, Heart, UserCheck, GraduationCap, Palette, AlertTriangle } from "lucide-react"
+import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, ExternalLink, BookOpen, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home } from "lucide-react"
 import { censoService } from "@/lib/mod/censo-service"
 import { censoMdgService } from "@/lib/mod/censo-mdg-service"
+import { getLunesSemanaActual } from "@/lib/mod/gestion-celulas-service"
 import { discipuladoCiclosService, CICLO_CONFIG, type CicloTipo } from "@/lib/mod/discipulado-ciclos-service"
 import { proyectoMarioCiclosService, PROYECTO_MARIO_CICLO_CONFIG, type ProyectoMarioCicloTipo } from "@/lib/mod/proyecto-mario-ciclos-service"
 
@@ -58,6 +59,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
   const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, censoMatrimonios: 0 })
   const [statsPresentaciones, setStatsPresentaciones] = useState({ total: 0, esteMes: 0 })
   const [statsAtrasados, setStatsAtrasados] = useState({ total: 0, sinGestionar: 0 })
+  const [statsCelulas, setStatsCelulas] = useState({ totalMiembros: 0, asistieronSemana: 0 })
   const [statsProyectoMario, setStatsProyectoMario] = useState<Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }>>({
     belleza_integral_sabados: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
     belleza_integral_viernes: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
@@ -181,6 +183,16 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
         total: (atrasadosData || []).length,
         sinGestionar: (atrasadosData || []).filter(a => !a.gestionado).length,
       })
+
+      // Células: miembros activos en células + asistencia de esta semana
+      const totalCelulasMiembros = censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length
+      const lunesSemana = getLunesSemanaActual()
+      const { data: gestionCelulasData } = await supabase
+        .from("gestion_celulas")
+        .select("id, asistio")
+        .eq("semana_inicio", lunesSemana)
+      const asistieronSemana = (gestionCelulasData || []).filter(g => g.asistio).length
+      setStatsCelulas({ totalMiembros: totalCelulasMiembros, asistieronSemana })
 
       // Proyecto Mario (ciclos activos)
       const pmStats: Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }> = {
@@ -404,17 +416,20 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
             </div>
 
             {/* Fila 2: Datos de iglesia */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
               <Card className="border-indigo-200 bg-indigo-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/censo")}>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-[10px] text-indigo-600 font-medium">Censo Protocolo</p>
-                  <p className="text-2xl font-bold text-indigo-800">{statsCenso.total}</p>
-                  <p className="text-[9px] text-indigo-500">{statsCenso.miembros} miembros · {statsCenso.activos} activos</p>
+                  <div className="flex items-center gap-1">
+                    <img src="/logo.png" alt="IRDD" className="w-4 h-4 object-contain" />
+                    <p className="text-[10px] text-indigo-600 font-medium">Miembros IRDD</p>
+                  </div>
+                  <p className="text-2xl font-bold text-indigo-800">{statsCenso.total + statsCensoMdg.total}</p>
+                  <p className="text-[9px] text-indigo-500">protocolo + MDG</p>
                 </CardContent>
               </Card>
               <Card className="border-violet-200 bg-violet-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/censo-mdg")}>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-[10px] text-violet-600 font-medium">Censo MDG</p>
+                  <p className="text-[10px] text-violet-600 font-medium">Miembros Nuevos IRDD</p>
                   <p className="text-2xl font-bold text-violet-800">{statsCensoMdg.total}</p>
                   <p className="text-[9px] text-violet-500">{statsCensoMdg.miembros} miembros · {statsCensoMdg.activos} activos</p>
                 </CardContent>
@@ -430,27 +445,37 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                 <CardContent className="pt-4 pb-3">
                   <p className="text-[10px] text-teal-600 font-medium">Bautizos</p>
                   <p className="text-2xl font-bold text-teal-800">{statsBautizos.censoBautizados}</p>
-                  <p className="text-[9px] text-teal-500">en censos · {statsBautizos.total} manual{statsBautizos.esteMes > 0 ? ` · +${statsBautizos.esteMes} este mes` : ""}</p>
+                  <p className="text-[9px] text-teal-500">total · {statsBautizos.esteMes > 0 ? <span className="text-teal-700 font-semibold">+{statsBautizos.esteMes} este mes</span> : <span>0 este mes</span>}</p>
                 </CardContent>
               </Card>
               <Card className="border-rose-200 bg-rose-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/matrimonio")}>
                 <CardContent className="pt-4 pb-3">
                   <p className="text-[10px] text-rose-600 font-medium">Matrimonios</p>
                   <p className="text-2xl font-bold text-rose-800">{statsMatrimonios.censoMatrimonios}</p>
-                  <p className="text-[9px] text-rose-500">en censos · {statsMatrimonios.total} manual{statsMatrimonios.esteMes > 0 ? ` · +${statsMatrimonios.esteMes} este mes` : ""}</p>
+                  <p className="text-[9px] text-rose-500">total · {statsMatrimonios.esteMes > 0 ? <span className="text-rose-700 font-semibold">+{statsMatrimonios.esteMes} este mes</span> : <span>0 este mes</span>}</p>
                 </CardContent>
               </Card>
               <Card className="border-pink-200 bg-pink-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/presentacion-ninos")}>
                 <CardContent className="pt-4 pb-3">
                   <p className="text-[10px] text-pink-600 font-medium">Pres. Niños</p>
                   <p className="text-2xl font-bold text-pink-800">{statsPresentaciones.total}</p>
-                  <p className="text-[9px] text-pink-500">registrados{statsPresentaciones.esteMes > 0 ? ` · +${statsPresentaciones.esteMes} este mes` : ""}</p>
+                  <p className="text-[9px] text-pink-500">total · {statsPresentaciones.esteMes > 0 ? <span className="text-pink-700 font-semibold">+{statsPresentaciones.esteMes} este mes</span> : <span>0 este mes</span>}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-emerald-200 bg-emerald-50/50">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-1">
+                    <Home className="w-3 h-3 text-emerald-600" />
+                    <p className="text-[10px] text-emerald-600 font-medium">Células</p>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p>
+                  <p className="text-[9px] text-emerald-500">miembros activos · {statsCelulas.asistieronSemana} asistieron esta semana</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Fila 3: Proyecto Mario + Atrasados + Totales */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Fila 3: Proyecto Mario + Atrasados */}
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <Card className="border-orange-200 bg-orange-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenProyectoMario(!openProyectoMario)}>
                 <CardContent className="pt-5 pb-4">
                   <div className="flex items-center justify-between">
@@ -460,6 +485,18 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                       <p className="text-[9px] text-orange-600">inscritos · {Object.values(statsProyectoMario).filter(v => v.inscritos > 0).length} cursos activos</p>
                     </div>
                     <Palette className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-orange-200 space-y-0.5">
+                    {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => {
+                      const stats = statsProyectoMario[tipo]
+                      const config = PROYECTO_MARIO_CICLO_CONFIG[tipo]
+                      return (
+                        <div key={tipo} className="flex justify-between items-center">
+                          <span className="text-[9px] text-orange-600 truncate">{config.label}</span>
+                          <span className="text-[10px] font-semibold text-orange-800">{stats.inscritos}</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -475,30 +512,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-sky-200 bg-sky-50/50">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-sky-700">Total Censados</p>
-                      <p className="text-xl font-bold text-sky-700">{statsCenso.total + statsCensoMdg.total}</p>
-                      <p className="text-[9px] text-sky-600">protocolo + MDG</p>
-                    </div>
-                    <Users className="w-6 h-6 text-sky-400" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-green-200 bg-green-50/50">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-green-700">Miembros Activos</p>
-                      <p className="text-xl font-bold text-green-700">{statsCenso.activos + statsCensoMdg.activos}</p>
-                      <p className="text-[9px] text-green-600">protocolo + MDG</p>
-                    </div>
-                    <UserCheck className="w-6 h-6 text-green-400" />
-                  </div>
-                </CardContent>
-              </Card>
+
             </div>
 
             {/* Acordeones */}
