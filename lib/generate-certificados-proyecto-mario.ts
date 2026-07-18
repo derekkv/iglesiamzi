@@ -2,7 +2,9 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 import type { ProyectoMarioCicloTipo } from "./mod/proyecto-mario-ciclos-service"
 
 const MODULO_LABELS: Record<ProyectoMarioCicloTipo, string> = {
-  belleza_integral: "BELLEZA INTEGRAL",
+  belleza_integral_sabados: "BELLEZA INTEGRAL - SABADOS",
+  belleza_integral_viernes: "BELLEZA INTEGRAL - VIERNES",
+  manualidades: "MANUALIDADES",
   belleza_cejas: "BELLEZA CEJAS",
   gastronomia: "GASTRONOMÍA",
 }

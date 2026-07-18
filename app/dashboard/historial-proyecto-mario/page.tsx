@@ -25,7 +25,9 @@ import {
 import { downloadCertificadosProyectoMario } from "@/lib/generate-certificados-proyecto-mario"
 
 const TABS: { value: ProyectoMarioCicloTipo; label: string }[] = [
-  { value: "belleza_integral", label: "Belleza Integral" },
+  { value: "belleza_integral_sabados", label: "Belleza integral - Sabados" },
+  { value: "belleza_integral_viernes", label: "Belleza integral - Viernes" },
+  { value: "manualidades", label: "Manualidades" },
   { value: "belleza_cejas", label: "Belleza Cejas" },
   { value: "gastronomia", label: "Gastronomía" },
 ]
@@ -35,9 +37,11 @@ function HistorialContent({ canEdit }: { canEdit: boolean }) {
   const { user } = useAuth()
   const audit = user ? { user_id: user.id, user_name: user.username } : undefined
 
-  const [activeTab, setActiveTab] = useState<ProyectoMarioCicloTipo>("belleza_integral")
+  const [activeTab, setActiveTab] = useState<ProyectoMarioCicloTipo>("belleza_integral_sabados")
   const [ciclos, setCiclos] = useState<Record<ProyectoMarioCicloTipo, ProyectoMarioCiclo[]>>({
-    belleza_integral: [],
+    belleza_integral_sabados: [],
+    belleza_integral_viernes: [],
+    manualidades: [],
     belleza_cejas: [],
     gastronomia: [],
   })
@@ -53,12 +57,14 @@ function HistorialContent({ canEdit }: { canEdit: boolean }) {
   const loadCiclos = useCallback(async () => {
     setLoading(true)
     try {
-      const [bi, bc, ga] = await Promise.all([
-        proyectoMarioCiclosService.getHistorialCiclos("belleza_integral"),
+      const [bi_s, bi_v, man, bc, ga] = await Promise.all([
+        proyectoMarioCiclosService.getHistorialCiclos("belleza_integral_sabados"),
+        proyectoMarioCiclosService.getHistorialCiclos("belleza_integral_viernes"),
+        proyectoMarioCiclosService.getHistorialCiclos("manualidades"),
         proyectoMarioCiclosService.getHistorialCiclos("belleza_cejas"),
         proyectoMarioCiclosService.getHistorialCiclos("gastronomia"),
       ])
-      setCiclos({ belleza_integral: bi, belleza_cejas: bc, gastronomia: ga })
+      setCiclos({ belleza_integral_sabados: bi_s, belleza_integral_viernes: bi_v, manualidades: man, belleza_cejas: bc, gastronomia: ga })
     } catch (error) {
       console.error("Error cargando historial:", error)
     } finally {
@@ -190,7 +196,7 @@ function HistorialContent({ canEdit }: { canEdit: boolean }) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as ProyectoMarioCicloTipo); setExpandedCiclo(null) }}>
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             {TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} className="text-xs sm:text-sm">
                 {tab.label}

@@ -220,16 +220,16 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === PROYECTO MARIO ===
   proyecto_mario_ciclos: {
-    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
   },
   proyecto_mario_ciclo_participantes: {
-    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
   },
   proyecto_mario_ciclo_fechas: {
-    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
   },
   proyecto_mario_ciclo_asistencia: {
-    modules: ["proyecto_mario_belleza_integral", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
   },
 
   // === MENSAJES Y CITACIONES ===

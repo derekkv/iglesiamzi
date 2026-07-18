@@ -6,7 +6,7 @@
 -- 1. Tabla principal de ciclos
 CREATE TABLE IF NOT EXISTS proyecto_mario_ciclos (
   id BIGSERIAL PRIMARY KEY,
-  tipo TEXT NOT NULL CHECK (tipo IN ('belleza_integral', 'belleza_cejas', 'gastronomia')),
+  tipo TEXT NOT NULL CHECK (tipo IN ('belleza_integral_sabados', 'belleza_integral_viernes', 'manualidades', 'belleza_cejas', 'gastronomia')),
   fecha_inicio DATE NOT NULL,
   total_clases INTEGER NOT NULL DEFAULT 10,
   activo BOOLEAN NOT NULL DEFAULT true,
@@ -86,9 +86,11 @@ CREATE POLICY "Service role full access" ON proyecto_mario_ciclo_asistencia
 
 -- Módulos de ciclos/cursos
 INSERT INTO system_modules (name, display_name, description, icon, route, requires_active_month, group_id, sort_order) VALUES
-  ('proyecto_mario_belleza_integral', 'Belleza Integral', 'Control de asistencia del curso Belleza Integral', '💇', '/dashboard/proyecto-mario-belleza-integral', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 1),
-  ('proyecto_mario_belleza_cejas', 'Belleza Cejas', 'Control de asistencia del curso Belleza Cejas', '✨', '/dashboard/proyecto-mario-belleza-cejas', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 2),
-  ('proyecto_mario_gastronomia', 'Gastronomía', 'Control de asistencia del curso de Gastronomía', '🍳', '/dashboard/proyecto-mario-gastronomia', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 3),
+  ('proyecto_mario_belleza_integral_sabados', 'Belleza integral - Sabados', 'Control de asistencia del curso Belleza integral - Sabados', '💇', '/dashboard/proyecto-mario-belleza-integral-sabados', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 1),
+  ('proyecto_mario_belleza_integral_viernes', 'Belleza integral - Viernes', 'Control de asistencia del curso Belleza integral - Viernes', '💇', '/dashboard/proyecto-mario-belleza-integral-viernes', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 2),
+  ('proyecto_mario_manualidades', 'Manualidades', 'Control de asistencia del curso Manualidades', '🎨', '/dashboard/proyecto-mario-manualidades', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 3),
+  ('proyecto_mario_belleza_cejas', 'Belleza Cejas', 'Control de asistencia del curso Belleza Cejas', '✨', '/dashboard/proyecto-mario-belleza-cejas', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 4),
+  ('proyecto_mario_gastronomia', 'Gastronomía', 'Control de asistencia del curso de Gastronomía', '🍳', '/dashboard/proyecto-mario-gastronomia', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 5),
   ('historial_proyecto_mario', 'Historial', 'Historial de ciclos cerrados de Proyecto Mario', '📋', '/dashboard/historial-proyecto-mario', false, (SELECT id FROM module_groups WHERE name = 'Proyecto Mario' LIMIT 1), 4)
 ON CONFLICT (name) DO NOTHING;
 
@@ -114,7 +116,9 @@ ON CONFLICT (name) DO NOTHING;
 UPDATE system_modules 
 SET group_id = (SELECT id FROM module_groups WHERE name = 'Proyecto Mario')
 WHERE name IN (
-  'proyecto_mario_belleza_integral',
+  'proyecto_mario_belleza_integral_sabados',
+  'proyecto_mario_belleza_integral_viernes',
+  'proyecto_mario_manualidades',
   'proyecto_mario_belleza_cejas',
   'proyecto_mario_gastronomia',
   'historial_proyecto_mario',

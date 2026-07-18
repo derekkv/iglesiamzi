@@ -3,15 +3,19 @@ import { auditService, type AuditInfo } from "./audit-service"
 
 // === TIPOS ===
 
-export type ProyectoMarioCicloTipo = "belleza_integral" | "belleza_cejas" | "gastronomia"
+export type ProyectoMarioCicloTipo = "belleza_integral_sabados" | "belleza_integral_viernes" | "manualidades" | "belleza_cejas" | "gastronomia"
 
 // === VARIABLES DE CONFIGURACIÓN (modificar número de clases aquí) ===
-const TOTAL_CLASES_BELLEZA_INTEGRAL = 12
+const TOTAL_CLASES_BELLEZA_INTEGRAL_SABADOS = 12
+const TOTAL_CLASES_BELLEZA_INTEGRAL_VIERNES = 12
+const TOTAL_CLASES_MANUALIDADES = 12
 const TOTAL_CLASES_BELLEZA_CEJAS = 8
 const TOTAL_CLASES_GASTRONOMIA = 12
 
 export const PROYECTO_MARIO_CICLO_CONFIG: Record<ProyectoMarioCicloTipo, { label: string; totalClases: number; moduleName: string }> = {
-  belleza_integral: { label: "Belleza Integral", totalClases: TOTAL_CLASES_BELLEZA_INTEGRAL, moduleName: "proyecto_mario_belleza_integral" },
+  belleza_integral_sabados: { label: "Belleza integral - Sabados", totalClases: TOTAL_CLASES_BELLEZA_INTEGRAL_SABADOS, moduleName: "proyecto_mario_belleza_integral_sabados" },
+  belleza_integral_viernes: { label: "Belleza integral - Viernes", totalClases: TOTAL_CLASES_BELLEZA_INTEGRAL_VIERNES, moduleName: "proyecto_mario_belleza_integral_viernes" },
+  manualidades: { label: "Manualidades", totalClases: TOTAL_CLASES_MANUALIDADES, moduleName: "proyecto_mario_manualidades" },
   belleza_cejas: { label: "Belleza Cejas", totalClases: TOTAL_CLASES_BELLEZA_CEJAS, moduleName: "proyecto_mario_belleza_cejas" },
   gastronomia: { label: "Gastronomía", totalClases: TOTAL_CLASES_GASTRONOMIA, moduleName: "proyecto_mario_gastronomia" },
 }

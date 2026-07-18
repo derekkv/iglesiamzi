@@ -4,12 +4,12 @@ import { PermissionsGuard } from "@/lib/permissions-guard"
 import { ProyectoMarioCicloView } from "@/app/dashboard/proyecto-mario/ProyectoMarioCicloView"
 
 function Content({ canEdit }: { canEdit: boolean }) {
-  return <ProyectoMarioCicloView tipo="belleza_integral_sabados" canEdit={canEdit} />
+  return <ProyectoMarioCicloView tipo="belleza_integral_viernes" canEdit={canEdit} />
 }
 
-export default function ProyectoMarioBellezaIntegralPage() {
+export default function ProyectoMarioBellezaIntegralViernesPage() {
   return (
-    <PermissionsGuard moduleName="proyecto_mario_belleza_integral_sabados">
+    <PermissionsGuard moduleName="proyecto_mario_belleza_integral_viernes">
       {(canEdit) => <Content canEdit={canEdit} />}
     </PermissionsGuard>
   )
