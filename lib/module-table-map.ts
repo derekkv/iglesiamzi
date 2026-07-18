@@ -315,6 +315,12 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: false,
   },
 
+  // === EVENTOS (ENCUENTRO) ===
+  encuentro_participantes: {
+    modules: ["eventos_encuentro"],
+    requireEditForWrite: true,
+  },
+
   // === NOTIFICACIONES ===
   service_notifications_log: {
     modules: "any",
