@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS evento_participantes (
   ministerio TEXT,
   valor NUMERIC(10,2) NOT NULL DEFAULT 0,
   abono NUMERIC(10,2) NOT NULL DEFAULT 0,
+  metodo_pago TEXT NOT NULL DEFAULT 'Efectivo' CHECK (metodo_pago IN ('Efectivo', 'Transferencia')),
   equipo TEXT CHECK (equipo IN ('amarillo', 'azul', 'verde', 'naranja')),
   equipo_razon TEXT,
   importado_de_evento_id INTEGER REFERENCES eventos_tabs(id) ON DELETE SET NULL,

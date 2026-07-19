@@ -6,6 +6,7 @@ import { auditService } from "@/lib/mod/audit-service"
 export type Genero = "masculino" | "femenino"
 export type Contextura = "delgada" | "media" | "robusta"
 export type Equipo = "amarillo" | "azul" | "verde" | "naranja"
+export type MetodoPago = "Efectivo" | "Transferencia"
 
 export interface EventoTab {
   id: number
@@ -34,6 +35,7 @@ export interface EventoParticipante {
   ministerio: string | null
   valor: number
   abono: number
+  metodo_pago: MetodoPago
   equipo: Equipo | null
   equipo_razon: string | null
   importado_de_evento_id: number | null
@@ -75,12 +77,12 @@ export const eventosTabsService = {
     return data || []
   },
 
-  async getById(id: number): Promise<EventoTab> {
+  async getById(id: number): Promise<EventoTab | null> {
     const { data, error } = await supabase
       .from("eventos_tabs")
       .select("*")
       .eq("id", id)
-      .single()
+      .maybeSingle()
     if (error) throw error
     return data
   },
@@ -156,6 +158,32 @@ export const eventosTabsService = {
 
 // ==================== SERVICIO DE PARTICIPANTES POR EVENTO ====================
 
+/** Obtiene el mes activo actual (necesario para registrar ingresos) */
+async function _getActiveMesId(): Promise<string | null> {
+  const { data } = await supabase
+    .from("meses")
+    .select("id")
+    .eq("status", "active")
+    .order("start_date", { ascending: false })
+    .limit(1)
+  return data && data.length > 0 ? data[0].id : null
+}
+
+/** Genera el detalle único para vincular ingreso con participante del evento */
+function _ingresoDetalle(nombre: string, eventoNombre: string): string {
+  return `Abono evento - ${nombre} (${eventoNombre})`
+}
+
+/** Obtiene el nombre del evento por su ID */
+async function _getEventoNombre(eventoId: number): Promise<string> {
+  const { data } = await supabase
+    .from("eventos_tabs")
+    .select("nombre")
+    .eq("id", eventoId)
+    .maybeSingle()
+  return data?.nombre || `Evento #${eventoId}`
+}
+
 export const eventoParticipantesService = {
   async getByEvento(eventoId: number): Promise<EventoParticipante[]> {
     const { data, error } = await supabase
@@ -184,10 +212,19 @@ export const eventoParticipantesService = {
         details: { nombre: input.nombre, evento_id: input.evento_id },
       })
     }
+
+    // Sincronizar ingreso si tiene abono > 0
+    if (data.abono > 0) {
+      await this._syncIngresoCreate(data)
+    }
+
     return data
   },
 
   async update(id: number, input: Partial<EventoParticipanteInput>, audit?: { userId: string; userName: string }): Promise<EventoParticipante> {
+    // Obtener datos antes de actualizar (para sync de ingreso)
+    const { data: antes } = await supabase.from("evento_participantes").select("*").eq("id", id).maybeSingle()
+
     const { data, error } = await supabase
       .from("evento_participantes")
       .update({ ...input, updated_at: new Date().toISOString() })
@@ -205,10 +242,19 @@ export const eventoParticipantesService = {
         details: { id, cambios: input },
       })
     }
+
+    // Sincronizar ingreso cuando cambia el abono
+    if (antes) {
+      await this._syncIngresoUpdate(antes, data)
+    }
+
     return data
   },
 
   async delete(id: number, audit?: { userId: string; userName: string; nombre: string }): Promise<void> {
+    // Obtener datos antes de eliminar (para eliminar ingreso vinculado)
+    const { data: record } = await supabase.from("evento_participantes").select("*").eq("id", id).maybeSingle()
+
     const { error } = await supabase
       .from("evento_participantes")
       .delete()
@@ -223,6 +269,11 @@ export const eventoParticipantesService = {
         description: `Participante evento eliminado: ${audit.nombre}`,
         details: { id, nombre: audit.nombre },
       })
+    }
+
+    // Eliminar ingreso vinculado si tenía abono
+    if (record && record.abono > 0) {
+      await this._syncIngresoDelete(record)
     }
   },
 
@@ -301,6 +352,170 @@ export const eventoParticipantesService = {
     }
 
     return { importados, duplicados }
+  },
+
+  // ==================== SYNC CON INGRESOS ====================
+
+  async _syncIngresoCreate(record: EventoParticipante) {
+    try {
+      const mesId = await _getActiveMesId()
+      if (!mesId) return // No hay mes activo, no se puede registrar ingreso
+
+      const eventoNombre = await _getEventoNombre(record.evento_id)
+      const detalle = _ingresoDetalle(record.nombre, eventoNombre)
+
+      await supabase.from("ingresos").insert({
+        mes_id: mesId,
+        concepto: "auto-evento",
+        monto: record.abono,
+        fecha: new Date().toISOString().split("T")[0],
+        ministerio: "Administración",
+        categoria_principal: "Ingresos x Eventos",
+        detalle,
+        observacion: `Abono de ${record.nombre} para ${eventoNombre} (valor total: $${Number(record.valor).toFixed(2)})`,
+        estado: "Procesado",
+        metodo_pago: record.metodo_pago || "Efectivo",
+      })
+    } catch (e) {
+      console.error("[eventos] Error sync ingreso create:", e)
+    }
+  },
+
+  async _syncIngresoUpdate(antes: EventoParticipante, despues: EventoParticipante) {
+    try {
+      const eventoNombre = await _getEventoNombre(antes.evento_id)
+      const oldDetalle = _ingresoDetalle(antes.nombre, eventoNombre)
+
+      // Buscar ingreso vinculado
+      const { data: ingreso } = await supabase
+        .from("ingresos")
+        .select("id")
+        .eq("concepto", "auto-evento")
+        .eq("detalle", oldDetalle)
+        .limit(1)
+        .maybeSingle()
+
+      const abonoAntes = Number(antes.abono)
+      const abonoDespues = Number(despues.abono)
+
+      if (abonoAntes === 0 && abonoDespues > 0) {
+        // No tenía ingreso, crear uno nuevo
+        await this._syncIngresoCreate(despues)
+      } else if (abonoAntes > 0 && abonoDespues === 0) {
+        // Abono eliminado, borrar ingreso
+        if (ingreso) {
+          await supabase.from("ingresos").delete().eq("id", ingreso.id)
+        }
+      } else if (abonoAntes > 0 && abonoDespues > 0 && ingreso) {
+        // Actualizar monto y datos del ingreso
+        const newDetalle = _ingresoDetalle(despues.nombre, eventoNombre)
+        await supabase.from("ingresos").update({
+          monto: abonoDespues,
+          detalle: newDetalle,
+          observacion: `Abono de ${despues.nombre} para ${eventoNombre} (valor total: $${Number(despues.valor).toFixed(2)})`,
+          metodo_pago: despues.metodo_pago || "Efectivo",
+        }).eq("id", ingreso.id)
+      }
+    } catch (e) {
+      console.error("[eventos] Error sync ingreso update:", e)
+    }
+  },
+
+  async _syncIngresoDelete(record: EventoParticipante) {
+    try {
+      const eventoNombre = await _getEventoNombre(record.evento_id)
+      const detalle = _ingresoDetalle(record.nombre, eventoNombre)
+
+      await supabase
+        .from("ingresos")
+        .delete()
+        .eq("concepto", "auto-evento")
+        .eq("detalle", detalle)
+    } catch (e) {
+      console.error("[eventos] Error sync ingreso delete:", e)
+    }
+  },
+
+  /**
+   * Sincroniza todos los abonos de un evento con ingresos.
+   * - Crea ingresos faltantes para participantes con abono > 0 que no tienen ingreso
+   * - Actualiza montos desincronizados
+   * - Elimina ingresos huérfanos (de participantes que ya no existen o abono = 0)
+   */
+  async syncMissingIngresos(eventoId: number): Promise<{ creados: number; actualizados: number; eliminados: number }> {
+    try {
+      const mesId = await _getActiveMesId()
+      if (!mesId) return { creados: 0, actualizados: 0, eliminados: 0 }
+
+      const eventoNombre = await _getEventoNombre(eventoId)
+      const participantes = await this.getByEvento(eventoId)
+
+      // Obtener ingresos auto-evento existentes (todos los del mes con concepto auto-evento)
+      const { data: ingresosExistentes } = await supabase
+        .from("ingresos")
+        .select("id, detalle, monto, metodo_pago")
+        .eq("concepto", "auto-evento")
+        .ilike("detalle", `%${eventoNombre}%`)
+
+      // Mapa de ingresos existentes por detalle
+      const ingresosMap = new Map<string, { id: number; monto: number; metodo_pago: string }>()
+      for (const ing of (ingresosExistentes || [])) {
+        ingresosMap.set(ing.detalle, { id: ing.id, monto: Number(ing.monto), metodo_pago: ing.metodo_pago })
+      }
+
+      let creados = 0
+      let actualizados = 0
+      let eliminados = 0
+
+      // Recorrer participantes con abono > 0
+      const detallesActivos = new Set<string>()
+      for (const p of participantes) {
+        if (Number(p.abono) <= 0) continue
+
+        const detalle = _ingresoDetalle(p.nombre, eventoNombre)
+        detallesActivos.add(detalle)
+
+        const existente = ingresosMap.get(detalle)
+
+        if (!existente) {
+          // No tiene ingreso, crear
+          await supabase.from("ingresos").insert({
+            mes_id: mesId,
+            concepto: "auto-evento",
+            monto: p.abono,
+            fecha: new Date().toISOString().split("T")[0],
+            ministerio: "Administración",
+            categoria_principal: "Ingresos x Eventos",
+            detalle,
+            observacion: `Abono de ${p.nombre} para ${eventoNombre} (valor total: $${Number(p.valor).toFixed(2)})`,
+            estado: "Procesado",
+            metodo_pago: p.metodo_pago || "Efectivo",
+          })
+          creados++
+        } else if (existente.monto !== Number(p.abono) || existente.metodo_pago !== (p.metodo_pago || "Efectivo")) {
+          // Monto o método desincronizado, actualizar
+          await supabase.from("ingresos").update({
+            monto: p.abono,
+            observacion: `Abono de ${p.nombre} para ${eventoNombre} (valor total: $${Number(p.valor).toFixed(2)})`,
+            metodo_pago: p.metodo_pago || "Efectivo",
+          }).eq("id", existente.id)
+          actualizados++
+        }
+      }
+
+      // Eliminar ingresos huérfanos (participante eliminado o abono puesto a 0)
+      for (const [detalle, ing] of ingresosMap) {
+        if (!detallesActivos.has(detalle)) {
+          await supabase.from("ingresos").delete().eq("id", ing.id)
+          eliminados++
+        }
+      }
+
+      return { creados, actualizados, eliminados }
+    } catch (e) {
+      console.error("[eventos] Error syncMissingIngresos:", e)
+      return { creados: 0, actualizados: 0, eliminados: 0 }
+    }
   },
 
   /**

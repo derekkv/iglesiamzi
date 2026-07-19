@@ -20,6 +20,7 @@ import {
   type EventoTab,
   type Genero,
   type Contextura,
+  type MetodoPago,
   EQUIPOS,
 } from "@/lib/mod/eventos-service"
 
@@ -43,6 +44,7 @@ const emptyForm: Omit<EventoParticipanteInput, "evento_id"> = {
   ministerio: "",
   valor: 0,
   abono: 0,
+  metodo_pago: "Efectivo",
 }
 
 export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, onDataChanged }: EventoTabContentProps) {
@@ -73,6 +75,8 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
     try {
       const data = await eventoParticipantesService.getByEvento(evento.id)
       setParticipantes(data)
+      // Sync automático con ingresos (silencioso, no bloquea la UI)
+      eventoParticipantesService.syncMissingIngresos(evento.id).catch(() => {})
     } catch (error) {
       console.error("Error cargando participantes:", error)
       toast.error("Error al cargar participantes")
@@ -99,6 +103,7 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
       ministerio: p.ministerio || "",
       valor: p.valor,
       abono: p.abono,
+      metodo_pago: p.metodo_pago || "Efectivo",
     })
     setIsEditing(true)
     setEditingId(p.id)
@@ -173,9 +178,6 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
       setImporting(false)
     }
   }
-
-
-
 
   const getStatus = (p: EventoParticipante): { label: string; variant: "default" | "destructive" | "secondary" } => {
     if (p.valor <= 0) return { label: "Sin costo", variant: "secondary" }
@@ -263,6 +265,7 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                   <TableHead>Ministerio</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Abono</TableHead>
+                  <TableHead className="text-center">Método</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Equipo</TableHead>
                   <TableHead className="text-center">Acciones</TableHead>
@@ -271,7 +274,7 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center text-gray-400 py-8">
+                    <TableCell colSpan={14} className="text-center text-gray-400 py-8">
                       {searchFilter ? "No se encontraron resultados" : "No hay participantes registrados"}
                     </TableCell>
                   </TableRow>
@@ -300,6 +303,11 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                         <TableCell className="text-xs">{p.ministerio || "—"}</TableCell>
                         <TableCell className="text-right font-mono">${Number(p.valor).toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono">${Number(p.abono).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="text-xs">
+                            {p.abono > 0 ? (p.metodo_pago === "Transferencia" ? "Transf." : "Efect.") : "—"}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-center">
                           <Badge variant={status.variant} className={status.variant === "default" ? "bg-green-600" : ""}>
                             {status.label}
@@ -476,6 +484,19 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                 />
               </div>
             </div>
+            {form.abono > 0 && (
+              <div className="grid gap-2">
+                <Label>Método de Pago *</Label>
+                <Select value={form.metodo_pago} onValueChange={(v) => setForm({ ...form, metodo_pago: v as MetodoPago })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">Se registrará automáticamente como ingreso en Ingresos y Egresos</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
