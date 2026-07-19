@@ -3,7 +3,7 @@ import { auditService, type AuditInfo } from "./audit-service"
 
 // === TIPOS ===
 
-export type MetodoPagoCaja = "Cambio en efectivo" | "Deposito en efectivo" | "Deposito en cheques"
+export type MetodoPagoCaja = "Cambio en efectivo - transferencia" | "Deposito en efectivo" | "Deposito en cheques"
 export type TipoMovimiento = "Ingreso" | "Egreso"
 
 export interface CajaChicaMovimiento {
@@ -67,7 +67,7 @@ export interface ArqueoInput {
 // === CONSTANTES ===
 
 export const METODOS_PAGO_CAJA: MetodoPagoCaja[] = [
-  "Cambio en efectivo",
+  "Cambio en efectivo - transferencia",
   "Deposito en efectivo",
   "Deposito en cheques",
 ]
@@ -224,7 +224,7 @@ export const cajaChicaService = {
       detalle: `Gestion de Efectivo - ${input.responsable}`,
       observacion: `${input.detalle} (${input.metodo_pago})`,
       estado: "Procesado",
-      metodo_pago: "Efectivo",
+      metodo_pago: "Transferencia",
     })
 
     return movimiento
