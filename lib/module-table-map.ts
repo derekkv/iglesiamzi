@@ -320,6 +320,15 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["eventos_encuentro"],
     requireEditForWrite: true,
   },
+  eventos_tabs: {
+    modules: ["eventos_encuentro"],
+    requireEditForWrite: true,
+    requireAdminForDelete: true,
+  },
+  evento_participantes: {
+    modules: ["eventos_encuentro"],
+    requireEditForWrite: true,
+  },
 
   // === NOTIFICACIONES ===
   service_notifications_log: {
