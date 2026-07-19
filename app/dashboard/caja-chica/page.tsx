@@ -73,6 +73,8 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
       ])
       setArqueos(arqs)
       setGestiones(gest)
+      // Sync automático: corrige metodo_pago y registros faltantes
+      cajaChicaService.syncIngresosCajaChica(currentMonth.id).catch(() => {})
     } catch (error: any) {
       console.error("Error cargando caja chica:", error)
       if (!silent) toast.error("Error al cargar datos")

@@ -279,6 +279,7 @@ export const cajaChicaService = {
           fecha: input.fecha,
           detalle: `Gestion de Efectivo - ${input.responsable}`,
           observacion: `${input.detalle} (${input.metodo_pago})`,
+          metodo_pago: "Transferencia",
         }).eq("id", ingresoVinculado.id)
       }
     }
@@ -391,5 +392,68 @@ export const cajaChicaService = {
       const cantidad = cantidades[den.key] || 0
       return total + (cantidad * den.valor)
     }, 0)
+  },
+
+  /**
+   * Sincroniza todos los ingresos de caja chica del mes:
+   * - Corrige metodo_pago a "Transferencia" en los que estén como "Efectivo"
+   * - Crea ingresos faltantes
+   * - Elimina huérfanos
+   */
+  async syncIngresosCajaChica(mesId: string): Promise<void> {
+    try {
+      const gestiones = await this.getGestionEfectivo(mesId)
+      
+      // Obtener todos los ingresos auto-caja-chica del mes
+      const { data: ingresosExistentes } = await supabase
+        .from("ingresos")
+        .select("id, detalle, monto, metodo_pago")
+        .eq("concepto", "auto-caja-chica")
+        .eq("mes_id", mesId)
+
+      const ingresosMap = new Map<string, { id: number; monto: number; metodo_pago: string }>()
+      for (const ing of (ingresosExistentes || [])) {
+        ingresosMap.set(ing.detalle, { id: ing.id, monto: Number(ing.monto), metodo_pago: ing.metodo_pago })
+      }
+
+      const detallesActivos = new Set<string>()
+
+      for (const g of gestiones) {
+        const detalle = `Gestion de Efectivo - ${g.responsable}`
+        detallesActivos.add(detalle)
+        const existente = ingresosMap.get(detalle)
+
+        if (!existente) {
+          // Crear faltante
+          await supabase.from("ingresos").insert({
+            mes_id: mesId,
+            concepto: "auto-caja-chica",
+            monto: g.monto,
+            fecha: g.fecha,
+            ministerio: "Administracion",
+            categoria_principal: "Caja Chica",
+            detalle,
+            observacion: `${g.detalle} (${g.metodo_pago})`,
+            estado: "Procesado",
+            metodo_pago: "Transferencia",
+          })
+        } else if (existente.metodo_pago !== "Transferencia" || existente.monto !== Number(g.monto)) {
+          // Corregir metodo_pago o monto desincronizado
+          await supabase.from("ingresos").update({
+            metodo_pago: "Transferencia",
+            monto: g.monto,
+          }).eq("id", existente.id)
+        }
+      }
+
+      // Eliminar huérfanos
+      for (const [detalle, ing] of ingresosMap) {
+        if (!detallesActivos.has(detalle)) {
+          await supabase.from("ingresos").delete().eq("id", ing.id)
+        }
+      }
+    } catch (e) {
+      console.error("[caja-chica] Error syncIngresosCajaChica:", e)
+    }
   },
 }
