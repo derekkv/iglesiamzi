@@ -77,10 +77,10 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["flujo_pago"],
   },
   ingresos: {
-    modules: ["ingresos_egresos", "diezmos", "caja_chica"],
+    modules: ["ingresos_egresos", "diezmos", "caja_chica", "control_mensual"],
   },
   egresos: {
-    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica"],
+    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica", "control_mensual"],
   },
 
   // === CAJA CHICA ===
