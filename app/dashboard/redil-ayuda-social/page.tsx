@@ -841,7 +841,7 @@ function RedilAyudaSocialContent({ canEdit }: { canEdit: boolean }) {
 
   const handleDeleteCaso = async (casoId: number) => {
     try {
-      await redilService.eliminarCaso(casoId)
+      await redilService.eliminarCaso(casoId, user ? { id: user.id, nombre: user.username } : undefined)
       toast.success("Caso eliminado")
       await loadData(true)
     } catch (error: any) {

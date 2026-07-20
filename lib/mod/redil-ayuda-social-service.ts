@@ -5,6 +5,7 @@
  */
 
 import { db } from "@/lib/secure-db"
+import { auditService } from "./audit-service"
 
 // ============================================================
 // TIPOS
@@ -291,6 +292,22 @@ class RedilAyudaSocialService {
       throw new Error(solError.message || "Error creando solicitud")
     }
 
+    // Audit log
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "crear",
+      description: `Solicitud Redil creada - ${input.nombre_completo}`,
+      details: {
+        caso_id: caso.id,
+        nombre: input.nombre_completo,
+        tipo_ayuda: input.tipo_ayuda,
+        motivo: input.motivo,
+        barrio_sector: input.barrio_sector,
+      },
+    })
+
     return caso
   }
 
@@ -337,6 +354,24 @@ class RedilAyudaSocialService {
       .eq("id", casoId)
 
     if (updateError) throw new Error(updateError.message)
+
+    // Audit log
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "editar",
+      description: `Visita técnica registrada - Caso #${casoId} - Resultado: ${input.resultado}`,
+      details: {
+        caso_id: casoId,
+        resultado: input.resultado,
+        tipo_ayuda_aprobada: input.tipo_ayuda_aprobada,
+        observaciones: input.observaciones,
+        motivo_rechazo: input.motivo_rechazo,
+        antes: { estado: "pendiente_visita" },
+        despues: { estado: nuevoEstado },
+      },
+    })
   }
 
   /** Registrar entrega (Paso 3) */
@@ -370,16 +405,54 @@ class RedilAyudaSocialService {
       .eq("id", casoId)
 
     if (updateError) throw new Error(updateError.message)
+
+    // Audit log
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "editar",
+      description: `Entrega registrada - Caso #${casoId}`,
+      details: {
+        caso_id: casoId,
+        fecha_entrega: input.fecha_entrega,
+        observaciones: input.observaciones,
+        archivos_count: input.archivos.length,
+        antes: { estado: "pendiente_entrega" },
+        despues: { estado: "cerrado" },
+      },
+    })
   }
 
   /** Eliminar caso completo (solo admin) */
-  async eliminarCaso(casoId: number): Promise<void> {
+  async eliminarCaso(casoId: number, usuario?: { id: string; nombre: string }): Promise<void> {
+    // Obtener datos antes de eliminar para audit
+    const { data: caso } = await db.from("casos_redil").select("*").eq("id", casoId).maybeSingle()
+    const { data: solicitud } = await db.from("solicitudes_redil").select("nombre_completo, tipo_ayuda").eq("caso_id", casoId).maybeSingle()
+
     const { error } = await db
       .from("casos_redil")
       .delete()
       .eq("id", casoId)
 
     if (error) throw new Error(error.message)
+
+    // Audit log
+    if (usuario) {
+      auditService.log({
+        user_id: usuario.id,
+        user_name: usuario.nombre,
+        module: "redil_ayuda_social",
+        action: "eliminar",
+        description: `Caso Redil eliminado #${casoId} - ${solicitud?.nombre_completo || "Sin nombre"}`,
+        details: {
+          caso_id: casoId,
+          estado_al_eliminar: caso?.estado,
+          nombre_solicitante: solicitud?.nombre_completo,
+          tipo_ayuda: solicitud?.tipo_ayuda,
+        },
+      })
+    }
   }
 
   /** Obtener solicitud de un caso */

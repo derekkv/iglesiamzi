@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/secure-db"
 import { todayEcuador } from "../timezone"
 import { getInternalHeaders } from "../auth-fetch"
+import { auditService } from "./audit-service"
 
 export interface GestionAtrasado {
   id: number
@@ -45,6 +46,22 @@ export async function registrarAtraso(params: {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  // Audit log
+  auditService.log({
+    user_id: params.registradoPor,
+    user_name: params.registradoPorNombre,
+    module: "gestion-atrasados",
+    action: "crear",
+    description: `Atraso registrado - ${params.userName} en ${params.modulo}`,
+    details: {
+      id: data?.id,
+      modulo: params.modulo,
+      servidor: params.userName,
+      fecha: params.fecha,
+    },
+  })
+
   return { success: true, id: data?.id }
 }
 
@@ -71,6 +88,13 @@ export async function gestionarAtraso(params: {
   gestionadoPor: string
   gestionadoPorNombre: string
 }): Promise<{ success: boolean; error?: string }> {
+  // Obtener datos antes de la gestión
+  const { data: antes } = await supabase
+    .from("gestion_atrasados")
+    .select("user_name, modulo, fecha, gestionado, respuesta_gestion, acuerdo")
+    .eq("id", params.id)
+    .single()
+
   const { error } = await supabase
     .from("gestion_atrasados")
     .update({
@@ -85,6 +109,29 @@ export async function gestionarAtraso(params: {
     .eq("id", params.id)
 
   if (error) return { success: false, error: error.message }
+
+  // Audit log
+  auditService.log({
+    user_id: params.gestionadoPor,
+    user_name: params.gestionadoPorNombre,
+    module: "gestion-atrasados",
+    action: "editar",
+    description: `Atraso gestionado - ${antes?.user_name || "?"} en ${antes?.modulo || "?"}`,
+    details: {
+      id: params.id,
+      antes: {
+        gestionado: antes?.gestionado ?? false,
+        respuesta_gestion: antes?.respuesta_gestion,
+        acuerdo: antes?.acuerdo,
+      },
+      despues: {
+        gestionado: true,
+        respuesta_gestion: params.respuestaGestion,
+        acuerdo: params.acuerdo,
+      },
+    },
+  })
+
   return { success: true }
 }
 

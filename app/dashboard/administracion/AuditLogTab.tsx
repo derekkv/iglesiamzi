@@ -20,7 +20,9 @@ const MODULES = [
   { value: "bautizo", label: "Bautizo" },
   { value: "matrimonio", label: "Matrimonio" },
   { value: "presentacion-ninos", label: "Presentación de Niños" },
-  { value: "censo", label: "Censo" },
+  { value: "censo", label: "Censo Protocolo" },
+  { value: "censo-mdg", label: "Censo MDG" },
+  { value: "censo-ninos", label: "Censo Niños" },
   { value: "diezmos", label: "Diezmos" },
   { value: "asistencia", label: "Asistencia" },
   { value: "discipulado", label: "Discipulado" },
@@ -28,6 +30,15 @@ const MODULES = [
   { value: "ingresos_egresos", label: "Ingresos/Egresos" },
   { value: "inventario", label: "Inventario" },
   { value: "administracion", label: "Administración" },
+  { value: "caja_chica", label: "Caja Chica" },
+  { value: "redil_ayuda_social", label: "Redil - Ayuda Social" },
+  { value: "gestion-atrasados", label: "Gestión Atrasados" },
+  { value: "eventos_encuentro", label: "Eventos / Encuentro" },
+  { value: "ofrenda-celulas", label: "Ofrenda Células" },
+  { value: "celulas", label: "Células" },
+  { value: "pago_diario", label: "Pago Diario" },
+  { value: "cronograma", label: "Cronograma" },
+  { value: "proyecto-mario", label: "Proyecto Mario" },
 ]
 
 const ACTIONS = [

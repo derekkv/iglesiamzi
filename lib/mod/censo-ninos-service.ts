@@ -139,8 +139,9 @@ export const censoNinosService = {
 
     cleaned.updated_at = new Date().toISOString()
 
+    // Obtener datos antes de la edición para audit completo
     const { data: antes } = audit
-      ? await supabase.from("censo_ninos").select("nombre, grupo").eq("id", id).single()
+      ? await supabase.from("censo_ninos").select("nombre, fecha_nacimiento, edad, grupo, nombre_madre, telefono_madre, nombre_padre, telefono_padre, alergias, observaciones").eq("id", id).single()
       : { data: null }
 
     const { data, error } = await supabase
@@ -159,7 +160,22 @@ export const censoNinosService = {
         module: "censo-ninos",
         action: "editar",
         description: `Censo Niños editado - ${data.nombre}`,
-        details: { id, antes, despues: { nombre: data.nombre, grupo: data.grupo } },
+        details: {
+          id,
+          antes: antes || {},
+          despues: {
+            nombre: data.nombre,
+            fecha_nacimiento: data.fecha_nacimiento,
+            edad: data.edad,
+            grupo: data.grupo,
+            nombre_madre: data.nombre_madre,
+            telefono_madre: data.telefono_madre,
+            nombre_padre: data.nombre_padre,
+            telefono_padre: data.telefono_padre,
+            alergias: data.alergias,
+            observaciones: data.observaciones,
+          },
+        },
       })
     }
 
