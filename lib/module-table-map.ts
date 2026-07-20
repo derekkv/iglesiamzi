@@ -164,6 +164,10 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   censo: {
     modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
   },
+  censo_ninos: {
+    modules: ["censo-ninos"],
+    requireEditForWrite: true,
+  },
   censo_mdg: {
     modules: ["censo-mdg", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
   },

@@ -479,48 +479,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
               </Card>
             </div>
 
-            {/* Fila 3: Proyecto Mario + Atrasados */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <Card className="border-orange-200 bg-orange-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenProyectoMario(!openProyectoMario)}>
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-orange-700">Proyecto Mario</p>
-                      <p className="text-xl font-bold text-orange-700">{Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)}</p>
-                      <p className="text-[9px] text-orange-600">inscritos · {Object.values(statsProyectoMario).filter(v => v.inscritos > 0).length} cursos activos</p>
-                    </div>
-                    <Palette className="w-6 h-6 text-orange-400" />
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-orange-200 space-y-0.5">
-                    {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => {
-                      const stats = statsProyectoMario[tipo]
-                      const config = PROYECTO_MARIO_CICLO_CONFIG[tipo]
-                      return (
-                        <div key={tipo} className="flex justify-between items-center">
-                          <span className="text-[9px] text-orange-600 truncate">{config.label}</span>
-                          <span className="text-[10px] font-semibold text-orange-800">{stats.inscritos}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-amber-200 bg-amber-50/50">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-amber-700">Atrasados</p>
-                      <p className="text-xl font-bold text-amber-700">{statsAtrasados.total}</p>
-                      <p className="text-[9px] text-red-600">{statsAtrasados.sinGestionar} sin gestionar · {statsAtrasados.total - statsAtrasados.sinGestionar} gestionados</p>
-                    </div>
-                    <AlertTriangle className="w-6 h-6 text-amber-400" />
-                  </div>
-                </CardContent>
-              </Card>
-
-            </div>
-
-            {/* Fila 4: Servidores + Redil + Cumpleaños + Eventos */}
+            {/* Fila 3: Servidores + Redil + Cumpleaños + Eventos */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* Asistencia Servidores */}
               <Card className="border-cyan-200 bg-cyan-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenServidores(!openServidores)}>
@@ -589,6 +548,47 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+
+            {/* Fila 4: Proyecto Mario + Atrasados */}
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+              <Card className="border-orange-200 bg-orange-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenProyectoMario(!openProyectoMario)}>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-orange-700">Proyecto Mario</p>
+                      <p className="text-xl font-bold text-orange-700">{Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)}</p>
+                      <p className="text-[9px] text-orange-600">inscritos · {Object.values(statsProyectoMario).filter(v => v.inscritos > 0).length} cursos activos</p>
+                    </div>
+                    <Palette className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-orange-200 space-y-0.5">
+                    {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => {
+                      const stats = statsProyectoMario[tipo]
+                      const config = PROYECTO_MARIO_CICLO_CONFIG[tipo]
+                      return (
+                        <div key={tipo} className="flex justify-between items-center">
+                          <span className="text-[9px] text-orange-600 truncate">{config.label}</span>
+                          <span className="text-[10px] font-semibold text-orange-800">{stats.inscritos}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-amber-700">Atrasados</p>
+                      <p className="text-xl font-bold text-amber-700">{statsAtrasados.total}</p>
+                      <p className="text-[9px] text-red-600">{statsAtrasados.sinGestionar} sin gestionar · {statsAtrasados.total - statsAtrasados.sinGestionar} gestionados</p>
+                    </div>
+                    <AlertTriangle className="w-6 h-6 text-amber-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
             </div>
 
             {/* Acordeones */}
