@@ -213,7 +213,7 @@ async function sendWhatsAppAudio(phone: string): Promise<boolean> {
   }
 }
 
-// Enviar email de cumpleaños con imagen adjunta
+// Enviar email de cumpleaños con imagen inline
 async function sendBirthdayEmail(to: string, nombre: string, edad: number): Promise<boolean> {
   try {
     const nodemailer = require("nodemailer")
@@ -227,22 +227,129 @@ async function sendBirthdayEmail(to: string, nombre: string, edad: number): Prom
       },
     })
 
-    // Adjuntar imagen personalizada con nombre
+    // Generar imagen personalizada con el nombre (misma que WhatsApp)
     const attachments: any[] = []
     const media = await getBirthdayImage(nombre)
     if (media) {
       attachments.push({
         filename: media.filename,
         content: media.buffer,
-        cid: "cumpleanos-imagen",
+        contentType: "image/png",
+        cid: "cumpleanos-imagen", // Content-ID para referenciar inline
       })
     }
+
+    const htmlEmail = `<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <title>Feliz Cumplea\u00f1os</title>
+</head>
+<body style="margin:0; padding:0; background-color:#fff5f7; font-family:Arial, Helvetica, sans-serif; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <!-- Wrapper table for full-width background -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fff5f7;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <!-- Main container 600px -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(236,72,153,0.1);">
+          
+          <!-- Header gradient -->
+          <tr>
+            <td style="background:linear-gradient(135deg, #ec4899, #f97316); padding:32px 24px; text-align:center;">
+              <!--[if mso]>
+              <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:100px;">
+                <v:fill type="gradient" color="#ec4899" color2="#f97316" angle="135"/>
+                <v:textbox inset="0,0,0,0" style="mso-fit-shape-to-text:true">
+              <![endif]-->
+              <h1 style="color:#ffffff; margin:0; font-size:26px; font-weight:bold; font-family:Arial, Helvetica, sans-serif;">&#127874; &#161;Feliz Cumplea&#241;os! &#127881;</h1>
+              <p style="color:rgba(255,255,255,0.9); margin:8px 0 0; font-size:18px; font-family:Arial, Helvetica, sans-serif;">${nombre}</p>
+              <!--[if mso]></v:textbox></v:rect><![endif]-->
+            </td>
+          </tr>
+
+          ${media ? `<!-- Imagen personalizada de cumpleaños -->
+          <tr>
+            <td style="padding:24px 24px 0; text-align:center;">
+              <img src="cid:cumpleanos-imagen" alt="Feliz Cumplea\u00f1os ${nombre}" width="520" style="display:block; max-width:100%; height:auto; border-radius:8px; margin:0 auto;" />
+            </td>
+          </tr>` : ""}
+
+          <!-- Body content -->
+          <tr>
+            <td style="padding:24px 28px;">
+              <p style="font-size:15px; color:#374151; line-height:1.7; margin:0 0 14px; font-family:Arial, Helvetica, sans-serif;">
+                Querido/a <strong>${nombre}</strong>,
+              </p>
+              <p style="font-size:15px; color:#374151; line-height:1.7; margin:0 0 14px; font-family:Arial, Helvetica, sans-serif;">
+                En este d&#237;a damos gracias a Dios por tu vida y por el privilegio de celebrar un a&#241;o m&#225;s de las bendiciones que &#201;l te ha concedido.
+              </p>
+              <p style="font-size:15px; color:#374151; line-height:1.7; margin:0 0 14px; font-family:Arial, Helvetica, sans-serif;">
+                Oramos para que el Se&#241;or contin&#250;e fortaleci&#233;ndote, llen&#225;ndote de sabidur&#237;a, salud, paz y gozo. Que Su presencia te acompa&#241;e cada d&#237;a y que este nuevo a&#241;o est&#233; lleno de victorias, crecimiento espiritual y del cumplimiento de los prop&#243;sitos que Dios tiene para tu vida.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Bible verse -->
+          <tr>
+            <td style="padding:0 28px 20px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="background-color:#fdf2f8; border-left:4px solid #ec4899; padding:14px 18px; border-radius:0 8px 8px 0;">
+                    <p style="font-style:italic; color:#9d174d; margin:0; font-size:14px; line-height:1.6; font-family:Arial, Helvetica, sans-serif;">
+                      &ldquo;Este es el d&#237;a que hizo el Se&#241;or; nos gozaremos y alegraremos en &#233;l.&rdquo;
+                    </p>
+                    <p style="color:#be185d; margin:8px 0 0; font-weight:bold; font-size:13px; font-family:Arial, Helvetica, sans-serif;">&mdash; Salmo 118:24</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Closing -->
+          <tr>
+            <td style="padding:0 28px 28px;">
+              <p style="font-size:15px; color:#374151; line-height:1.7; margin:0 0 14px; font-family:Arial, Helvetica, sans-serif;">
+                &#161;Que Dios te bendiga abundantemente! Recibe un fuerte abrazo y nuestros mejores deseos en este d&#237;a tan especial.
+              </p>
+              <p style="font-size:14px; color:#6b7280; margin:20px 0 0; font-family:Arial, Helvetica, sans-serif;">
+                Con cari&#241;o y en el amor de Cristo,<br>
+                <strong>Iglesia Regalo de Dios</strong> &#10084;&#65039;&#128591;
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#fdf2f8; padding:14px 24px; text-align:center; border-top:1px solid #fce7f3;">
+              <p style="color:#9d174d; margin:0; font-size:12px; font-family:Arial, Helvetica, sans-serif;">&#127880; &#161;Que tengas un maravilloso d&#237;a! &#127880;</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
 
     await transporter.sendMail({
       from: `"Iglesia Regalo de Dios" <${process.env.SMTP_USER || "notificaciones@iglesiaregalodedios.com"}>`,
       to,
       subject: `🎂 ¡Feliz Cumpleaños, ${nombre}! — Iglesia Regalo de Dios`,
-      html: generarHTMLEmail(nombre, edad),
+      html: htmlEmail,
       attachments,
     })
     return true
@@ -493,22 +600,48 @@ async function notifyAdminsBirthdays(
         await sendWhatsAppText(adminUser.phone, waMessage)
         await new Promise((r) => setTimeout(r, 1500))
 
-        // Enviar cada imagen de cumpleañero
-        for (const img of imagenesGeneradas) {
+        // Enviar cada cumpleañero: imagen + mensaje de felicitación + audio
+        for (const c of cumpleaneros) {
           try {
             const formatted = formatPhoneForWhatsApp(adminUser.phone)
-            const blob = new Blob([new Uint8Array(img.media.buffer)], { type: img.media.type })
-            const formData = new FormData()
-            formData.append("phone", formatted)
-            formData.append("file", blob, img.media.filename)
-            formData.append("caption", `🎂 ${img.nombre}`)
-            formData.append("mediaType", "image")
 
-            await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
-              method: "POST",
-              body: formData,
-            })
-            await new Promise((r) => setTimeout(r, 2000))
+            // Imagen personalizada con el nombre
+            const img = imagenesGeneradas.find((i) => i.nombre === c.nombre)
+            if (img) {
+              const blob = new Blob([new Uint8Array(img.media.buffer)], { type: img.media.type })
+              const formData = new FormData()
+              formData.append("phone", formatted)
+              formData.append("file", blob, img.media.filename)
+              formData.append("caption", `🎂 *${c.nombre}* — Cumple ${c.edad} años`)
+              formData.append("mediaType", "image")
+
+              await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
+                method: "POST",
+                body: formData,
+              })
+              await new Promise((r) => setTimeout(r, 2000))
+            }
+
+            // Mensaje de felicitación completo (el mismo que recibe la persona)
+            const mensajeFelicitacion = generarMensajeCumple(c.nombre, c.edad)
+            await sendWhatsAppText(adminUser.phone, `📨 *Mensaje enviado a ${c.nombre}:*\n\n${mensajeFelicitacion}`)
+            await new Promise((r) => setTimeout(r, 1500))
+
+            // Audio de cumpleaños feliz
+            if (fs.existsSync(BIRTHDAY_AUDIO_PATH)) {
+              const audioBuffer = fs.readFileSync(BIRTHDAY_AUDIO_PATH)
+              const audioBlob = new Blob([audioBuffer], { type: "audio/mpeg" })
+              const audioForm = new FormData()
+              audioForm.append("phone", formatted)
+              audioForm.append("file", audioBlob, "cumpleanos-feliz.mp3")
+              audioForm.append("mediaType", "audio")
+
+              await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
+                method: "POST",
+                body: audioForm,
+              })
+              await new Promise((r) => setTimeout(r, 2000))
+            }
           } catch {}
         }
       }
