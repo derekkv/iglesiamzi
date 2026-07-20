@@ -235,6 +235,24 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados", "resumen-pastoral"],
   },
 
+  // === HEREDEROS DEL REINO (CICLOS) ===
+  herederos_ciclos: {
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    requireEditForWrite: true,
+  },
+  herederos_ciclo_participantes: {
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    requireEditForWrite: true,
+  },
+  herederos_ciclo_fechas: {
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    requireEditForWrite: true,
+  },
+  herederos_ciclo_asistencia: {
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    requireEditForWrite: true,
+  },
+
   // === MENSAJES Y CITACIONES ===
   mensajes_citaciones: {
     modules: [
