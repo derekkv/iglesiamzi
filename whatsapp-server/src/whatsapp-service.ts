@@ -15,10 +15,11 @@ import * as fs from "fs"
 const AUTH_FOLDER = path.join(__dirname, "..", "auth_info")
 const logger = pino({ level: "silent" })
 
-const MAX_RECONNECT_ATTEMPTS = 8
+const MAX_RECONNECT_ATTEMPTS = 30
 const BASE_RECONNECT_DELAY_MS = 2000 // 2s base, crece exponencialmente
 const MAX_RECONNECT_DELAY_MS = 60000 // máximo 60s entre reintentos
-const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutos sin evento = socket muerto
+const WATCHDOG_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutos sin evento = socket muerto (antes 5min era muy agresivo)
+const KEEPALIVE_INTERVAL_MS = 3 * 60 * 1000 // Cada 3 minutos verificar presencia para generar actividad
 
 export interface WAStatus {
   connected: boolean
@@ -35,6 +36,7 @@ export class WhatsAppService {
   private connectingLock = false
   private lastEventTimestamp = Date.now()
   private watchdogInterval: NodeJS.Timeout | null = null
+  private keepAliveInterval: NodeJS.Timeout | null = null
   private status: WAStatus = {
     connected: false,
     connecting: false,
@@ -85,11 +87,37 @@ export class WhatsAppService {
       clearInterval(this.watchdogInterval)
       this.watchdogInterval = null
     }
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval)
+      this.keepAliveInterval = null
+    }
   }
 
   /** Registra actividad para el watchdog */
   private touchWatchdog(): void {
     this.lastEventTimestamp = Date.now()
+  }
+
+  /**
+   * Keep-alive: envía presencia periódicamente para mantener la conexión activa
+   * y evitar que el watchdog mate el proceso en periodos de inactividad.
+   */
+  private startKeepAlive(): void {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval)
+    }
+
+    this.keepAliveInterval = setInterval(async () => {
+      if (this.socket && this.status.connected) {
+        try {
+          await this.socket.sendPresenceUpdate("available")
+          this.touchWatchdog()
+        } catch (err) {
+          // Si falla el keep-alive, no hacer nada — el watchdog se encargará si persiste
+          console.log("⚠️  Keep-alive falló (normal si hay intermitencia):", (err as Error).message)
+        }
+      }
+    }, KEEPALIVE_INTERVAL_MS)
   }
 
   /**
@@ -180,45 +208,25 @@ export class WhatsAppService {
           this.connectingLock = false
 
           const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut
 
-          console.log(`❌ Conexión cerrada. Código: ${statusCode}. Reconectar: ${shouldReconnect}`)
+          console.log(`❌ Conexión cerrada. Código: ${statusCode}. Intento: ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`)
 
-          // Si las credenciales son inválidas (401, 403, 405), limpiar y empezar de cero
-          if (statusCode === 401 || statusCode === 403 || statusCode === 405) {
-            console.log("🗑️  Credenciales inválidas. Limpiando...")
-            this.destroySocket()
-            this.cleanAuthFolder()
-            if (this.reconnectAttempts < 2) {
-              this.reconnectAttempts++
-              const delay = this.getReconnectDelay()
-              console.log(`🔄 Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${Math.round(delay / 1000)}s...`)
-              setTimeout(() => this.connect(), delay)
-            } else {
-              console.log("⛔ Múltiples fallos con credenciales limpias. Detenido.")
-              this.reconnectAttempts = 0
-              this.stopWatchdog()
-            }
-            return
-          }
+          // NUNCA borrar credenciales automáticamente — solo reconectar.
+          // Si WhatsApp da 401 puede ser temporal. Solo después de 30 intentos fallidos se limpian.
+          this.reconnectAttempts++
+          this.destroySocket()
 
-          if (shouldReconnect && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            this.reconnectAttempts++
+          if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             const delay = this.getReconnectDelay()
-            console.log(`🔄 Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${Math.round(delay / 1000)}s (backoff)...`)
-            // Destruir el socket viejo antes de reconectar
-            this.destroySocket()
+            console.log(`🔄 Reintento ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${Math.round(delay / 1000)}s (código: ${statusCode})...`)
             setTimeout(() => this.connect(), delay)
-          } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.error(`⛔ Máximo de reintentos (${MAX_RECONNECT_ATTEMPTS}) alcanzado. Matando proceso para reinicio limpio...`)
-            this.stopWatchdog()
-            // Dar un momento para que los logs se escriban
-            setTimeout(() => process.exit(1), 1000)
           } else {
-            // Logout intencional
-            this.destroySocket()
+            // Solo después de agotar TODOS los reintentos, limpiar credenciales
+            console.log("🗑️  Máximo de reintentos agotado. Limpiando credenciales...")
             this.cleanAuthFolder()
+            this.reconnectAttempts = 0
             this.stopWatchdog()
+            console.log("⛔ Necesita escanear QR nuevamente desde el panel.")
           }
         }
 
@@ -236,6 +244,9 @@ export class WhatsAppService {
             this.status.phoneNumber = user.id.split(":")[0].split("@")[0]
             this.status.name = user.name || null
           }
+
+          // Iniciar keep-alive: enviar presencia periódicamente para mantener el socket activo
+          this.startKeepAlive()
 
           console.log(`✅ WhatsApp conectado como ${this.status.name} (${this.status.phoneNumber})`)
         }
