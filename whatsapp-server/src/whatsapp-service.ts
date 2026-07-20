@@ -366,10 +366,17 @@ export class WhatsAppService {
         throw new Error(`Tipo de media no soportado: ${mediaType}`)
     }
 
-    const result = await this.socket.sendMessage(jid, messageContent)
-    this.touchWatchdog()
-    console.log(`📤 Media (${mediaType}) enviado a ${cleanPhone}`)
-    return result!
+    try {
+      const result = await this.socket.sendMessage(jid, messageContent)
+      this.touchWatchdog()
+      console.log(`📤 Media (${mediaType}) enviado a ${cleanPhone}`)
+      return result!
+    } catch (err: any) {
+      // Si el error es de red/socket pero NO cierra la sesión, solo propagar el error
+      // sin destruir el estado de conexión
+      console.error(`❌ Error enviando media (${mediaType}) a ${cleanPhone}:`, err.message)
+      throw new Error(`Error enviando media: ${err.message}`)
+    }
   }
 
   async sendBulkMedia(

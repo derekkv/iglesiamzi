@@ -49,14 +49,14 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
 
     fs.writeFileSync(tmpPdf, pdfBytes)
 
-    // 3. Convertir con ImageMagick
+    // 3. Convertir con ImageMagick — usar JPEG para menor tamaño (WhatsApp comprime de todos modos)
     try {
-      execSync(`convert -density 200 "${tmpPdf}[0]" -quality 90 "${tmpPng}"`, {
+      execSync(`convert -density 150 "${tmpPdf}[0]" -quality 80 -resize 1280x "${tmpPng}"`, {
         timeout: 15000,
       })
     } catch {
       // Intentar con magick (ImageMagick 7)
-      execSync(`magick -density 200 "${tmpPdf}[0]" -quality 90 "${tmpPng}"`, {
+      execSync(`magick -density 150 "${tmpPdf}[0]" -quality 80 -resize 1280x "${tmpPng}"`, {
         timeout: 15000,
       })
     }

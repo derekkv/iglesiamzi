@@ -134,11 +134,39 @@ async function sendWhatsAppImage(phone: string, nombre: string, caption: string)
     formData.append("caption", caption)
     formData.append("mediaType", "image")
 
-    const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
-      method: "POST",
-      body: formData,
-    })
-    return res.ok
+    // Verificar que WhatsApp está conectado antes de enviar
+    try {
+      const statusRes = await fetch(`${WA_SERVER_URL}/api/whatsapp/status`, { signal: AbortSignal.timeout(5000) })
+      if (statusRes.ok) {
+        const status = await statusRes.json()
+        if (!status.connected) {
+          console.warn("WhatsApp no está conectado. Saltando envío de imagen.")
+          return false
+        }
+      }
+    } catch {
+      console.warn("No se pudo verificar estado de WhatsApp. Saltando envío.")
+      return false
+    }
+
+    // Enviar con timeout de 30s para evitar EPIPE por conexión colgada
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000)
+
+    try {
+      const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      return res.ok
+    } catch (fetchErr: any) {
+      clearTimeout(timeout)
+      // EPIPE o abort — no propagar, solo loggear
+      console.error("Error en fetch send-media (imagen cumpleaños):", fetchErr?.cause?.code || fetchErr.name || fetchErr.message)
+      return false
+    }
   } catch (err) {
     console.error("Error enviando imagen WhatsApp:", err)
     return false
@@ -163,11 +191,22 @@ async function sendWhatsAppAudio(phone: string): Promise<boolean> {
     formData.append("file", blob, "cumpleanos-feliz.mp3")
     formData.append("mediaType", "audio")
 
-    const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
-      method: "POST",
-      body: formData,
-    })
-    return res.ok
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000)
+
+    try {
+      const res = await fetch(`${WA_SERVER_URL}/api/whatsapp/send-media`, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      return res.ok
+    } catch (fetchErr: any) {
+      clearTimeout(timeout)
+      console.error("Error en fetch send-media (audio cumpleaños):", fetchErr?.cause?.code || fetchErr.name || fetchErr.message)
+      return false
+    }
   } catch (err) {
     console.error("Error enviando audio WhatsApp:", err)
     return false
