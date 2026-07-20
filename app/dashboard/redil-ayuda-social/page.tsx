@@ -554,6 +554,27 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
         <TabsContent value="visita" className="space-y-4 mt-4">
           {visita ? (
             <div className="space-y-4">
+              {/* DECISIÓN: APROBADO / DENEGADO — Banner prominente */}
+              <div className={`rounded-xl p-6 text-center shadow-md ${visita.resultado === "aprobado" ? "bg-gradient-to-r from-green-500 to-emerald-600" : "bg-gradient-to-r from-red-500 to-rose-600"}`}>
+                <div className="flex items-center justify-center gap-3">
+                  {visita.resultado === "aprobado" ? <CheckCircle className="w-8 h-8 text-white" /> : <XCircle className="w-8 h-8 text-white" />}
+                  <div>
+                    <p className="text-white/80 text-xs font-medium uppercase tracking-wide">Decisión de Visita Técnica</p>
+                    <p className="text-white text-2xl font-bold">{visita.resultado === "aprobado" ? "APROBADO" : "DENEGADO"}</p>
+                  </div>
+                </div>
+                <p className="text-white/80 text-sm mt-2">
+                  {visita.resultado === "aprobado"
+                    ? "La solicitud fue aprobada. Procede a la etapa de entrega."
+                    : "La solicitud fue denegada. El caso ha sido cerrado."}
+                </p>
+                {visita.motivo_rechazo && (
+                  <div className="mt-3 bg-white/10 rounded-lg p-3">
+                    <p className="text-white/90 text-sm"><span className="font-semibold">Motivo:</span> {visita.motivo_rechazo}</p>
+                  </div>
+                )}
+              </div>
+
               {/* Resultado principal */}
               <Card className="shadow-sm border-amber-200">
                 <CardHeader className="pb-2 bg-amber-50 rounded-t-lg">
@@ -784,10 +805,56 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                         </label>
                       ))}
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* DECISIÓN FINAL: APROBADO / DENEGADO */}
+                <Card className="shadow-sm border-2 border-gray-300">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">Decisión Final</h4>
+                    <p className="text-xs text-gray-500">¿Se aprueba o se deniega la solicitud de ayuda social?</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div
+                        onClick={() => setVisitaForm({ ...visitaForm, ficha_recomendacion: visitaForm.ficha_recomendacion === "no_recomendado" ? "apto" : visitaForm.ficha_recomendacion || "apto" })}
+                        className={`flex items-center justify-center gap-3 p-5 rounded-xl border-2 cursor-pointer transition-all ${visitaForm.ficha_recomendacion && visitaForm.ficha_recomendacion !== "no_recomendado" ? "border-green-500 bg-green-50 shadow-md scale-[1.02]" : "border-gray-200 hover:border-green-300 hover:bg-green-50/50"}`}
+                      >
+                        <CheckCircle className={`w-7 h-7 ${visitaForm.ficha_recomendacion && visitaForm.ficha_recomendacion !== "no_recomendado" ? "text-green-600" : "text-gray-400"}`} />
+                        <div>
+                          <p className={`font-bold text-lg ${visitaForm.ficha_recomendacion && visitaForm.ficha_recomendacion !== "no_recomendado" ? "text-green-700" : "text-gray-600"}`}>APROBADO</p>
+                          <p className="text-xs text-gray-500">Pasa a etapa de entrega</p>
+                        </div>
+                      </div>
+
+                      <div
+                        onClick={() => setVisitaForm({ ...visitaForm, ficha_recomendacion: "no_recomendado" })}
+                        className={`flex items-center justify-center gap-3 p-5 rounded-xl border-2 cursor-pointer transition-all ${visitaForm.ficha_recomendacion === "no_recomendado" ? "border-red-500 bg-red-50 shadow-md scale-[1.02]" : "border-gray-200 hover:border-red-300 hover:bg-red-50/50"}`}
+                      >
+                        <XCircle className={`w-7 h-7 ${visitaForm.ficha_recomendacion === "no_recomendado" ? "text-red-600" : "text-gray-400"}`} />
+                        <div>
+                          <p className={`font-bold text-lg ${visitaForm.ficha_recomendacion === "no_recomendado" ? "text-red-700" : "text-gray-600"}`}>DENEGADO</p>
+                          <p className="text-xs text-gray-500">Se cierra el caso</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Motivo de rechazo si es denegado */}
+                    {visitaForm.ficha_recomendacion === "no_recomendado" && (
+                      <div className="mt-3">
+                        <Label className="text-xs font-medium text-red-700">Motivo de la denegación</Label>
+                        <Textarea
+                          value={visitaForm.motivo_rechazo || ""}
+                          onChange={(e) => setVisitaForm({ ...visitaForm, motivo_rechazo: e.target.value })}
+                          rows={3}
+                          placeholder="Explique por qué se deniega la solicitud..."
+                          className="mt-1 border-red-200 focus:border-red-400"
+                        />
+                      </div>
+                    )}
 
                     <div className="flex justify-end pt-3 border-t">
-                      <Button onClick={handleGuardarVisita} disabled={savingVisita} size="lg" className="bg-amber-600 hover:bg-amber-700">
-                        {savingVisita ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Guardando...</> : "Guardar Ficha"}
+                      <Button onClick={handleGuardarVisita} disabled={savingVisita || !visitaForm.ficha_recomendacion} size="lg" className={visitaForm.ficha_recomendacion === "no_recomendado" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}>
+                        {savingVisita ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Guardando...</> : visitaForm.ficha_recomendacion === "no_recomendado" ? <><XCircle className="w-5 h-5 mr-2" />Denegar Solicitud</> : <><CheckCircle className="w-5 h-5 mr-2" />Aprobar Solicitud</>}
                       </Button>
                     </div>
                   </CardContent>
@@ -805,7 +872,24 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
 
         {/* TAB: Entrega */}
         <TabsContent value="entrega" className="space-y-4 mt-4">
-          {entrega ? (
+          {/* Si la visita fue denegada, mostrar mensaje de caso cerrado */}
+          {visita && visita.resultado === "no_aprobado" ? (
+            <div className="text-center py-12 space-y-4">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                <XCircle className="w-10 h-10 text-red-500" />
+              </div>
+              <div>
+                <p className="text-gray-800 font-semibold text-lg">Caso Denegado</p>
+                <p className="text-gray-500 text-sm mt-1">La visita técnica determinó que la solicitud no fue aprobada.</p>
+                <p className="text-gray-500 text-sm">Este caso ha sido cerrado y no procede a la etapa de entrega.</p>
+              </div>
+              {visita.motivo_rechazo && (
+                <div className="max-w-md mx-auto bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                  <p className="text-sm text-red-800"><span className="font-semibold">Motivo:</span> {visita.motivo_rechazo}</p>
+                </div>
+              )}
+            </div>
+          ) : entrega ? (
             <Card className="border-emerald-200 shadow-sm">
               <CardHeader className="pb-3 bg-emerald-50 rounded-t-lg">
                 <CardTitle className="text-base flex items-center gap-3">
