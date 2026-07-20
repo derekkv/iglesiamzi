@@ -68,7 +68,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === FINANCIERO (muy sensible) ===
   nomina: {
-    modules: ["flujo_pago"],
+    modules: ["flujo_pago", "resumen-pastoral"],
   },
   payment_tables: {
     modules: ["flujo_pago"],
@@ -77,10 +77,10 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["flujo_pago"],
   },
   ingresos: {
-    modules: ["ingresos_egresos", "diezmos", "caja_chica", "control_mensual", "eventos_encuentro"],
+    modules: ["ingresos_egresos", "diezmos", "caja_chica", "control_mensual", "eventos_encuentro", "resumen-pastoral"],
   },
   egresos: {
-    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica", "control_mensual"],
+    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica", "control_mensual", "resumen-pastoral"],
   },
 
   // === CAJA CHICA ===
@@ -94,15 +94,15 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["diezmos", "ingresos_egresos"],
   },
   alfoli: {
-    modules: ["administracion", "control_mensual"],
+    modules: ["administracion", "control_mensual", "resumen-pastoral"],
   },
   ofrendas_celulas: {
-    modules: ["ofrenda-celulas", "celulas"],
+    modules: ["ofrenda-celulas", "celulas", "resumen-pastoral"],
   },
 
   // === GESTIÓN DE CÉLULAS ===
   gestion_celulas: {
-    modules: ["celulas", "ofrenda-celulas"],
+    modules: ["celulas", "ofrenda-celulas", "resumen-pastoral"],
   },
   miembros_celulas: {
     modules: ["celulas"],
@@ -133,19 +133,18 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "cronograma-intercesion", "cronograma-mdg", "cronograma-redil",
       "cronograma-hombres", "cronograma-jovenes", "cronograma-pastoral",
       "cronograma-celulas", "cronograma-proyecto-mario",
-      "gestion-cronogramas",
-    ],
+      "gestion-cronogramas", "resumen-pastoral"],
   },
 
   // === ASISTENCIA GENERAL ===
   asistencia_columnas: {
-    modules: ["asistencia", "control_mensual"],
+    modules: ["asistencia", "control_mensual", "resumen-pastoral"],
   },
   asistencia_detalles: {
-    modules: ["asistencia", "control_mensual"],
+    modules: ["asistencia", "control_mensual", "resumen-pastoral"],
   },
   asistencia_datos: {
-    modules: ["asistencia", "control_mensual"],
+    modules: ["asistencia", "control_mensual", "resumen-pastoral"],
   },
 
   // === ASISTENCIA SERVIDORES ===
@@ -158,15 +157,15 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
       "asistencia-servidores-redil", "asistencia-servidores-hombres",
       "asistencia-servidores-jovenes", "asistencia-servidores-pastoral",
       "asistencia-servidores-celulas", "asistencia-servidores-proyecto-mario",
-    ],
+      "control_mensual", "resumen-pastoral"],
   },
 
   // === DATOS PERSONALES ===
   censo: {
-    modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados"],
+    modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
   },
   censo_mdg: {
-    modules: ["censo-mdg", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados"],
+    modules: ["censo-mdg", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
   },
   censo_catalogos: {
     modules: ["censo", "censo-mdg"],
@@ -175,19 +174,19 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["censo", "censo-mdg"],
   },
   bautizos: {
-    modules: ["bautizo"],
+    modules: ["bautizo", "resumen-pastoral"],
   },
   bautizos_manual: {
     modules: ["bautizo"],
   },
   matrimonios: {
-    modules: ["matrimonio"],
+    modules: ["matrimonio", "resumen-pastoral"],
   },
   matrimonios_manual: {
     modules: ["matrimonio"],
   },
   presentacion_ninos: {
-    modules: ["presentacion-ninos", "listados"],
+    modules: ["presentacion-ninos", "listados", "resumen-pastoral"],
   },
 
   // === INVENTARIO ===
@@ -197,7 +196,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === DISCIPULADO ===
   discipulado_ciclos: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados", "resumen-pastoral"],
   },
   discipulado_ciclo_participantes: {
     modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
@@ -209,27 +208,27 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
   },
   discipulado_asistencia: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados", "resumen-pastoral"],
   },
   discipulado_fechas: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados", "resumen-pastoral"],
   },
   discipulado_participantes: {
-    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados"],
+    modules: ["discipulado_primeros_pasos", "discipulado_seguimos_avanzando", "discipulado_siendo_iglesia", "historial_discipulado", "listados", "resumen-pastoral"],
   },
 
   // === PROYECTO MARIO ===
   proyecto_mario_ciclos: {
-    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados", "resumen-pastoral"],
   },
   proyecto_mario_ciclo_participantes: {
-    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados", "resumen-pastoral"],
   },
   proyecto_mario_ciclo_fechas: {
-    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados", "resumen-pastoral"],
   },
   proyecto_mario_ciclo_asistencia: {
-    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados"],
+    modules: ["proyecto_mario_belleza_integral_sabados", "proyecto_mario_belleza_integral_viernes", "proyecto_mario_manualidades", "proyecto_mario_belleza_cejas", "proyecto_mario_gastronomia", "historial_proyecto_mario", "listados", "resumen-pastoral"],
   },
 
   // === MENSAJES Y CITACIONES ===
@@ -265,7 +264,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === CUMPLEAÑOS ===
   cumpleanos_enviados: {
-    modules: ["cumpleanos-comunicacion"],
+    modules: ["cumpleanos-comunicacion", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: false,
   },
 
@@ -293,19 +292,19 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === REDIL - AYUDA SOCIAL ===
   casos_redil: {
-    modules: ["redil_ayuda_social"],
+    modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
   solicitudes_redil: {
-    modules: ["redil_ayuda_social"],
+    modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
   visitas_tecnicas: {
-    modules: ["redil_ayuda_social"],
+    modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
   entregas_redil: {
-    modules: ["redil_ayuda_social"],
+    modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
 
@@ -321,12 +320,12 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: true,
   },
   eventos_tabs: {
-    modules: ["eventos_encuentro"],
+    modules: ["eventos_encuentro", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
     requireAdminForDelete: true,
   },
   evento_participantes: {
-    modules: ["eventos_encuentro"],
+    modules: ["eventos_encuentro", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
 

@@ -15,12 +15,30 @@ import { useRestrictedAccess } from "@/hooks/use-restricted-access"
 import { currentMonthNameEcuador, todayEcuador, currentMonthEcuador, currentYearEcuador } from "@/lib/timezone"
 import { getAlfoliMes } from "@/lib/mod/alfoli-service"
 
-import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, ExternalLink, BookOpen, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home } from "lucide-react"
+import { Lock, ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, ExternalLink, BookOpen, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home, Cake, ClipboardCheck, CalendarDays } from "lucide-react"
 import { censoService } from "@/lib/mod/censo-service"
 import { censoMdgService } from "@/lib/mod/censo-mdg-service"
 import { getLunesSemanaActual } from "@/lib/mod/gestion-celulas-service"
 import { discipuladoCiclosService, CICLO_CONFIG, type CicloTipo } from "@/lib/mod/discipulado-ciclos-service"
 import { proyectoMarioCiclosService, PROYECTO_MARIO_CICLO_CONFIG, type ProyectoMarioCicloTipo } from "@/lib/mod/proyecto-mario-ciclos-service"
+import { getCumpleanerosMes, getHistorialEnvios } from "@/lib/mod/cumpleanos-service"
+
+// Ministerios para asistencia de servidores
+const MINISTERIOS_SERVIDORES: { key: string; label: string }[] = [
+  { key: "administracion", label: "Administración" },
+  { key: "alabanza", label: "Alabanza" },
+  { key: "celulas", label: "Células" },
+  { key: "comunicacion", label: "Comunicación" },
+  { key: "discipulado", label: "Discipulado" },
+  { key: "herederos", label: "Herederos" },
+  { key: "hombres", label: "Hombres" },
+  { key: "intercesion", label: "Intercesión" },
+  { key: "jovenes", label: "Jóvenes" },
+  { key: "mdg", label: "Mujeres de Gracia" },
+  { key: "pastoral", label: "Pastoral" },
+  { key: "protocolo", label: "Protocolo" },
+  { key: "redil", label: "Redil" },
+]
 
 function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
@@ -68,6 +86,34 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
     gastronomia: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
   })
   const [loadingStats, setLoadingStats] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+
+  // === NUEVAS SECCIONES ===
+  // Asistencia de Servidores
+  const [statsServidores, setStatsServidores] = useState<Record<string, { total: number; asistieron: number; faltaron: number; justificaron: number; atrasados: number }>>({})
+  const [openServidores, setOpenServidores] = useState(false)
+
+  // Redil - Ayuda Social
+  const [statsRedil, setStatsRedil] = useState({
+    totalCasos: 0,
+    pendientes: 0,
+    entregadosSemana: 0,
+    entregadosMes: 0,
+    porTipo: {} as Record<string, number>,
+  })
+  const [openRedil, setOpenRedil] = useState(false)
+
+  // Cumpleaños
+  const [statsCumpleanos, setStatsCumpleanos] = useState({
+    totalMes: 0,
+    enviados: 0,
+    pendientesEnvio: 0,
+  })
+  const [openCumpleanos, setOpenCumpleanos] = useState(false)
+
+  // Eventos / Encuentro
+  const [statsEventos, setStatsEventos] = useState<Array<{ id: number; nombre: string; inscritos: number; pagadosCompleto: number; pendientesPago: number; totalRecaudado: number; totalValor: number }>>([])
+  const [openEventos, setOpenEventos] = useState(false)
 
   // Auto apertura/cierre de mes
   const autoManageRef = useRef(false)
@@ -119,121 +165,61 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
 
   const loadEstadisticas = async () => {
     setLoadingStats(true)
-    try {
-      const mesActual = currentMonthEcuador()
-      const anioActual = currentYearEcuador()
-      const primerDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-01`
-      const ultimoDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-31`
+    setLoadingProgress(0)
 
-      // Censo Protocolo
-      const censoData = await censoService.getAll()
-      setStatsCenso({
-        total: censoData.length,
-        miembros: censoData.filter(c => c.miembro).length,
-        activos: censoData.filter(c => c.miembro_activo).length,
-      })
+    const mesActual = currentMonthEcuador()
+    const anioActual = currentYearEcuador()
+    const primerDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-01`
+    const ultimoDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-31`
+    const lunesSemana = getLunesSemanaActual()
 
-      // Censo MDG
-      const censoMdgData = await censoMdgService.getAll()
-      setStatsCensoMdg({
-        total: censoMdgData.length,
-        miembros: censoMdgData.filter(c => c.miembro).length,
-        activos: censoMdgData.filter(c => c.miembro_activo).length,
-      })
+    let completed = 0
+    const totalTasks = 12
+    const tick = () => { completed++; setLoadingProgress(Math.round((completed / totalTasks) * 100)) }
 
-      // Discipulado (ciclos activos)
-      const discipuladoStats: Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }> = {
-        primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
-        seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
-        siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
-      }
-      for (const tipo of Object.keys(CICLO_CONFIG) as CicloTipo[]) {
-        const cicloCompleto = await discipuladoCiclosService.getCicloActivoCompleto(tipo)
-        if (cicloCompleto) {
-          discipuladoStats[tipo] = {
-            inscritos: cicloCompleto.participantes.length,
-            aprobados: cicloCompleto.participantes.filter(p => p.estatus === "aprobado").length,
-            reprobados: cicloCompleto.participantes.filter(p => p.estatus === "reprobado").length,
-            enCurso: cicloCompleto.participantes.filter(p => p.estatus === "en_curso").length,
-          }
-        }
-      }
-      setStatsDiscipulado(discipuladoStats)
+    // Cada sección se lanza en paralelo y actualiza su estado apenas resuelve
+    const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => [])]).then(([censoData, censoMdgData]) => {
+      setStatsCenso({ total: censoData.length, miembros: censoData.filter(c => c.miembro).length, activos: censoData.filter(c => c.miembro_activo).length })
+      setStatsCensoMdg({ total: censoMdgData.length, miembros: censoMdgData.filter(c => c.miembro).length, activos: censoMdgData.filter(c => c.miembro_activo).length })
+      tick()
+      return { censoBautizados: censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length, censoMatrimonios: censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length, totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
+    })
+    const p2 = Promise.all((Object.keys(CICLO_CONFIG) as CicloTipo[]).map(tipo => discipuladoCiclosService.getCicloActivoCompleto(tipo).then(r => ({ tipo, data: r })).catch(() => ({ tipo, data: null })))).then(results => {
+      const stats: Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }> = { primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } }
+      for (const { tipo, data: ciclo } of results) { if (ciclo) { stats[tipo] = { inscritos: ciclo.participantes.length, aprobados: ciclo.participantes.filter(p => p.estatus === "aprobado").length, reprobados: ciclo.participantes.filter(p => p.estatus === "reprobado").length, enCurso: ciclo.participantes.filter(p => p.estatus === "en_curso").length } } }
+      setStatsDiscipulado(stats); tick()
+    })
+    const p3 = supabase.from("bautizos").select("id, fecha").then(res => { const d = res.data||[]; p1.then(({censoBautizados})=>{setStatsBautizos({total:d.length,esteMes:d.filter(b=>b.fecha>=primerDiaMes&&b.fecha<=ultimoDiaMes).length,censoBautizados})}); tick() })
+    const p4 = supabase.from("matrimonios").select("id, fecha").then(res => { const d = res.data||[]; p1.then(({censoMatrimonios})=>{setStatsMatrimonios({total:d.length,esteMes:d.filter(m=>m.fecha>=primerDiaMes&&m.fecha<=ultimoDiaMes).length,censoMatrimonios})}); tick() })
+    const p5 = supabase.from("presentacion_ninos").select("id, fecha").then(res => { const d = res.data||[]; setStatsPresentaciones({total:d.length,esteMes:d.filter(p=>p.fecha>=primerDiaMes&&p.fecha<=ultimoDiaMes).length}); tick() })
+    const p6 = supabase.from("gestion_atrasados").select("id, gestionado, fecha").gte("fecha", primerDiaMes).lte("fecha", ultimoDiaMes).then(res => { const d = res.data||[]; setStatsAtrasados({total:d.length,sinGestionar:d.filter(a=>!a.gestionado).length}); tick() })
+    const p7 = supabase.from("gestion_celulas").select("id, asistio").eq("semana_inicio", lunesSemana).then(res => { const d = res.data||[]; p1.then(({totalCelulasMiembros})=>{setStatsCelulas({totalMiembros:totalCelulasMiembros,asistieronSemana:d.filter(g=>g.asistio).length})}); tick() })
+    const p8 = Promise.all((Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => proyectoMarioCiclosService.getCicloActivoCompleto(tipo).then(r => ({ tipo, data: r })).catch(() => ({ tipo, data: null })))).then(results => {
+      const pm: Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }> = { belleza_integral_sabados:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, belleza_integral_viernes:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, manualidades:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, belleza_cejas:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, gastronomia:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0} }
+      for (const {tipo,data:ciclo} of results) { if(ciclo){const ins=ciclo.participantes.length;const hoy=new Date();hoy.setHours(0,0,0,0);const fp=ciclo.fechas.filter(f=>new Date(f.fecha+"T00:00:00")<=hoy);const uf=fp[fp.length-1];let a=0,fa=0;if(uf){a=ciclo.asistencia.filter(x=>x.fecha_id===uf.id&&x.status==="A").length;fa=ins-a};pm[tipo]={inscritos:ins,ultimaClase:uf?uf.numero_clase:0,asistieron:a,faltaron:fa}} }
+      setStatsProyectoMario(pm); tick()
+    })
+    const p9 = supabase.from("asistencia_servidores").select("modulo, estado").gte("fecha", primerDiaMes).lte("fecha", ultimoDiaMes).then(res => {
+      const data = res.data||[]; const s: Record<string,{total:number;asistieron:number;faltaron:number;justificaron:number;atrasados:number}> = {}
+      for (const min of MINISTERIOS_SERVIDORES){const r=data.filter((x:any)=>x.modulo===min.key);s[min.key]={total:r.filter((x:any)=>x.estado&&x.estado!=="pendiente").length,asistieron:r.filter((x:any)=>x.estado==="asistio").length,faltaron:r.filter((x:any)=>x.estado==="falto").length,justificaron:r.filter((x:any)=>x.estado==="justifico").length,atrasados:r.filter((x:any)=>x.estado==="atrasado").length}}
+      setStatsServidores(s); tick()
+    })
+    const p10 = Promise.all([supabase.from("casos_redil").select("id, estado, fecha_creacion"),supabase.from("solicitudes_redil").select("caso_id, tipo_ayuda"),supabase.from("entregas_redil").select("caso_id, fecha_entrega")]).then(([cR,sR,eR])=>{
+      const casos=cR.data||[];const sols=sR.data||[];const ents=eR.data||[];const pend=casos.filter((c:any)=>!["cerrado","rechazado","entregado"].includes(c.estado)).length;const eMes=ents.filter((e:any)=>e.fecha_entrega>=primerDiaMes&&e.fecha_entrega<=ultimoDiaMes).length;const h7=new Date();h7.setDate(h7.getDate()-7);const eSem=ents.filter((e:any)=>e.fecha_entrega>=h7.toISOString().split("T")[0]).length
+      const ids=new Set(casos.filter((c:any)=>c.estado==="cerrado"||c.estado==="entregado").map((c:any)=>c.id));const pt:Record<string,number>={};for(const s of sols){if(ids.has((s as any).caso_id)){for(const t of (s as any).tipo_ayuda||[]){pt[t]=(pt[t]||0)+1}}}
+      setStatsRedil({totalCasos:casos.length,pendientes:pend,entregadosSemana:eSem,entregadosMes:eMes,porTipo:pt}); tick()
+    })
+    const p11 = Promise.all([getCumpleanerosMes(mesActual,anioActual).catch(()=>[] as any[]),getHistorialEnvios(anioActual,mesActual).catch(()=>[] as any[])]).then(([cum,env])=>{
+      const pend=cum.length-env.length;setStatsCumpleanos({totalMes:cum.length,enviados:env.length,pendientesEnvio:pend>0?pend:0}); tick()
+    })
+    const p12 = supabase.from("eventos_tabs").select("id, nombre, valor_default, is_active").eq("is_active", true).order("sort_order", { ascending: true }).then(async(res)=>{
+      const evts=res.data||[];if(evts.length>0){const parts=await Promise.all(evts.map((ev:any)=>supabase.from("evento_participantes").select("id, valor, abono").eq("evento_id",ev.id).then(r=>({id:ev.id,nombre:ev.nombre,parts:r.data||[]}))));setStatsEventos(parts.map(({id,nombre,parts:pp})=>{const ins=pp.length;const pag=pp.filter((p:any)=>Number(p.valor)<=0||Number(p.abono)>=Number(p.valor)).length;return{id,nombre,inscritos:ins,pagadosCompleto:pag,pendientesPago:ins-pag,totalRecaudado:pp.reduce((s:number,p:any)=>s+Number(p.abono||0),0),totalValor:pp.reduce((s:number,p:any)=>s+Number(p.valor||0),0)}}))}else{setStatsEventos([])}
+      tick()
+    })
 
-      // Bautizos (manual + ambos censos con bautizo_irdd)
-      const { data: bautizosData } = await supabase.from("bautizos").select("id, fecha")
-      const bautizosEsteMes = (bautizosData || []).filter(b => b.fecha >= primerDiaMes && b.fecha <= ultimoDiaMes)
-      const censoBautizados = censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length
-      setStatsBautizos({ total: (bautizosData || []).length, esteMes: bautizosEsteMes.length, censoBautizados })
-
-      // Matrimonios (manual + ambos censos con matrimonio_irdd)
-      const { data: matrimoniosData } = await supabase.from("matrimonios").select("id, fecha")
-      const matrimoniosEsteMes = (matrimoniosData || []).filter(m => m.fecha >= primerDiaMes && m.fecha <= ultimoDiaMes)
-      const censoMatrimonios = censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length
-      setStatsMatrimonios({ total: (matrimoniosData || []).length, esteMes: matrimoniosEsteMes.length, censoMatrimonios })
-
-      // Presentación de niños
-      const { data: presentacionesData } = await supabase.from("presentacion_ninos").select("id, fecha")
-      const presentacionesEsteMes = (presentacionesData || []).filter(p => p.fecha >= primerDiaMes && p.fecha <= ultimoDiaMes)
-      setStatsPresentaciones({ total: (presentacionesData || []).length, esteMes: presentacionesEsteMes.length })
-
-      // Atrasados (del mes actual)
-      const { data: atrasadosData } = await supabase.from("gestion_atrasados").select("id, gestionado, fecha").gte("fecha", primerDiaMes).lte("fecha", ultimoDiaMes)
-      setStatsAtrasados({
-        total: (atrasadosData || []).length,
-        sinGestionar: (atrasadosData || []).filter(a => !a.gestionado).length,
-      })
-
-      // Células: miembros activos en células + asistencia de esta semana
-      const totalCelulasMiembros = censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length
-      const lunesSemana = getLunesSemanaActual()
-      const { data: gestionCelulasData } = await supabase
-        .from("gestion_celulas")
-        .select("id, asistio")
-        .eq("semana_inicio", lunesSemana)
-      const asistieronSemana = (gestionCelulasData || []).filter(g => g.asistio).length
-      setStatsCelulas({ totalMiembros: totalCelulasMiembros, asistieronSemana })
-
-      // Proyecto Mario (ciclos activos)
-      const pmStats: Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }> = {
-        belleza_integral_sabados: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
-        belleza_integral_viernes: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
-        manualidades: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
-        belleza_cejas: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
-        gastronomia: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
-      }
-      for (const tipo of Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]) {
-        const cicloCompleto = await proyectoMarioCiclosService.getCicloActivoCompleto(tipo)
-        if (cicloCompleto) {
-          const inscritos = cicloCompleto.participantes.length
-          // Encontrar la última clase que ya pasó
-          const hoy = new Date()
-          hoy.setHours(0, 0, 0, 0)
-          const fechasPasadas = cicloCompleto.fechas.filter(f => new Date(f.fecha + "T00:00:00") <= hoy)
-          const ultimaFecha = fechasPasadas[fechasPasadas.length - 1]
-
-          let asistieron = 0
-          let faltaron = 0
-          if (ultimaFecha) {
-            const asistenciaUltima = cicloCompleto.asistencia.filter(a => a.fecha_id === ultimaFecha.id)
-            asistieron = asistenciaUltima.filter(a => a.status === "A").length
-            faltaron = inscritos - asistieron
-          }
-
-          pmStats[tipo] = {
-            inscritos,
-            ultimaClase: ultimaFecha ? ultimaFecha.numero_clase : 0,
-            asistieron,
-            faltaron,
-          }
-        }
-      }
-      setStatsProyectoMario(pmStats)
-    } catch (error) {
-      console.error("Error cargando estadísticas:", error)
-    } finally {
-      setLoadingStats(false)
-    }
+    await Promise.allSettled([p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12])
+    setLoadingProgress(100)
+    setLoadingStats(false)
   }
 
   const loadSummary = async () => {
@@ -341,7 +327,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Info del mes */}
-        {currentMonth ? (
+        {currentMonth && (
           <Card className="border-blue-200 bg-blue-50/30">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -353,13 +339,32 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <Alert><AlertDescription>No hay mes activo. Se creará automáticamente.</AlertDescription></Alert>
+        )}
+
+        {/* Indicador de carga */}
+        {loadingStats && (
+          <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 animate-pulse">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-sm font-medium text-blue-800">Cargando datos del panel...</p>
+                    <span className="text-xs font-bold text-blue-700">{loadingProgress}%</span>
+                  </div>
+                  <div className="w-full bg-blue-200/50 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${loadingProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Tarjetas de resumen superiores */}
-        {currentMonth && (
-          <>
             {/* Fila 1: Financiero */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="border-green-200 bg-green-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/ingresos-egresos")}>
@@ -513,6 +518,77 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                 </CardContent>
               </Card>
 
+            </div>
+
+            {/* Fila 4: Servidores + Redil + Cumpleaños + Eventos */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Asistencia Servidores */}
+              <Card className="border-cyan-200 bg-cyan-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenServidores(!openServidores)}>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-cyan-700">Asistencia Servidores</p>
+                      <p className="text-xl font-bold text-cyan-700">
+                        {Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}
+                      </p>
+                      <p className="text-[9px] text-cyan-600">
+                        asistieron · {Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)} faltaron
+                      </p>
+                    </div>
+                    <ClipboardCheck className="w-6 h-6 text-cyan-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Redil */}
+              <Card className="border-lime-200 bg-lime-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenRedil(!openRedil)}>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-lime-700">Redil - Ayuda Social</p>
+                      <p className="text-xl font-bold text-lime-700">{statsRedil.entregadosMes}</p>
+                      <p className="text-[9px] text-lime-600">
+                        entregados este mes · {statsRedil.pendientes} pendientes
+                      </p>
+                    </div>
+                    <Heart className="w-6 h-6 text-lime-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cumpleaños */}
+              <Card className="border-fuchsia-200 bg-fuchsia-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenCumpleanos(!openCumpleanos)}>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-fuchsia-700">Cumpleaños del Mes</p>
+                      <p className="text-xl font-bold text-fuchsia-700">{statsCumpleanos.totalMes}</p>
+                      <p className="text-[9px] text-fuchsia-600">
+                        {statsCumpleanos.enviados} felicitados · {statsCumpleanos.pendientesEnvio} pendientes
+                      </p>
+                    </div>
+                    <Cake className="w-6 h-6 text-fuchsia-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Eventos / Encuentro */}
+              <Card className="border-violet-200 bg-violet-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setOpenEventos(!openEventos)}>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-violet-700">Eventos / Encuentro</p>
+                      <p className="text-xl font-bold text-violet-700">
+                        {statsEventos.reduce((s, e) => s + e.inscritos, 0)}
+                      </p>
+                      <p className="text-[9px] text-violet-600">
+                        inscritos · {statsEventos.length} evento(s) activo(s)
+                      </p>
+                    </div>
+                    <CalendarDays className="w-6 h-6 text-violet-400" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Acordeones */}
@@ -716,6 +792,267 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                             </div>
                           )
                         })}
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* ASISTENCIA SERVIDORES */}
+              <Card className="overflow-hidden border-cyan-200">
+                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenServidores(!openServidores)}>
+                  <div className="flex items-center gap-3">
+                    {openServidores ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                    <ClipboardCheck className="w-5 h-5 text-cyan-600" />
+                    <span className="font-semibold text-gray-900">Asistencia Servidores por Ministerio</span>
+                    <Badge className="bg-cyan-100 text-cyan-800 text-xs">
+                      {Object.values(statsServidores).reduce((s, v) => s + v.total, 0)} registros
+                    </Badge>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-green-700">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)} A</span>
+                    <span className="mx-1 text-gray-400">·</span>
+                    <span className="font-bold text-red-700">{Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)} F</span>
+                  </div>
+                </button>
+                {openServidores && (
+                  <CardContent className="pt-0 pb-6 border-t">
+                    {loadingStats ? (
+                      <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div></div>
+                    ) : (
+                      <div className="mt-3 space-y-1">
+                        {/* Tabla resumen */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-2 text-gray-600 font-medium">Ministerio</th>
+                                <th className="text-center py-2 px-1 text-green-700 font-medium">Asistieron</th>
+                                <th className="text-center py-2 px-1 text-red-700 font-medium">Faltaron</th>
+                                <th className="text-center py-2 px-1 text-blue-700 font-medium">Justificaron</th>
+                                <th className="text-center py-2 px-1 text-amber-700 font-medium">Atrasados</th>
+                                <th className="text-center py-2 px-1 text-gray-700 font-medium">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {MINISTERIOS_SERVIDORES.map(min => {
+                                const s = statsServidores[min.key] || { total: 0, asistieron: 0, faltaron: 0, justificaron: 0, atrasados: 0 }
+                                return (
+                                  <tr key={min.key} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="py-1.5 px-2 text-gray-800 font-medium">{min.label}</td>
+                                    <td className="text-center py-1.5 px-1">
+                                      <Badge className="bg-green-100 text-green-800 text-[10px]">{s.asistieron}</Badge>
+                                    </td>
+                                    <td className="text-center py-1.5 px-1">
+                                      <Badge className="bg-red-100 text-red-800 text-[10px]">{s.faltaron}</Badge>
+                                    </td>
+                                    <td className="text-center py-1.5 px-1">
+                                      <Badge className="bg-blue-100 text-blue-800 text-[10px]">{s.justificaron}</Badge>
+                                    </td>
+                                    <td className="text-center py-1.5 px-1">
+                                      <Badge className="bg-amber-100 text-amber-800 text-[10px]">{s.atrasados}</Badge>
+                                    </td>
+                                    <td className="text-center py-1.5 px-1 font-semibold text-gray-700">{s.total}</td>
+                                  </tr>
+                                )
+                              })}
+                              {/* Fila totales */}
+                              <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold">
+                                <td className="py-2 px-2 text-gray-900">TOTAL</td>
+                                <td className="text-center py-2 px-1 text-green-800">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</td>
+                                <td className="text-center py-2 px-1 text-red-800">{Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)}</td>
+                                <td className="text-center py-2 px-1 text-blue-800">{Object.values(statsServidores).reduce((s, v) => s + v.justificaron, 0)}</td>
+                                <td className="text-center py-2 px-1 text-amber-800">{Object.values(statsServidores).reduce((s, v) => s + v.atrasados, 0)}</td>
+                                <td className="text-center py-2 px-1 text-gray-900">{Object.values(statsServidores).reduce((s, v) => s + v.total, 0)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* REDIL - AYUDA SOCIAL */}
+              <Card className="overflow-hidden border-lime-200">
+                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenRedil(!openRedil)}>
+                  <div className="flex items-center gap-3">
+                    {openRedil ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                    <Heart className="w-5 h-5 text-lime-600" />
+                    <span className="font-semibold text-gray-900">Redil — Ayuda Social</span>
+                    <Badge className="bg-lime-100 text-lime-800 text-xs">{statsRedil.totalCasos} casos</Badge>
+                  </div>
+                </button>
+                {openRedil && (
+                  <CardContent className="pt-0 pb-6 border-t">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                      <div className="text-center p-3 bg-lime-50 rounded-lg border border-lime-100">
+                        <p className="text-[10px] text-lime-600 font-medium">Entregados (semana)</p>
+                        <p className="text-2xl font-bold text-lime-800">{statsRedil.entregadosSemana}</p>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                        <p className="text-[10px] text-green-600 font-medium">Entregados (mes)</p>
+                        <p className="text-2xl font-bold text-green-800">{statsRedil.entregadosMes}</p>
+                      </div>
+                      <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                        <p className="text-[10px] text-yellow-600 font-medium">Solicitudes Pendientes</p>
+                        <p className="text-2xl font-bold text-yellow-800">{statsRedil.pendientes}</p>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-[10px] text-gray-600 font-medium">Total Histórico</p>
+                        <p className="text-2xl font-bold text-gray-800">{statsRedil.totalCasos}</p>
+                      </div>
+                    </div>
+                    {/* Desglose por tipo de ayuda */}
+                    {Object.keys(statsRedil.porTipo).length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Ayudas entregadas por tipo (histórico cerrados):</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {Object.entries(statsRedil.porTipo).sort(([, a], [, b]) => b - a).map(([tipo, cantidad]) => {
+                            const tipoInfo = [
+                              { value: "canasta", label: "Canasta/Víveres", icon: "🧺" },
+                              { value: "medicinas", label: "Medicinas", icon: "💊" },
+                              { value: "ropa", label: "Ropa", icon: "🧥" },
+                              { value: "panales", label: "Pañales", icon: "👶" },
+                              { value: "utiles_escolares", label: "Útiles", icon: "📚" },
+                              { value: "ayuda_economica", label: "Económica", icon: "💰" },
+                              { value: "otro", label: "Otro", icon: "📦" },
+                            ].find(t => t.value === tipo)
+                            return (
+                              <div key={tipo} className="flex items-center gap-2 p-2 bg-white rounded border border-gray-100">
+                                <span className="text-sm">{tipoInfo?.icon || "📦"}</span>
+                                <div>
+                                  <p className="text-[10px] text-gray-600">{tipoInfo?.label || tipo}</p>
+                                  <p className="text-sm font-bold text-gray-800">{cantidad}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <Button variant="ghost" size="sm" className="mt-3 text-lime-700" onClick={() => router.push("/dashboard/redil-ayuda-social")}>
+                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Redil
+                    </Button>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* CUMPLEAÑOS DEL MES */}
+              <Card className="overflow-hidden border-fuchsia-200">
+                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCumpleanos(!openCumpleanos)}>
+                  <div className="flex items-center gap-3">
+                    {openCumpleanos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                    <Cake className="w-5 h-5 text-fuchsia-600" />
+                    <span className="font-semibold text-gray-900">Cumpleaños del Mes</span>
+                    <Badge className="bg-fuchsia-100 text-fuchsia-800 text-xs">{statsCumpleanos.totalMes} personas</Badge>
+                  </div>
+                </button>
+                {openCumpleanos && (
+                  <CardContent className="pt-0 pb-6 border-t">
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      <div className="text-center p-3 bg-fuchsia-50 rounded-lg border border-fuchsia-100">
+                        <p className="text-[10px] text-fuchsia-600 font-medium">Total Cumpleañeros</p>
+                        <p className="text-2xl font-bold text-fuchsia-800">{statsCumpleanos.totalMes}</p>
+                        <p className="text-[9px] text-fuchsia-500">este mes</p>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                        <p className="text-[10px] text-green-600 font-medium">Felicitados</p>
+                        <p className="text-2xl font-bold text-green-800">{statsCumpleanos.enviados}</p>
+                        <p className="text-[9px] text-green-500">ya enviados</p>
+                      </div>
+                      <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-100">
+                        <p className="text-[10px] text-orange-600 font-medium">Pendientes</p>
+                        <p className="text-2xl font-bold text-orange-800">{statsCumpleanos.pendientesEnvio}</p>
+                        <p className="text-[9px] text-orange-500">sin felicitar</p>
+                      </div>
+                    </div>
+                    {/* Barra de progreso */}
+                    {statsCumpleanos.totalMes > 0 && (
+                      <div className="mt-4">
+                        <div className="flex justify-between text-[10px] text-gray-600 mb-1">
+                          <span>Progreso de felicitaciones</span>
+                          <span>{Math.round((statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-fuchsia-500 h-2 rounded-full transition-all"
+                            style={{ width: `${(statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                    <Button variant="ghost" size="sm" className="mt-3 text-fuchsia-700" onClick={() => router.push("/dashboard/cumpleanos")}>
+                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Cumpleaños
+                    </Button>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* EVENTOS / ENCUENTRO */}
+              <Card className="overflow-hidden border-violet-200">
+                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenEventos(!openEventos)}>
+                  <div className="flex items-center gap-3">
+                    {openEventos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                    <CalendarDays className="w-5 h-5 text-violet-600" />
+                    <span className="font-semibold text-gray-900">Eventos / Encuentro</span>
+                    <Badge className="bg-violet-100 text-violet-800 text-xs">
+                      {statsEventos.reduce((s, e) => s + e.inscritos, 0)} inscritos
+                    </Badge>
+                  </div>
+                </button>
+                {openEventos && (
+                  <CardContent className="pt-0 pb-6 border-t">
+                    {loadingStats ? (
+                      <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin"></div></div>
+                    ) : statsEventos.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4 mt-3">No hay eventos activos</p>
+                    ) : (
+                      <div className="space-y-3 mt-3">
+                        {statsEventos.map(evento => (
+                          <div key={evento.id} className="p-3 bg-violet-50 rounded-lg border border-violet-100">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-semibold text-violet-700">{evento.nombre}</p>
+                              <Badge className="bg-violet-200 text-violet-900 text-[10px]">{evento.inscritos} inscritos</Badge>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              <div className="text-center">
+                                <p className="text-lg font-bold text-violet-800">{evento.inscritos}</p>
+                                <p className="text-[9px] text-violet-600">Inscritos</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-lg font-bold text-green-700">{evento.pagadosCompleto}</p>
+                                <p className="text-[9px] text-green-600">Pagado completo</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-lg font-bold text-orange-700">{evento.pendientesPago}</p>
+                                <p className="text-[9px] text-orange-600">Pendiente pago</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-lg font-bold text-emerald-700">${evento.totalRecaudado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                                <p className="text-[9px] text-emerald-600">Recaudado / ${evento.totalValor.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                              </div>
+                            </div>
+                            {/* Barra progreso recaudación */}
+                            {evento.totalValor > 0 && (
+                              <div className="mt-2">
+                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                  <div
+                                    className="bg-violet-500 h-1.5 rounded-full transition-all"
+                                    style={{ width: `${Math.min((evento.totalRecaudado / evento.totalValor) * 100, 100)}%` }}
+                                  ></div>
+                                </div>
+                                <p className="text-[9px] text-gray-400 text-right mt-0.5">
+                                  {Math.round((evento.totalRecaudado / evento.totalValor) * 100)}% recaudado
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <Button variant="ghost" size="sm" className="text-violet-700" onClick={() => router.push("/dashboard/eventos")}>
+                          <ExternalLink className="w-3 h-3 mr-1" /> Ir a Eventos
+                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -940,8 +1277,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                 )}
               </CardContent>
             </Card>
-          </>
-        )}
+
       </main>
     </div>
   )
