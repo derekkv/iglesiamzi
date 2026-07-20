@@ -114,6 +114,7 @@ export interface VisitaTecnica {
   ficha_desea_emprender: boolean | null
   ficha_idea_negocio: string | null
   ficha_espacio_emprendimiento: boolean | null
+  ficha_espacio_descripcion: string | null
   ficha_motivacion: string | null
   ficha_apoyo_familiar: string | null
   ficha_cuidado_hijos: string | null
@@ -202,6 +203,7 @@ export interface VisitaTecnicaInput {
   ficha_desea_emprender?: boolean | null
   ficha_idea_negocio?: string | null
   ficha_espacio_emprendimiento?: boolean | null
+  ficha_espacio_descripcion?: string | null
   ficha_motivacion?: string | null
   ficha_apoyo_familiar?: string | null
   ficha_cuidado_hijos?: string | null
@@ -380,6 +382,7 @@ class RedilAyudaSocialService {
         ficha_desea_emprender: input.ficha_desea_emprender ?? null,
         ficha_idea_negocio: input.ficha_idea_negocio || null,
         ficha_espacio_emprendimiento: input.ficha_espacio_emprendimiento ?? null,
+        ficha_espacio_descripcion: input.ficha_espacio_descripcion || null,
         ficha_motivacion: input.ficha_motivacion || null,
         ficha_apoyo_familiar: input.ficha_apoyo_familiar || null,
         ficha_cuidado_hijos: input.ficha_cuidado_hijos || null,

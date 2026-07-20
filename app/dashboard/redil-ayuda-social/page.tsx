@@ -324,6 +324,7 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
     ficha_desea_emprender: null,
     ficha_idea_negocio: "",
     ficha_espacio_emprendimiento: null,
+    ficha_espacio_descripcion: "",
     ficha_motivacion: "",
     ficha_apoyo_familiar: "",
     ficha_cuidado_hijos: "",
@@ -363,25 +364,26 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   useRealtime({ table: "entregas_redil", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
 
   const handleGuardarVisita = async () => {
-    if (!visitaForm.resultado) { toast.error("Seleccione un resultado"); return }
-    if (visitaForm.resultado === "aprobado" && visitaForm.tipo_ayuda_aprobada.length === 0) {
-      toast.error("Seleccione al menos un tipo de ayuda aprobada"); return
-    }
+    if (!visitaForm.ficha_recomendacion) { toast.error("Seleccione una recomendación técnica"); return }
+    // Derivar resultado de la recomendación
+    const resultado = visitaForm.ficha_recomendacion === "no_recomendado" ? "no_aprobado" : "aprobado"
+    const formToSave = { ...visitaForm, resultado: resultado as "aprobado" | "no_aprobado" }
+
     setSavingVisita(true)
     try {
-      await redilService.registrarVisitaTecnica(casoId, visitaForm, { id: userId, nombre: userName })
-      toast.success(visitaForm.resultado === "aprobado" ? "Solicitud aprobada" : "Solicitud rechazada")
+      await redilService.registrarVisitaTecnica(casoId, formToSave, { id: userId, nombre: userName })
+      toast.success("Ficha socioeconómica guardada")
       if (casoCompleto?.caso) {
         await enviarNotificacionRedil({
-          tipo: visitaForm.resultado === "aprobado" ? "aprobada" : "rechazada",
+          tipo: resultado === "aprobado" ? "aprobada" : "rechazada",
           destinatario: { email: "", telefono: "", nombre: casoCompleto.caso.usuario_creador_nombre },
           solicitante: casoCompleto.solicitud?.nombre_completo || "",
-          tipoAyuda: visitaForm.tipo_ayuda_aprobada,
+          tipoAyuda: [],
         })
       }
       await loadCaso(true)
     } catch (error: any) {
-      toast.error("Error guardando visita: " + error.message)
+      toast.error("Error guardando ficha: " + error.message)
     } finally {
       setSavingVisita(false)
     }
@@ -551,47 +553,89 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
         {/* TAB: Visita Técnica */}
         <TabsContent value="visita" className="space-y-4 mt-4">
           {visita ? (
-            <Card className={`shadow-sm ${visita.resultado === "aprobado" ? "border-green-200" : "border-red-200"}`}>
-              <CardHeader className={`pb-3 rounded-t-lg ${visita.resultado === "aprobado" ? "bg-green-50" : "bg-red-50"}`}>
-                <CardTitle className="text-base flex items-center gap-3">
-                  Resultado de la Visita
-                  {visita.resultado === "aprobado" ? (
-                    <Badge className="bg-green-600 text-white px-3 py-1">✅ Aprobado</Badge>
-                  ) : (
-                    <Badge className="bg-red-600 text-white px-3 py-1">❌ No Aprobado</Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm pt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <p><span className="font-medium text-gray-500">Fecha:</span> {new Date(visita.fecha_visita).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</p>
-                  <p><span className="font-medium text-gray-500">Realizada por:</span> {visita.realizada_por_nombre}</p>
-                </div>
-                {visita.observaciones && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="font-medium text-gray-700 mb-1">Observaciones:</p>
-                    <p className="whitespace-pre-wrap text-gray-600">{visita.observaciones}</p>
-                  </div>
-                )}
-                {visita.motivo_rechazo && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="font-medium text-red-700 mb-1">Motivo de rechazo:</p>
-                    <p className="whitespace-pre-wrap text-red-600">{visita.motivo_rechazo}</p>
-                  </div>
-                )}
-                {visita.tipo_ayuda_aprobada.length > 0 && (
-                  <div>
-                    <p className="font-medium text-gray-700 mb-2">Ayuda aprobada:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {visita.tipo_ayuda_aprobada.map((t) => {
-                        const tipo = TIPOS_AYUDA.find((ta) => ta.value === t)
-                        return <Badge key={t} className="bg-green-100 text-green-800 px-3 py-1">{tipo?.icon} {tipo?.label || t}</Badge>
-                      })}
+            <div className="space-y-4">
+              {/* Resultado principal */}
+              <Card className="shadow-sm border-amber-200">
+                <CardHeader className="pb-2 bg-amber-50 rounded-t-lg">
+                  <CardTitle className="text-base">Ficha Socioeconómica</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm pt-4">
+                  {/* Recomendación técnica prominente */}
+                  {visita.ficha_recomendacion && (
+                    <div className={`rounded-xl p-5 text-center ${{apto:"bg-green-50 border-2 border-green-300",apto_acompanamiento:"bg-blue-50 border-2 border-blue-300",seguimiento_adicional:"bg-yellow-50 border-2 border-yellow-300",no_recomendado:"bg-red-50 border-2 border-red-300"}[visita.ficha_recomendacion] || "bg-gray-50 border-2 border-gray-300"}`}>
+                      <p className="text-xs text-gray-500 mb-1">Recomendación Técnica</p>
+                      <p className={`text-xl font-bold ${{apto:"text-green-700",apto_acompanamiento:"text-blue-700",seguimiento_adicional:"text-yellow-700",no_recomendado:"text-red-700"}[visita.ficha_recomendacion] || "text-gray-700"}`}>
+                        {{"apto":"✅ Apto para participar","apto_acompanamiento":"🤝 Apto con acompañamiento","seguimiento_adicional":"👁️ Requiere seguimiento adicional","no_recomendado":"⛔ No recomendado por el momento"}[visita.ficha_recomendacion] || visita.ficha_recomendacion}
+                      </p>
                     </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <p><span className="font-medium text-gray-500">Fecha:</span> {new Date(visita.fecha_visita).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</p>
+                    <p><span className="font-medium text-gray-500">Realizada por:</span> {visita.realizada_por_nombre}</p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  {visita.observaciones && (
+                    <div className="bg-gray-50 rounded-lg p-3"><p className="font-medium text-gray-700 text-xs mb-1">Observaciones:</p><p className="whitespace-pre-wrap text-gray-600">{visita.observaciones}</p></div>
+                  )}
+                  {visita.ficha_observaciones_ts && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="font-medium text-amber-700 text-xs mb-1">Observaciones de Trabajo Social:</p><p className="whitespace-pre-wrap text-amber-800">{visita.ficha_observaciones_ts}</p></div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* FICHA SOCIOECONÓMICA - Vista de detalle */}
+              {(visita.ficha_num_personas_hogar != null || visita.ficha_trabaja_actualmente != null || visita.ficha_tipo_vivienda) && (
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-4 text-sm pt-5">
+                    {/* Composición Familiar */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Composición Familiar</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-gray-50 rounded p-2 text-center"><p className="text-[10px] text-gray-500">Personas en hogar</p><p className="font-bold text-gray-800">{visita.ficha_num_personas_hogar ?? "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2 text-center"><p className="text-[10px] text-gray-500">Hijos menores</p><p className="font-bold text-gray-800">{visita.ficha_num_hijos_menores ?? "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2 text-center"><p className="text-[10px] text-gray-500">Dependientes económicos</p><p className="font-bold text-gray-800">{visita.ficha_personas_dependientes ?? "-"}</p></div>
+                      </div>
+                    </div>
+                    {/* Situación Laboral */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Situación Laboral y Económica</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Trabaja?</p><p className="font-medium">{visita.ficha_trabaja_actualmente === true ? `Sí — ${visita.ficha_ocupacion || ""}` : visita.ficha_trabaja_actualmente === false ? "No" : "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Negocio propio?</p><p className="font-medium">{visita.ficha_tiene_negocio === true ? "Sí" : visita.ficha_tiene_negocio === false ? "No" : "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">Ingreso mensual</p><p className="font-medium">{visita.ficha_ingreso_mensual || "-"}</p></div>
+                      </div>
+                    </div>
+                    {/* Vivienda */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Condiciones de Vivienda</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">Tipo</p><p className="font-medium">{visita.ficha_tipo_vivienda || "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">Material</p><p className="font-medium">{visita.ficha_material_vivienda || "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">Servicios</p><p className="font-medium">{(visita.ficha_servicios_basicos || []).join(", ") || "-"}</p></div>
+                      </div>
+                    </div>
+                    {/* Emprendimiento */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Emprendimiento</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Desea emprender?</p><p className="font-medium">{visita.ficha_desea_emprender === true ? `Sí — ${visita.ficha_idea_negocio || ""}` : visita.ficha_desea_emprender === false ? "No" : "-"}</p></div>
+                        <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Espacio en casa?</p><p className="font-medium">{visita.ficha_espacio_emprendimiento === true ? `Sí${(visita as any).ficha_espacio_descripcion ? ` — ${(visita as any).ficha_espacio_descripcion}` : ""}` : visita.ficha_espacio_emprendimiento === false ? "No" : "-"}</p></div>
+                      </div>
+                    </div>
+                    {/* Motivación */}
+                    {(visita.ficha_motivacion || visita.ficha_apoyo_familiar || visita.ficha_cuidado_hijos) && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Motivación y Apoyo</p>
+                        <div className="space-y-2">
+                          {visita.ficha_motivacion && <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Por qué desea participar?</p><p className="text-gray-700">{visita.ficha_motivacion}</p></div>}
+                          {visita.ficha_apoyo_familiar && <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Quiénes le apoyan?</p><p className="text-gray-700">{visita.ficha_apoyo_familiar}</p></div>}
+                          {visita.ficha_cuidado_hijos && <div className="bg-gray-50 rounded p-2"><p className="text-[10px] text-gray-500">¿Quién cuida a los hijos?</p><p className="text-gray-700">{visita.ficha_cuidado_hijos}</p></div>}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           ) : (
             canEdit && (caso.estado === "pendiente_visita" || caso.estado === "en_visita_tecnica") ? (
               <div className="space-y-4">
@@ -696,6 +740,9 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                           <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="espacio" checked={visitaForm.ficha_espacio_emprendimiento === true} onChange={() => setVisitaForm({ ...visitaForm, ficha_espacio_emprendimiento: true })} className="accent-blue-600" /><span className="text-sm">Sí</span></label>
                           <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="espacio" checked={visitaForm.ficha_espacio_emprendimiento === false} onChange={() => setVisitaForm({ ...visitaForm, ficha_espacio_emprendimiento: false })} className="accent-blue-600" /><span className="text-sm">No</span></label>
                         </div>
+                        {visitaForm.ficha_espacio_emprendimiento && (
+                          <div><Label className="text-xs">Describa el espacio</Label><Input value={visitaForm.ficha_espacio_descripcion || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_espacio_descripcion: e.target.value })} placeholder="Ej: Garaje, cuarto extra..." /></div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -719,73 +766,28 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                   </CardContent>
                 </Card>
 
-                {/* RECOMENDACIÓN TÉCNICA Y RESOLUCIÓN */}
+                {/* RECOMENDACIÓN TÉCNICA */}
                 <Card className="shadow-sm border-2 border-amber-200">
-                  <CardContent className="space-y-5 pt-6">
-                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">Recomendación Técnica y Resolución</h4>
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">Recomendación Técnica</h4>
 
-                    {/* Recomendación */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">Recomendación técnica</Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {[
-                          { value: "apto", label: "Apto para participar", color: "border-green-500 bg-green-50" },
-                          { value: "apto_acompanamiento", label: "Apto con acompañamiento", color: "border-blue-500 bg-blue-50" },
-                          { value: "seguimiento_adicional", label: "Requiere seguimiento adicional", color: "border-yellow-500 bg-yellow-50" },
-                          { value: "no_recomendado", label: "No recomendado por el momento", color: "border-red-500 bg-red-50" },
-                        ].map((opt) => (
-                          <label key={opt.value} onClick={() => setVisitaForm({ ...visitaForm, ficha_recomendacion: opt.value })} className={`flex items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${visitaForm.ficha_recomendacion === opt.value ? opt.color + " shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
-                            <input type="radio" name="recomendacion" checked={visitaForm.ficha_recomendacion === opt.value} onChange={() => {}} className="accent-blue-600" />
-                            <span className="text-sm">{opt.label}</span>
-                          </label>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { value: "apto", label: "Apto para participar", icon: "✅", color: "border-green-500 bg-green-50" },
+                        { value: "apto_acompanamiento", label: "Apto con acompañamiento", icon: "🤝", color: "border-blue-500 bg-blue-50" },
+                        { value: "seguimiento_adicional", label: "Requiere seguimiento adicional", icon: "👁️", color: "border-yellow-500 bg-yellow-50" },
+                        { value: "no_recomendado", label: "No recomendado por el momento", icon: "⛔", color: "border-red-500 bg-red-50" },
+                      ].map((opt) => (
+                        <label key={opt.value} onClick={() => setVisitaForm({ ...visitaForm, ficha_recomendacion: opt.value })} className={`flex items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${visitaForm.ficha_recomendacion === opt.value ? opt.color + " shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
+                          <input type="radio" name="recomendacion" checked={visitaForm.ficha_recomendacion === opt.value} onChange={() => {}} className="accent-blue-600" />
+                          <span className="text-sm">{opt.icon} {opt.label}</span>
+                        </label>
+                      ))}
                     </div>
 
-                    {/* Resultado final */}
-                    <div className="space-y-3">
-                      <Label className="font-semibold">Resultado final *</Label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div onClick={() => setVisitaForm({ ...visitaForm, resultado: "aprobado" })} className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 cursor-pointer transition-all ${visitaForm.resultado === "aprobado" ? "border-green-500 bg-green-50 shadow-md scale-[1.02]" : "border-gray-200 hover:border-green-200"}`}>
-                          <CheckCircle className={`w-8 h-8 ${visitaForm.resultado === "aprobado" ? "text-green-600" : "text-gray-300"}`} />
-                          <span className="font-semibold">Aprobado</span>
-                        </div>
-                        <div onClick={() => setVisitaForm({ ...visitaForm, resultado: "no_aprobado" })} className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 cursor-pointer transition-all ${visitaForm.resultado === "no_aprobado" ? "border-red-500 bg-red-50 shadow-md scale-[1.02]" : "border-gray-200 hover:border-red-200"}`}>
-                          <XCircle className={`w-8 h-8 ${visitaForm.resultado === "no_aprobado" ? "text-red-600" : "text-gray-300"}`} />
-                          <span className="font-semibold">No aprobado</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {visitaForm.resultado === "no_aprobado" && (
-                      <div>
-                        <Label htmlFor="motivo_rechazo" className="font-semibold text-red-700">Motivo del rechazo</Label>
-                        <Textarea id="motivo_rechazo" value={visitaForm.motivo_rechazo} onChange={(e) => setVisitaForm({ ...visitaForm, motivo_rechazo: e.target.value })} placeholder="Explique el motivo..." rows={3} className="mt-1 border-red-200 focus:border-red-400" />
-                      </div>
-                    )}
-
-                    {visitaForm.resultado === "aprobado" && (
-                      <div className="space-y-3">
-                        <Label className="font-semibold">Tipo de ayuda aprobada *</Label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {TIPOS_AYUDA.map((tipo) => (
-                            <div key={tipo.value} onClick={() => { setVisitaForm((prev) => ({ ...prev, tipo_ayuda_aprobada: prev.tipo_ayuda_aprobada.includes(tipo.value) ? prev.tipo_ayuda_aprobada.filter((t) => t !== tipo.value) : [...prev.tipo_ayuda_aprobada, tipo.value] })) }} className={`flex items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${visitaForm.tipo_ayuda_aprobada.includes(tipo.value) ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-green-200"}`}>
-                              {visitaForm.tipo_ayuda_aprobada.includes(tipo.value) ? <CheckCircle className="w-4 h-4 text-green-600" /> : <div className="w-4 h-4 rounded-full border-2 border-gray-300" />}
-                              <span>{tipo.icon} {tipo.label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <Label htmlFor="obs_visita" className="font-semibold">Observaciones generales</Label>
-                      <Textarea id="obs_visita" value={visitaForm.observaciones} onChange={(e) => setVisitaForm({ ...visitaForm, observaciones: e.target.value })} placeholder="Observaciones adicionales de la visita..." rows={3} className="mt-1" />
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t">
-                      <Button onClick={handleGuardarVisita} disabled={savingVisita} size="lg" className={visitaForm.resultado === "aprobado" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}>
-                        {savingVisita ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Guardando...</> : "Guardar Resolución"}
+                    <div className="flex justify-end pt-3 border-t">
+                      <Button onClick={handleGuardarVisita} disabled={savingVisita} size="lg" className="bg-amber-600 hover:bg-amber-700">
+                        {savingVisita ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Guardando...</> : "Guardar Ficha"}
                       </Button>
                     </div>
                   </CardContent>
