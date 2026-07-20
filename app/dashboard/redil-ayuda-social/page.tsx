@@ -311,6 +311,24 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
     observaciones: "",
     motivo_rechazo: "",
     tipo_ayuda_aprobada: [],
+    ficha_num_personas_hogar: null,
+    ficha_num_hijos_menores: null,
+    ficha_personas_dependientes: null,
+    ficha_trabaja_actualmente: null,
+    ficha_ocupacion: "",
+    ficha_tiene_negocio: null,
+    ficha_ingreso_mensual: "",
+    ficha_tipo_vivienda: "",
+    ficha_material_vivienda: "",
+    ficha_servicios_basicos: [],
+    ficha_desea_emprender: null,
+    ficha_idea_negocio: "",
+    ficha_espacio_emprendimiento: null,
+    ficha_motivacion: "",
+    ficha_apoyo_familiar: "",
+    ficha_cuidado_hijos: "",
+    ficha_observaciones_ts: "",
+    ficha_recomendacion: "",
   })
   const [savingVisita, setSavingVisita] = useState(false)
 
@@ -578,14 +596,155 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
             canEdit && (caso.estado === "pendiente_visita" || caso.estado === "en_visita_tecnica") ? (
               <div className="space-y-4">
                 <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-5 text-white">
-                  <h3 className="font-bold text-lg">Registrar Visita Técnica</h3>
-                  <p className="text-amber-100 text-sm mt-1">Evalúe la solicitud y registre su resolución</p>
+                  <h3 className="font-bold text-lg">Ficha Socioeconómica — Visita Técnica</h3>
+                  <p className="text-amber-100 text-sm mt-1">Complete la evaluación socioeconómica del solicitante</p>
                 </div>
+
+                {/* SECCIÓN 2: COMPOSICIÓN FAMILIAR */}
                 <Card className="shadow-sm">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">2. Composición Familiar</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div><Label className="text-xs">N° personas en el hogar</Label><Input type="number" min={0} value={visitaForm.ficha_num_personas_hogar ?? ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_num_personas_hogar: e.target.value ? parseInt(e.target.value) : null })} /></div>
+                      <div><Label className="text-xs">N° hijos menores de edad</Label><Input type="number" min={0} value={visitaForm.ficha_num_hijos_menores ?? ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_num_hijos_menores: e.target.value ? parseInt(e.target.value) : null })} /></div>
+                      <div><Label className="text-xs">Personas dependientes económicamente</Label><Input type="number" min={0} value={visitaForm.ficha_personas_dependientes ?? ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_personas_dependientes: e.target.value ? parseInt(e.target.value) : null })} /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* SECCIÓN 3: SITUACIÓN LABORAL Y ECONÓMICA */}
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">3. Situación Laboral y Económica</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">¿Actualmente trabaja?</Label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="trabaja" checked={visitaForm.ficha_trabaja_actualmente === true} onChange={() => setVisitaForm({ ...visitaForm, ficha_trabaja_actualmente: true })} className="accent-blue-600" /><span className="text-sm">Sí</span></label>
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="trabaja" checked={visitaForm.ficha_trabaja_actualmente === false} onChange={() => setVisitaForm({ ...visitaForm, ficha_trabaja_actualmente: false })} className="accent-blue-600" /><span className="text-sm">No</span></label>
+                        </div>
+                        {visitaForm.ficha_trabaja_actualmente && (
+                          <div><Label className="text-xs">Ocupación</Label><Input value={visitaForm.ficha_ocupacion || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_ocupacion: e.target.value })} placeholder="Ej: Vendedora ambulante" /></div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">¿Tiene negocio propio?</Label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="negocio" checked={visitaForm.ficha_tiene_negocio === true} onChange={() => setVisitaForm({ ...visitaForm, ficha_tiene_negocio: true })} className="accent-blue-600" /><span className="text-sm">Sí</span></label>
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="negocio" checked={visitaForm.ficha_tiene_negocio === false} onChange={() => setVisitaForm({ ...visitaForm, ficha_tiene_negocio: false })} className="accent-blue-600" /><span className="text-sm">No</span></label>
+                        </div>
+                      </div>
+                      <div><Label className="text-xs">Ingreso mensual aprox. del hogar</Label><Input value={visitaForm.ficha_ingreso_mensual || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_ingreso_mensual: e.target.value })} placeholder="$" /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* SECCIÓN 4: CONDICIONES DE VIVIENDA */}
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">4. Condiciones de Vivienda</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Tipo de vivienda</Label>
+                        <div className="space-y-1">
+                          {["Propia", "Arrendada", "Prestada", "Familiar"].map((t) => (
+                            <label key={t} className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="vivienda" checked={visitaForm.ficha_tipo_vivienda === t} onChange={() => setVisitaForm({ ...visitaForm, ficha_tipo_vivienda: t })} className="accent-blue-600" /><span className="text-sm">{t}</span></label>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Material predominante</Label>
+                        <div className="space-y-1">
+                          {["Hormigón", "Mixta", "Madera", "Caña"].map((m) => (
+                            <label key={m} className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="material" checked={visitaForm.ficha_material_vivienda === m} onChange={() => setVisitaForm({ ...visitaForm, ficha_material_vivienda: m })} className="accent-blue-600" /><span className="text-sm">{m}</span></label>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Servicios básicos</Label>
+                        <div className="space-y-1">
+                          {["Agua potable", "Energía eléctrica", "Alcantarillado", "Internet"].map((s) => (
+                            <label key={s} className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="checkbox" checked={(visitaForm.ficha_servicios_basicos || []).includes(s)} onChange={(e) => { const current = visitaForm.ficha_servicios_basicos || []; setVisitaForm({ ...visitaForm, ficha_servicios_basicos: e.target.checked ? [...current, s] : current.filter((x) => x !== s) }) }} className="accent-blue-600" />
+                              <span className="text-sm">{s}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* SECCIÓN 5: EMPRENDIMIENTO */}
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">5. Emprendimiento</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">¿Desea emprender?</Label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="emprender" checked={visitaForm.ficha_desea_emprender === true} onChange={() => setVisitaForm({ ...visitaForm, ficha_desea_emprender: true })} className="accent-blue-600" /><span className="text-sm">Sí</span></label>
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="emprender" checked={visitaForm.ficha_desea_emprender === false} onChange={() => setVisitaForm({ ...visitaForm, ficha_desea_emprender: false })} className="accent-blue-600" /><span className="text-sm">No</span></label>
+                        </div>
+                        {visitaForm.ficha_desea_emprender && (
+                          <div><Label className="text-xs">Idea de negocio</Label><Input value={visitaForm.ficha_idea_negocio || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_idea_negocio: e.target.value })} placeholder="Describa brevemente" /></div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">¿Tiene espacio para emprendimiento en casa?</Label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="espacio" checked={visitaForm.ficha_espacio_emprendimiento === true} onChange={() => setVisitaForm({ ...visitaForm, ficha_espacio_emprendimiento: true })} className="accent-blue-600" /><span className="text-sm">Sí</span></label>
+                          <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="espacio" checked={visitaForm.ficha_espacio_emprendimiento === false} onChange={() => setVisitaForm({ ...visitaForm, ficha_espacio_emprendimiento: false })} className="accent-blue-600" /><span className="text-sm">No</span></label>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* SECCIÓN 6: MOTIVACIÓN Y APOYO */}
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">6. Motivación y Apoyo Familiar</h4>
+                    <div><Label className="text-xs">¿Por qué desea participar en el proyecto?</Label><Textarea value={visitaForm.ficha_motivacion || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_motivacion: e.target.value })} rows={3} placeholder="Motivación del participante..." /></div>
+                    <div><Label className="text-xs">¿Quiénes le apoyan? (Estudios, emprender, trabajar, etc)</Label><Textarea value={visitaForm.ficha_apoyo_familiar || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_apoyo_familiar: e.target.value })} rows={2} placeholder="Red de apoyo familiar..." /></div>
+                    <div><Label className="text-xs">Si tiene hijos, ¿quién le ayudaría a cuidarlos en clases?</Label><Input value={visitaForm.ficha_cuidado_hijos || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_cuidado_hijos: e.target.value })} placeholder="Persona encargada del cuidado" /></div>
+                  </CardContent>
+                </Card>
+
+                {/* OBSERVACIONES DE TRABAJO SOCIAL */}
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-4 pt-5">
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">Observaciones de Trabajo Social</h4>
+                    <Textarea value={visitaForm.ficha_observaciones_ts || ""} onChange={(e) => setVisitaForm({ ...visitaForm, ficha_observaciones_ts: e.target.value })} rows={4} placeholder="Observaciones del profesional de trabajo social..." />
+                  </CardContent>
+                </Card>
+
+                {/* RECOMENDACIÓN TÉCNICA Y RESOLUCIÓN */}
+                <Card className="shadow-sm border-2 border-amber-200">
                   <CardContent className="space-y-5 pt-6">
-                    {/* Resultado */}
+                    <h4 className="font-semibold text-sm text-gray-700 border-b pb-2">Recomendación Técnica y Resolución</h4>
+
+                    {/* Recomendación */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">Recomendación técnica</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          { value: "apto", label: "Apto para participar", color: "border-green-500 bg-green-50" },
+                          { value: "apto_acompanamiento", label: "Apto con acompañamiento", color: "border-blue-500 bg-blue-50" },
+                          { value: "seguimiento_adicional", label: "Requiere seguimiento adicional", color: "border-yellow-500 bg-yellow-50" },
+                          { value: "no_recomendado", label: "No recomendado por el momento", color: "border-red-500 bg-red-50" },
+                        ].map((opt) => (
+                          <label key={opt.value} onClick={() => setVisitaForm({ ...visitaForm, ficha_recomendacion: opt.value })} className={`flex items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${visitaForm.ficha_recomendacion === opt.value ? opt.color + " shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
+                            <input type="radio" name="recomendacion" checked={visitaForm.ficha_recomendacion === opt.value} onChange={() => {}} className="accent-blue-600" />
+                            <span className="text-sm">{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Resultado final */}
                     <div className="space-y-3">
-                      <Label className="font-semibold">Resultado *</Label>
+                      <Label className="font-semibold">Resultado final *</Label>
                       <div className="grid grid-cols-2 gap-4">
                         <div onClick={() => setVisitaForm({ ...visitaForm, resultado: "aprobado" })} className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 cursor-pointer transition-all ${visitaForm.resultado === "aprobado" ? "border-green-500 bg-green-50 shadow-md scale-[1.02]" : "border-gray-200 hover:border-green-200"}`}>
                           <CheckCircle className={`w-8 h-8 ${visitaForm.resultado === "aprobado" ? "text-green-600" : "text-gray-300"}`} />
@@ -596,11 +755,6 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                           <span className="font-semibold">No aprobado</span>
                         </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="obs_visita" className="font-semibold">Observaciones</Label>
-                      <Textarea id="obs_visita" value={visitaForm.observaciones} onChange={(e) => setVisitaForm({ ...visitaForm, observaciones: e.target.value })} placeholder="Observaciones de la visita técnica..." rows={4} className="mt-1" />
                     </div>
 
                     {visitaForm.resultado === "no_aprobado" && (
@@ -623,6 +777,11 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                         </div>
                       </div>
                     )}
+
+                    <div>
+                      <Label htmlFor="obs_visita" className="font-semibold">Observaciones generales</Label>
+                      <Textarea id="obs_visita" value={visitaForm.observaciones} onChange={(e) => setVisitaForm({ ...visitaForm, observaciones: e.target.value })} placeholder="Observaciones adicionales de la visita..." rows={3} className="mt-1" />
+                    </div>
 
                     <div className="flex justify-end pt-4 border-t">
                       <Button onClick={handleGuardarVisita} disabled={savingVisita} size="lg" className={visitaForm.resultado === "aprobado" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}>

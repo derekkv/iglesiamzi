@@ -100,6 +100,25 @@ export interface VisitaTecnica {
   fecha_visita: string
   realizada_por: string
   realizada_por_nombre: string
+  // Ficha socioeconómica
+  ficha_num_personas_hogar: number | null
+  ficha_num_hijos_menores: number | null
+  ficha_personas_dependientes: number | null
+  ficha_trabaja_actualmente: boolean | null
+  ficha_ocupacion: string | null
+  ficha_tiene_negocio: boolean | null
+  ficha_ingreso_mensual: string | null
+  ficha_tipo_vivienda: string | null
+  ficha_material_vivienda: string | null
+  ficha_servicios_basicos: string[] | null
+  ficha_desea_emprender: boolean | null
+  ficha_idea_negocio: string | null
+  ficha_espacio_emprendimiento: boolean | null
+  ficha_motivacion: string | null
+  ficha_apoyo_familiar: string | null
+  ficha_cuidado_hijos: string | null
+  ficha_observaciones_ts: string | null
+  ficha_recomendacion: string | null
   created_at: string
 }
 
@@ -169,6 +188,25 @@ export interface VisitaTecnicaInput {
   observaciones?: string
   motivo_rechazo?: string
   tipo_ayuda_aprobada: string[]
+  // Ficha socioeconómica
+  ficha_num_personas_hogar?: number | null
+  ficha_num_hijos_menores?: number | null
+  ficha_personas_dependientes?: number | null
+  ficha_trabaja_actualmente?: boolean | null
+  ficha_ocupacion?: string | null
+  ficha_tiene_negocio?: boolean | null
+  ficha_ingreso_mensual?: string | null
+  ficha_tipo_vivienda?: string | null
+  ficha_material_vivienda?: string | null
+  ficha_servicios_basicos?: string[] | null
+  ficha_desea_emprender?: boolean | null
+  ficha_idea_negocio?: string | null
+  ficha_espacio_emprendimiento?: boolean | null
+  ficha_motivacion?: string | null
+  ficha_apoyo_familiar?: string | null
+  ficha_cuidado_hijos?: string | null
+  ficha_observaciones_ts?: string | null
+  ficha_recomendacion?: string | null
 }
 
 // Input para entrega
@@ -317,7 +355,7 @@ class RedilAyudaSocialService {
     input: VisitaTecnicaInput,
     usuario: { id: string; nombre: string }
   ): Promise<void> {
-    // 1. Crear registro de visita
+    // 1. Crear registro de visita con ficha socioeconómica
     const { error: visitaError } = await db
       .from("visitas_tecnicas")
       .insert({
@@ -328,6 +366,25 @@ class RedilAyudaSocialService {
         tipo_ayuda_aprobada: input.tipo_ayuda_aprobada,
         realizada_por: usuario.id,
         realizada_por_nombre: usuario.nombre,
+        // Ficha socioeconómica
+        ficha_num_personas_hogar: input.ficha_num_personas_hogar ?? null,
+        ficha_num_hijos_menores: input.ficha_num_hijos_menores ?? null,
+        ficha_personas_dependientes: input.ficha_personas_dependientes ?? null,
+        ficha_trabaja_actualmente: input.ficha_trabaja_actualmente ?? null,
+        ficha_ocupacion: input.ficha_ocupacion || null,
+        ficha_tiene_negocio: input.ficha_tiene_negocio ?? null,
+        ficha_ingreso_mensual: input.ficha_ingreso_mensual || null,
+        ficha_tipo_vivienda: input.ficha_tipo_vivienda || null,
+        ficha_material_vivienda: input.ficha_material_vivienda || null,
+        ficha_servicios_basicos: input.ficha_servicios_basicos || null,
+        ficha_desea_emprender: input.ficha_desea_emprender ?? null,
+        ficha_idea_negocio: input.ficha_idea_negocio || null,
+        ficha_espacio_emprendimiento: input.ficha_espacio_emprendimiento ?? null,
+        ficha_motivacion: input.ficha_motivacion || null,
+        ficha_apoyo_familiar: input.ficha_apoyo_familiar || null,
+        ficha_cuidado_hijos: input.ficha_cuidado_hijos || null,
+        ficha_observaciones_ts: input.ficha_observaciones_ts || null,
+        ficha_recomendacion: input.ficha_recomendacion || null,
       })
       .select("*")
 
