@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
+import { calcularEdadDesdeNacimiento } from "@/lib/mod/censo-ninos-service"
 
 export interface HijoData {
   nombre: string
@@ -132,6 +133,16 @@ export const censoService = {
     const { data, error } = await supabase.from("censo").select("*").order("apellidos_nombres", { ascending: true })
 
     if (error) throw error
+
+    // Recalcular edad en tiempo real desde fecha_nacimiento
+    if (data) {
+      for (const r of data) {
+        if (r.fecha_nacimiento) {
+          r.edad = calcularEdadDesdeNacimiento(r.fecha_nacimiento)
+        }
+      }
+    }
+
     return data || []
   },
 
@@ -139,6 +150,12 @@ export const censoService = {
     const { data, error } = await supabase.from("censo").select("*").eq("id", id).single()
 
     if (error) throw error
+
+    // Recalcular edad en tiempo real
+    if (data && data.fecha_nacimiento) {
+      data.edad = calcularEdadDesdeNacimiento(data.fecha_nacimiento)
+    }
+
     return data
   },
 

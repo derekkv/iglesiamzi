@@ -10,6 +10,7 @@ import { supabase } from "@/lib/secure-db"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -557,7 +558,7 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                   </div>
                   <div className="space-y-1.5">
                     <Label>Fecha</Label>
-                    <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                    <SmartDateInput value={fecha} onChange={(v) => setFecha(v)} />
                   </div>
                 </div>
 
@@ -779,10 +780,9 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Fecha *</Label>
-                <Input
-                  type="date"
+                <SmartDateInput
                   value={editForm.fecha}
-                  onChange={(e) => setEditForm({ ...editForm, fecha: e.target.value })}
+                  onChange={(v) => setEditForm({ ...editForm, fecha: v })}
                 />
               </div>
               <div className="grid gap-2">

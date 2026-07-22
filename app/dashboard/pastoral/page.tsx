@@ -13,6 +13,8 @@ import { currentMonthNameEcuador, currentMonthEcuador, currentYearEcuador } from
 import { ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home, Cake, ClipboardCheck, CalendarDays } from "lucide-react"
 import { censoService } from "@/lib/mod/censo-service"
 import { censoMdgService } from "@/lib/mod/censo-mdg-service"
+import { censoJovenesService } from "@/lib/mod/censo-jovenes-service"
+import { censoNinosService } from "@/lib/mod/censo-ninos-service"
 import { getLunesSemanaActual } from "@/lib/mod/gestion-celulas-service"
 import { discipuladoCiclosService, CICLO_CONFIG, type CicloTipo } from "@/lib/mod/discipulado-ciclos-service"
 import { proyectoMarioCiclosService, PROYECTO_MARIO_CICLO_CONFIG, type ProyectoMarioCicloTipo } from "@/lib/mod/proyecto-mario-ciclos-service"
@@ -58,6 +60,8 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
   // Estadísticas generales
   const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
   const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0 })
+  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0 })
+  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({ primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } })
   const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, censoBautizados: 0 })
   const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, censoMatrimonios: 0 })
@@ -108,12 +112,21 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
     const primerDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-01`
     const ultimoDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-31`
     const lunesSemana = getLunesSemanaActual()
-    let completed = 0; const totalTasks = 12
+    let completed = 0; const totalTasks = 13
     const tick = () => { completed++; setLoadingProgress(Math.round((completed / totalTasks) * 100)) }
 
-    const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => [])]).then(([censoData, censoMdgData]) => {
+    const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => []), censoNinosService.getAll().catch(() => []), censoJovenesService.getAll().catch(() => [])]).then(([censoData, censoMdgData, censoNinosData, censoJovenesData]) => {
       setStatsCenso({ total: censoData.length, miembros: censoData.filter(c => c.miembro).length, activos: censoData.filter(c => c.miembro_activo).length })
       setStatsCensoMdg({ total: censoMdgData.length, miembros: censoMdgData.filter(c => c.miembro).length, activos: censoMdgData.filter(c => c.miembro_activo).length })
+      setStatsCensoNinos({ total: censoNinosData.length })
+      const mesActualStr = `${anioActual}-${String(mesActual).padStart(2, "0")}`
+      setStatsCensoJovenes({
+        total: censoJovenesData.length,
+        miembros: censoJovenesData.filter(c => c.miembro).length,
+        activos: censoJovenesData.filter(c => c.miembro_activo).length,
+        nuevos: censoJovenesData.filter(c => c.nuevo_creyente).length,
+        primeraVez: censoJovenesData.filter((c: any) => c.primera_vez_iglesia && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+      })
       tick()
       return { censoBautizados: censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length, censoMatrimonios: censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length, totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
     })
@@ -262,6 +275,13 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                   <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100"><p className="text-[10px] text-violet-600 font-medium">MDG</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.total}</p></div>
                   <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100"><p className="text-[10px] text-violet-600 font-medium">Miembros MDG</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.miembros}</p></div>
                   <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100"><p className="text-[10px] text-violet-600 font-medium">Activos MDG</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.activos}</p></div>
+                </div>
+                {/* Niños y Jóvenes */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mt-3">
+                  <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100"><p className="text-[10px] text-amber-600 font-medium">Niños</p><p className="text-2xl font-bold text-amber-800">{statsCensoNinos.total}</p><p className="text-[9px] text-amber-500">Herederos del Reino</p></div>
+                  <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-100"><p className="text-[10px] text-pink-600 font-medium">Jóvenes</p><p className="text-2xl font-bold text-pink-800">{statsCensoJovenes.total}</p><p className="text-[9px] text-pink-500">{statsCensoJovenes.miembros} miembros · {statsCensoJovenes.activos} activos</p></div>
+                  <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-100"><p className="text-[10px] text-pink-600 font-medium">Nuevos Jóvenes</p><p className="text-2xl font-bold text-pink-800">{statsCensoJovenes.nuevos}</p><p className="text-[9px] text-pink-500">Nuevos creyentes</p></div>
+                  <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-100"><p className="text-[10px] text-emerald-600 font-medium">Primera Vez (Mes)</p><p className="text-2xl font-bold text-emerald-800">{statsCensoJovenes.primeraVez}</p><p className="text-[9px] text-emerald-500">Jóvenes nuevos este mes</p></div>
                 </div>
               </div>
               {/* Discipulado */}

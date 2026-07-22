@@ -27,7 +27,7 @@ import {
   type HerederosCicloTipo, type HerederosCicloCompleto,
   type HerederosParticipante, type HerederosFecha, type HerederosParticipanteInput,
 } from "@/lib/mod/herederos-ciclos-service"
-import { calcularEdadDesdeNacimiento } from "@/lib/mod/censo-ninos-service"
+import { calcularEdadDesdeNacimiento, censoNinosService } from "@/lib/mod/censo-ninos-service"
 import { Trash2, Plus, ArrowLeft, Edit, Lock, Play, CalendarDays } from "lucide-react"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -72,18 +72,30 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
 
 
   // Form data for new/edit participant
-  const [formData, setFormData] = useState<HerederosParticipanteInput>({
+  const [formData, setFormData] = useState<HerederosParticipanteInput & { nombre_madre?: string; telefono_madre?: string; nombre_padre?: string; telefono_padre?: string }>({
     nombre: "", fecha_nacimiento: "", edad: null, salon: "",
     nuevo: false, nombre_representante: "", celular: "",
-    fecha_registro: "", observaciones: "",
+    fecha_registro: "", alergias: "", observaciones: "",
+    nombre_madre: "", telefono_madre: "", nombre_padre: "", telefono_padre: "",
   })
   const [fechaNacDisplay, setFechaNacDisplay] = useState("")
 
   const audit = user ? { user_id: user.id, user_name: user.username } : undefined
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (syncCenso = false) => {
     try {
       const result = await herederosCiclosService.getCicloActivoCompleto(tipo)
+      if (result && syncCenso) {
+        // Auto-importar niños desde censo_ninos al cargar (solo una vez)
+        try {
+          const { importados } = await herederosCiclosService.importarDesdeCensoNinos(result.ciclo.id, tipo)
+          if (importados > 0) {
+            const updated = await herederosCiclosService.getCicloActivoCompleto(tipo)
+            setData(updated)
+            return
+          }
+        } catch { /* silencioso */ }
+      }
       setData(result)
     } catch (error) {
       console.error("Error loading herederos ciclo:", error)
@@ -92,17 +104,17 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
     }
   }, [tipo])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadData(true) }, [loadData])
 
   useRealtimeMultiple(
-    ["herederos_ciclos", "herederos_ciclo_participantes", "herederos_ciclo_fechas", "herederos_ciclo_asistencia"],
-    () => loadData()
+    ["herederos_ciclos", "herederos_ciclo_participantes", "herederos_ciclo_fechas", "herederos_ciclo_asistencia", "censo_ninos"],
+    () => loadData(false)
   )
 
   const cicloTerminado = data ? herederosCiclosService.cicloTerminado(data.fechas) : false
 
   const resetForm = () => {
-    setFormData({ nombre: "", fecha_nacimiento: "", edad: null, salon: "", nuevo: false, nombre_representante: "", celular: "", fecha_registro: "", observaciones: "" })
+    setFormData({ nombre: "", fecha_nacimiento: "", edad: null, salon: "", nuevo: false, nombre_representante: "", celular: "", fecha_registro: "", alergias: "", observaciones: "", nombre_madre: "", telefono_madre: "", nombre_padre: "", telefono_padre: "" })
     setFechaNacDisplay("")
   }
 
@@ -144,7 +156,33 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
     if (!formData.nombre.trim() || !data) return
     setSaving(true)
     try {
-      await herederosCiclosService.addParticipante(data.ciclo.id, formData, audit)
+      // Registrar en censo_ninos también
+      await censoNinosService.create({
+        nombre: formData.nombre.trim(),
+        fecha_nacimiento: formData.fecha_nacimiento || null,
+        edad: formData.edad ?? null,
+        grupo: config.label,
+        nombre_madre: formData.nombre_madre?.trim() || null,
+        telefono_madre: formData.telefono_madre?.trim() || null,
+        nombre_padre: formData.nombre_padre?.trim() || null,
+        telefono_padre: formData.telefono_padre?.trim() || null,
+        alergias: formData.alergias?.trim() || null,
+        observaciones: formData.observaciones?.trim() || null,
+      }, audit ? { userId: audit.user_id, userName: audit.user_name } : undefined)
+
+      // Agregar al ciclo herederos
+      const participanteInput: HerederosParticipanteInput = {
+        nombre: formData.nombre,
+        fecha_nacimiento: formData.fecha_nacimiento,
+        edad: formData.edad,
+        salon: config.label,
+        nuevo: formData.nuevo,
+        nombre_representante: formData.nombre_madre?.trim() || formData.nombre_padre?.trim() || null,
+        celular: formData.telefono_madre?.trim() || formData.telefono_padre?.trim() || null,
+        alergias: formData.alergias,
+        observaciones: formData.observaciones,
+      }
+      await herederosCiclosService.addParticipante(data.ciclo.id, participanteInput, audit)
       toast.success("Niño(a) agregado(a)")
       resetForm()
       setShowAddParticipant(false)
@@ -171,7 +209,9 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
         edad: p.edad, salon: p.salon || "", nuevo: p.nuevo,
         nombre_representante: p.nombre_representante || "",
         celular: p.celular || "", fecha_registro: p.fecha_registro || "",
-        observaciones: p.observaciones || "",
+        alergias: p.alergias || "", observaciones: p.observaciones || "",
+        nombre_madre: p.nombre_representante || "", telefono_madre: p.celular || "",
+        nombre_padre: "", telefono_padre: "",
       })
       setShowEditParticipant(true)
     })
@@ -181,7 +221,13 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
     if (!editingParticipant || !formData.nombre.trim()) return
     setSaving(true)
     try {
-      await herederosCiclosService.updateParticipante(editingParticipant.id, formData, audit)
+      const updateInput: Partial<HerederosParticipanteInput> = {
+        ...formData,
+        nombre_representante: formData.nombre_madre?.trim() || formData.nombre_padre?.trim() || formData.nombre_representante || null,
+        celular: formData.telefono_madre?.trim() || formData.telefono_padre?.trim() || formData.celular || null,
+        salon: config.label,
+      }
+      await herederosCiclosService.updateParticipante(editingParticipant.id, updateInput, audit)
       toast.success("Datos actualizados")
       setShowEditParticipant(false)
       setEditingParticipant(null)
@@ -382,11 +428,10 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                   <tr className="bg-gray-50">
                     <th className="border border-gray-200 px-2 py-2 text-center font-medium w-8">N°</th>
                     <th className="border border-gray-200 px-2 py-2 text-left font-medium min-w-[150px]">Nombre y Apellido</th>
-                    <th className="border border-gray-200 px-2 py-2 text-center font-medium min-w-[85px]">F. Nacimiento</th>
                     <th className="border border-gray-200 px-2 py-2 text-center font-medium w-12">Edad</th>
-                    <th className="border border-gray-200 px-2 py-2 text-center font-medium min-w-[70px]">Salón</th>
-                    <th className="border border-gray-200 px-2 py-2 text-center font-medium w-12">Nuevo</th>
-                    {/* 4 columnas de clases (fechas) */}
+                    <th className="border border-gray-200 px-2 py-2 text-left font-medium min-w-[90px]">Alergias</th>
+                    <th className="border border-gray-200 px-2 py-2 text-left font-medium min-w-[100px]">Observaciones</th>
+                    {/* Columnas de clases (fechas) */}
                     {data.fechas.map((f) => (
                       <th key={f.id} className="border border-gray-200 px-1 py-1 text-center font-medium min-w-[60px]">
                         <div className="flex flex-col items-center">
@@ -400,10 +445,10 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                         </div>
                       </th>
                     ))}
+                    <th className="border border-gray-200 px-2 py-2 text-center font-medium min-w-[70px]">Salón</th>
+                    <th className="border border-gray-200 px-2 py-2 text-center font-medium w-12">Nuevo</th>
                     <th className="border border-gray-200 px-2 py-2 text-left font-medium min-w-[130px]">Representante</th>
                     <th className="border border-gray-200 px-2 py-2 text-center font-medium min-w-[90px]">Celular</th>
-                    <th className="border border-gray-200 px-2 py-2 text-center font-medium min-w-[80px]">F. Registro</th>
-                    <th className="border border-gray-200 px-2 py-2 text-left font-medium min-w-[100px]">Observaciones</th>
                     {canEdit && <th className="border border-gray-200 px-1 py-2 text-center font-medium w-16">Acc.</th>}
                   </tr>
                 </thead>
@@ -412,10 +457,9 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                     <tr key={p.id} className="hover:bg-gray-50">
                       <td className="border border-gray-200 px-2 py-1 text-center">{idx + 1}</td>
                       <td className="border border-gray-200 px-2 py-1 font-medium">{p.nombre}</td>
-                      <td className="border border-gray-200 px-2 py-1 text-center">{p.fecha_nacimiento ? formatDateShort(p.fecha_nacimiento) : "-"}</td>
                       <td className="border border-gray-200 px-2 py-1 text-center">{p.edad ?? "-"}</td>
-                      <td className="border border-gray-200 px-2 py-1 text-center">{p.salon || "-"}</td>
-                      <td className="border border-gray-200 px-2 py-1 text-center">{p.nuevo ? "✓" : ""}</td>
+                      <td className="border border-gray-200 px-2 py-1 truncate max-w-[100px]">{p.alergias || "-"}</td>
+                      <td className="border border-gray-200 px-2 py-1 truncate max-w-[120px]">{p.observaciones || "-"}</td>
                       {data.fechas.map((f) => {
                         const status = getAttendanceStatus(p.id, f.id)
                         return (
@@ -432,10 +476,10 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                           </td>
                         )
                       })}
+                      <td className="border border-gray-200 px-2 py-1 text-center">{p.salon || config.label}</td>
+                      <td className="border border-gray-200 px-2 py-1 text-center">{p.nuevo ? "✓" : ""}</td>
                       <td className="border border-gray-200 px-2 py-1">{p.nombre_representante || "-"}</td>
                       <td className="border border-gray-200 px-2 py-1 text-center">{p.celular || "-"}</td>
-                      <td className="border border-gray-200 px-2 py-1 text-center">{p.fecha_registro ? formatDateShort(p.fecha_registro) : "-"}</td>
-                      <td className="border border-gray-200 px-2 py-1 truncate max-w-[120px]">{p.observaciones || "-"}</td>
                       {canEdit && (
                         <td className="border border-gray-200 px-1 py-1 text-center">
                           <div className="flex items-center justify-center gap-0.5">
@@ -484,16 +528,20 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                 <div><Label className="text-xs">Fecha Nacimiento</Label><Input value={fechaNacDisplay} onChange={(e) => handleFechaNacChange(e.target.value)} placeholder="dd/mm/aaaa" /><p className="text-[9px] text-gray-400 mt-0.5">Se calcula la edad</p></div>
                 <div><Label className="text-xs">Edad</Label><Input type="number" value={formData.edad ?? ""} readOnly className="bg-gray-50" placeholder="Auto" /></div>
               </div>
+              <div><Label className="text-xs">Alergias</Label><Input value={formData.alergias || ""} onChange={(e) => setFormData({ ...formData, alergias: e.target.value })} placeholder="Alergias conocidas..." /></div>
+              <div><Label className="text-xs">Observaciones</Label><Textarea value={formData.observaciones || ""} onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} rows={2} placeholder="Notas adicionales..." /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-xs">Salón</Label><Input value={formData.salon || ""} onChange={(e) => setFormData({ ...formData, salon: e.target.value })} placeholder="Ej: A, B, 1..." /></div>
-                <div className="flex items-end gap-2 pb-1">
-                  <Checkbox id="nuevo-check" checked={formData.nuevo} onCheckedChange={(v) => setFormData({ ...formData, nuevo: !!v })} />
-                  <Label htmlFor="nuevo-check" className="text-xs cursor-pointer">Nuevo</Label>
-                </div>
+                <div><Label className="text-xs">Nombre de la Madre</Label><Input value={formData.nombre_madre || ""} onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })} placeholder="Nombre completo" /></div>
+                <div><Label className="text-xs">Teléfono Madre</Label><Input value={formData.telefono_madre || ""} onChange={(e) => setFormData({ ...formData, telefono_madre: e.target.value })} placeholder="0999999999" /></div>
               </div>
-              <div><Label className="text-xs">Nombre del Representante</Label><Input value={formData.nombre_representante || ""} onChange={(e) => setFormData({ ...formData, nombre_representante: e.target.value })} placeholder="Padre/Madre/Tutor" /></div>
-              <div><Label className="text-xs">Celular</Label><Input value={formData.celular || ""} onChange={(e) => setFormData({ ...formData, celular: e.target.value })} placeholder="0999999999" /></div>
-              <div><Label className="text-xs">Observaciones</Label><Textarea value={formData.observaciones || ""} onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} rows={2} placeholder="Alergias, condiciones, notas..." /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Nombre del Padre</Label><Input value={formData.nombre_padre || ""} onChange={(e) => setFormData({ ...formData, nombre_padre: e.target.value })} placeholder="Nombre completo" /></div>
+                <div><Label className="text-xs">Teléfono Padre</Label><Input value={formData.telefono_padre || ""} onChange={(e) => setFormData({ ...formData, telefono_padre: e.target.value })} placeholder="0999999999" /></div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox id="nuevo-check" checked={formData.nuevo} onCheckedChange={(v) => setFormData({ ...formData, nuevo: !!v })} className="h-5 w-5" />
+                <Label htmlFor="nuevo-check" className="text-sm cursor-pointer">Nuevo</Label>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddParticipant(false)}>Cancelar</Button>
@@ -514,16 +562,20 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                 <div><Label className="text-xs">Fecha Nacimiento</Label><Input value={fechaNacDisplay} onChange={(e) => handleFechaNacChange(e.target.value)} placeholder="dd/mm/aaaa" /></div>
                 <div><Label className="text-xs">Edad</Label><Input type="number" value={formData.edad ?? ""} readOnly className="bg-gray-50" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-xs">Salón</Label><Input value={formData.salon || ""} onChange={(e) => setFormData({ ...formData, salon: e.target.value })} /></div>
-                <div className="flex items-end gap-2 pb-1">
-                  <Checkbox id="nuevo-edit" checked={formData.nuevo} onCheckedChange={(v) => setFormData({ ...formData, nuevo: !!v })} />
-                  <Label htmlFor="nuevo-edit" className="text-xs cursor-pointer">Nuevo</Label>
-                </div>
-              </div>
-              <div><Label className="text-xs">Nombre del Representante</Label><Input value={formData.nombre_representante || ""} onChange={(e) => setFormData({ ...formData, nombre_representante: e.target.value })} /></div>
-              <div><Label className="text-xs">Celular</Label><Input value={formData.celular || ""} onChange={(e) => setFormData({ ...formData, celular: e.target.value })} /></div>
+              <div><Label className="text-xs">Alergias</Label><Input value={formData.alergias || ""} onChange={(e) => setFormData({ ...formData, alergias: e.target.value })} placeholder="Alergias conocidas..." /></div>
               <div><Label className="text-xs">Observaciones</Label><Textarea value={formData.observaciones || ""} onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} rows={2} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Nombre de la Madre</Label><Input value={formData.nombre_madre || ""} onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })} /></div>
+                <div><Label className="text-xs">Teléfono Madre</Label><Input value={formData.telefono_madre || ""} onChange={(e) => setFormData({ ...formData, telefono_madre: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Nombre del Padre</Label><Input value={formData.nombre_padre || ""} onChange={(e) => setFormData({ ...formData, nombre_padre: e.target.value })} /></div>
+                <div><Label className="text-xs">Teléfono Padre</Label><Input value={formData.telefono_padre || ""} onChange={(e) => setFormData({ ...formData, telefono_padre: e.target.value })} /></div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox id="nuevo-edit" checked={formData.nuevo} onCheckedChange={(v) => setFormData({ ...formData, nuevo: !!v })} className="h-5 w-5" />
+                <Label htmlFor="nuevo-edit" className="text-sm cursor-pointer">Nuevo</Label>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowEditParticipant(false)}>Cancelar</Button>

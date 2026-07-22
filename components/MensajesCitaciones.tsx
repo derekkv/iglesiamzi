@@ -9,6 +9,7 @@ import { authFetch } from "@/lib/auth-fetch"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -611,7 +612,7 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm">Fecha *</Label>
-                <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                <SmartDateInput value={fecha} onChange={(v) => setFecha(v)} />
               </div>
               <div>
                 <Label className="text-sm">Valor ($)</Label>

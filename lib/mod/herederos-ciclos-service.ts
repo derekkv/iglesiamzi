@@ -7,11 +7,11 @@ import { currentMonthEcuador, currentYearEcuador } from "../timezone"
 
 export type HerederosCicloTipo = "herederos_baby" | "herederos_kids" | "herederos_explores" | "herederos_champions"
 
-export const HEREDEROS_CICLO_CONFIG: Record<HerederosCicloTipo, { label: string; edadRango: string; moduleName: string }> = {
-  herederos_baby: { label: "Herederos Baby", edadRango: "0-2 años", moduleName: "herederos_baby" },
-  herederos_kids: { label: "Herederos Kids", edadRango: "3-5 años", moduleName: "herederos_kids" },
-  herederos_explores: { label: "Herederos Explores", edadRango: "6-8 años", moduleName: "herederos_explores" },
-  herederos_champions: { label: "Herederos Champions", edadRango: "9-11 años", moduleName: "herederos_champions" },
+export const HEREDEROS_CICLO_CONFIG: Record<HerederosCicloTipo, { label: string; edadRango: string; moduleName: string; edadMin: number; edadMax: number }> = {
+  herederos_baby: { label: "Herederos Baby", edadRango: "0-2 años", moduleName: "herederos_baby", edadMin: 0, edadMax: 2 },
+  herederos_kids: { label: "Herederos Kids", edadRango: "3-5 años", moduleName: "herederos_kids", edadMin: 3, edadMax: 5 },
+  herederos_explores: { label: "Herederos Explores", edadRango: "6-8 años", moduleName: "herederos_explores", edadMin: 6, edadMax: 8 },
+  herederos_champions: { label: "Herederos Champions", edadRango: "9-11 años", moduleName: "herederos_champions", edadMin: 9, edadMax: 11 },
 }
 
 export interface HerederosCiclo {
@@ -35,6 +35,7 @@ export interface HerederosParticipante {
   nombre_representante: string | null
   celular: string | null
   fecha_registro: string | null
+  alergias: string | null
   observaciones: string | null
   created_at: string
   updated_at: string
@@ -75,6 +76,7 @@ export interface HerederosParticipanteInput {
   nombre_representante?: string | null
   celular?: string | null
   fecha_registro?: string | null
+  alergias?: string | null
   observaciones?: string | null
 }
 
@@ -197,6 +199,9 @@ class HerederosCiclosService {
 
     if (fechasError) throw fechasError
 
+    // Auto-importar niños desde censo_ninos según rango de edad
+    await this.importarDesdeCensoNinos(ciclo.id, tipo, audit)
+
     if (audit) {
       auditService.log({
         ...audit,
@@ -248,6 +253,16 @@ class HerederosCiclosService {
       .order("nombre", { ascending: true })
 
     if (error) throw error
+
+    // Recalcular edad en tiempo real desde fecha_nacimiento
+    if (data) {
+      for (const p of data) {
+        if (p.fecha_nacimiento) {
+          p.edad = calcularEdadDesdeNacimiento(p.fecha_nacimiento)
+        }
+      }
+    }
+
     return data || []
   }
 
@@ -266,6 +281,7 @@ class HerederosCiclosService {
         nombre_representante: input.nombre_representante?.trim() || null,
         celular: input.celular?.trim() || null,
         fecha_registro: input.fecha_registro || new Date().toISOString().split("T")[0],
+        alergias: input.alergias?.trim() || null,
         observaciones: input.observaciones?.trim() || null,
       })
       .select()
@@ -300,6 +316,7 @@ class HerederosCiclosService {
     if (input.nombre_representante !== undefined) updateData.nombre_representante = input.nombre_representante?.trim() || null
     if (input.celular !== undefined) updateData.celular = input.celular?.trim() || null
     if (input.fecha_registro !== undefined) updateData.fecha_registro = input.fecha_registro || null
+    if (input.alergias !== undefined) updateData.alergias = input.alergias?.trim() || null
     if (input.observaciones !== undefined) updateData.observaciones = input.observaciones?.trim() || null
 
     // Obtener antes
@@ -487,6 +504,71 @@ class HerederosCiclosService {
     const ciclo = await this.getCicloActivo(tipo)
     if (!ciclo) return null
     return this.getCicloCompleto(ciclo.id)
+  }
+
+  /**
+   * Importa niños desde censo_ninos al ciclo activo según el rango de edad del tipo.
+   * Solo importa los que no estén ya registrados (por nombre).
+   */
+  async importarDesdeCensoNinos(
+    cicloId: number,
+    tipo: HerederosCicloTipo,
+    audit?: AuditInfo
+  ): Promise<{ importados: number; yaExistentes: number }> {
+    const config = HEREDEROS_CICLO_CONFIG[tipo]
+
+    // Obtener niños de censo_ninos con edad en el rango
+    const { data: ninos, error: ninosError } = await supabase
+      .from("censo_ninos")
+      .select("*")
+      .gte("edad", config.edadMin)
+      .lte("edad", config.edadMax)
+
+    if (ninosError) throw ninosError
+    if (!ninos || ninos.length === 0) return { importados: 0, yaExistentes: 0 }
+
+    // Obtener participantes actuales del ciclo
+    const participantesActuales = await this.getParticipantes(cicloId)
+    const nombresExistentes = new Set(participantesActuales.map(p => p.nombre.trim().toUpperCase()))
+
+    // Filtrar los que no están registrados
+    const nuevos = ninos.filter(n => !nombresExistentes.has(n.nombre.trim().toUpperCase()))
+    const yaExistentes = ninos.length - nuevos.length
+
+    if (nuevos.length === 0) return { importados: 0, yaExistentes }
+
+    // Insertar nuevos participantes
+    const inserts = nuevos.map(n => ({
+      ciclo_id: cicloId,
+      nombre: n.nombre.trim(),
+      fecha_nacimiento: n.fecha_nacimiento || null,
+      edad: n.edad ?? null,
+      salon: config.label,
+      nuevo: false,
+      nombre_representante: n.nombre_madre || n.nombre_padre || null,
+      celular: n.telefono_madre || n.telefono_padre || null,
+      fecha_registro: new Date().toISOString().split("T")[0],
+      alergias: n.alergias || null,
+      observaciones: n.observaciones || null,
+    }))
+
+    const { error: insertError } = await supabase
+      .from("herederos_ciclo_participantes")
+      .insert(inserts)
+
+    if (insertError) throw insertError
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "herederos",
+        action: "crear",
+        description: `Importados ${nuevos.length} niños desde Censo Niños a ${config.label}`,
+        details: { ciclo_id: cicloId, tipo, importados: nuevos.length, ya_existentes: yaExistentes },
+      })
+    }
+
+    return { importados: nuevos.length, yaExistentes }
   }
 
   /** Eliminar un ciclo completo (asistencia, participantes, fechas, ciclo) */

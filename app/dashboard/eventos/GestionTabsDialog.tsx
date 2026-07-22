@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Plus, Pencil, Trash2, GripVertical } from "lucide-react"
@@ -238,18 +239,16 @@ export function GestionTabsDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Fecha Inicio</Label>
-                  <Input
-                    type="date"
+                  <SmartDateInput
                     value={form.fecha_inicio}
-                    onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })}
+                    onChange={(v) => setForm({ ...form, fecha_inicio: v })}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label>Fecha Fin</Label>
-                  <Input
-                    type="date"
+                  <SmartDateInput
                     value={form.fecha_fin}
-                    onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })}
+                    onChange={(v) => setForm({ ...form, fecha_fin: v })}
                   />
                 </div>
               </div>

@@ -9,6 +9,7 @@ import { useSecurityCheck } from "@/contexts/security-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -405,10 +406,9 @@ function PresentacionNinosContent({ canEdit }: { canEdit: boolean }) {
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Fecha de Presentación</Label>
-              <Input
-                type="date"
+              <SmartDateInput
                 value={formData.fecha}
-                onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, fecha: v })}
               />
             </div>
             <div className="space-y-1.5">

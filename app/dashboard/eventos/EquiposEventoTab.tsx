@@ -39,7 +39,23 @@ export function EquiposEventoTab({ tabs, canEdit, userId, userName }: EquiposEve
   // Modales
   const [showDividirModal, setShowDividirModal] = useState(false)
   const [showLimpiarModal, setShowLimpiarModal] = useState(false)
-  const [incluirSinCancelar, setIncluirSinCancelar] = useState(false)
+  const [excluirFaltantes, setExcluirFaltantes] = useState(true)
+  const [ocultarPendientes, setOcultarPendientes] = useState(true)
+  const [participantesIncluidos, setParticipantesIncluidos] = useState<Record<number, boolean>>({})
+
+  // Cuando se abre el modal, inicializar checks de todos los participantes
+  const abrirDividirModal = () => {
+    const initial: Record<number, boolean> = {}
+    participantes.forEach(p => {
+      // Los que tienen saldo pendiente se excluyen por defecto
+      const tieneSaldo = p.valor > 0 && p.abono < p.valor
+      initial[p.id] = !tieneSaldo // true = incluido, false = excluido
+    })
+    setParticipantesIncluidos(initial)
+    setExcluirFaltantes(true)
+    setOcultarPendientes(true)
+    setShowDividirModal(true)
+  }
 
   useEffect(() => {
     if (selectedEventoId) {
@@ -73,10 +89,15 @@ export function EquiposEventoTab({ tabs, canEdit, userId, userName }: EquiposEve
     setShowDividirModal(false)
     setDividing(true)
     try {
+      // IDs excluidos = los que tienen check en false (no incluidos)
+      const idsExcluidos = participantes
+        .filter(p => !participantesIncluidos[p.id])
+        .map(p => p.id)
+
       const result = await eventoParticipantesService.dividirEquipos(
         parseInt(selectedEventoId),
         { userId, userName },
-        { incluirSinCancelar }
+        { incluirSinCancelar: idsExcluidos.length === 0, idsExcluidos }
       )
       setRazones(result.razones)
       setExcluidos(result.excluidos)
@@ -109,7 +130,7 @@ export function EquiposEventoTab({ tabs, canEdit, userId, userName }: EquiposEve
       toast.error("Se necesitan al menos 4 participantes para dividir en equipos. Actualmente hay " + participantes.length + ".")
       return
     }
-    setShowDividirModal(true)
+    abrirDividirModal()
   }
 
   const equiposData: Record<Equipo, EventoParticipante[]> = {
@@ -349,30 +370,95 @@ export function EquiposEventoTab({ tabs, canEdit, userId, userName }: EquiposEve
 
       {/* Modal: Dividir equipos */}
       <Dialog open={showDividirModal} onOpenChange={setShowDividirModal}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Dividir en Equipos</DialogTitle>
             <DialogDescription>
-              Se dividirán los participantes de <strong>&quot;{selectedEvento?.nombre}&quot;</strong> en 4 equipos equilibrados (Amarillo, Azul, Verde, Naranja).
+              Se dividirán los participantes de <strong>&quot;{selectedEvento?.nombre}&quot;</strong> en 4 equipos equilibrados.
               {tieneEquipos && " Esto reemplazará la asignación actual."}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="flex items-center space-x-2">
+          <div className="py-3 space-y-4 flex-1 overflow-y-auto">
+            {/* Toggle excluir faltantes */}
+            <div className="flex items-center space-x-3 p-3 rounded-lg border bg-amber-50 border-amber-200">
               <Checkbox
-                id="incluirSinCancelar"
-                checked={incluirSinCancelar}
-                onCheckedChange={(checked) => setIncluirSinCancelar(checked as boolean)}
+                id="excluirFaltantes"
+                checked={excluirFaltantes}
+                className="h-6 w-6"
+                onCheckedChange={(checked) => {
+                  const val = checked as boolean
+                  setExcluirFaltantes(val)
+                  // Actualizar checks individuales según toggle
+                  const updated = { ...participantesIncluidos }
+                  sinCancelar.forEach(p => {
+                    updated[p.id] = !val // si excluir=true, no incluir a los faltantes
+                  })
+                  setParticipantesIncluidos(updated)
+                }}
               />
-              <Label htmlFor="incluirSinCancelar" className="text-sm">
-                Incluir personas con saldo pendiente ({sinCancelar.length} personas)
+              <Label htmlFor="excluirFaltantes" className="text-sm font-medium cursor-pointer text-amber-800">
+                Excluir a los que no han cancelado ({sinCancelar.length})
               </Label>
             </div>
-            {!incluirSinCancelar && sinCancelar.length > 0 && (
-              <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                Se excluirán {sinCancelar.length} personas que no han cancelado su cuota completa.
-              </p>
-            )}
+
+            {/* Lista de TODOS los participantes */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-gray-100 px-3 py-2 border-b flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-700">
+                  Participantes — desmarque para excluir:
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox
+                      id="ocultarPendientes"
+                      className="h-3.5 w-3.5"
+                      checked={ocultarPendientes}
+                      onCheckedChange={(checked) => setOcultarPendientes(checked as boolean)}
+                    />
+                    <Label htmlFor="ocultarPendientes" className="text-[10px] text-gray-500 cursor-pointer">
+                      Ocultar pendientes
+                    </Label>
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    {participantes.filter(p => participantesIncluidos[p.id]).length} incluidos · {participantes.filter(p => !participantesIncluidos[p.id]).length} excluidos
+                  </p>
+                </div>
+              </div>
+              <div className="max-h-56 overflow-y-auto divide-y">
+                {participantes
+                  .filter(p => !(ocultarPendientes && p.valor > 0 && p.abono < p.valor))
+                  .map(p => {
+                  const tieneSaldo = p.valor > 0 && p.abono < p.valor
+                  return (
+                    <div key={p.id} className={`flex items-center gap-3 px-3 py-2 hover:bg-gray-50 ${!participantesIncluidos[p.id] ? "bg-red-50/50" : ""}`}>
+                      <Checkbox
+                        id={`part-${p.id}`}
+                        className="h-5 w-5"
+                        checked={!!participantesIncluidos[p.id]}
+                        onCheckedChange={(checked) => {
+                          setParticipantesIncluidos(prev => ({ ...prev, [p.id]: checked as boolean }))
+                        }}
+                      />
+                      <Label htmlFor={`part-${p.id}`} className="flex-1 cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{p.nombre}</p>
+                          {tieneSaldo && (
+                            <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 ml-2">
+                              Debe ${(p.valor - p.abono).toFixed(2)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                          {p.edad} años · {p.genero === "masculino" ? "M" : "F"} · {p.contextura}
+                          {p.limitacion_fisica && " · ⚠️ Limitación"}
+                        </p>
+                      </Label>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
             <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
               <p className="font-medium mb-1">Criterios de equilibrio:</p>
               <ul className="list-disc list-inside text-xs space-y-0.5">
@@ -383,17 +469,13 @@ export function EquiposEventoTab({ tabs, canEdit, userId, userName }: EquiposEve
                 <li>Tamaño de equipos (±1 persona máximo)</li>
               </ul>
             </div>
-            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-              <p className="font-medium">Método:</p>
-              <p>Asignación greedy multi-criterio: primero se reparten las personas con limitación física (round-robin), luego cada persona restante se asigna al equipo que más la necesita según balance de tamaño, género, contextura y edad.</p>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDividirModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleDividir}>
-              Dividir Equipos
+            <Button onClick={handleDividir} disabled={participantes.filter(p => participantesIncluidos[p.id]).length < 4}>
+              Dividir Equipos ({participantes.filter(p => participantesIncluidos[p.id]).length} personas)
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -47,6 +47,18 @@ export function calcularEdadDesdeNacimiento(fechaNacimiento: string): number | n
 }
 
 /**
+ * Determina el grupo de Herederos del Reino según la edad.
+ */
+export function determinarGrupoHerederos(edad: number | null): string | null {
+  if (edad === null || edad < 0) return null
+  if (edad <= 2) return "HEREDEROS BABY"
+  if (edad <= 5) return "HEREDEROS KIDS"
+  if (edad <= 8) return "HEREDEROS EXPLORES"
+  if (edad <= 11) return "HEREDEROS CHAMPIONS"
+  return null
+}
+
+/**
  * Limpia el objeto antes de enviarlo a Supabase.
  */
 function cleanRecordForInsert(record: Partial<CensoNinoRecord>): Record<string, any> {
@@ -73,6 +85,18 @@ export const censoNinosService = {
       .order("nombre", { ascending: true })
 
     if (error) throw error
+
+    // Recalcular edad y grupo en tiempo real desde fecha_nacimiento
+    if (data) {
+      for (const r of data) {
+        if (r.fecha_nacimiento) {
+          r.edad = calcularEdadDesdeNacimiento(r.fecha_nacimiento)
+          const grupo = determinarGrupoHerederos(r.edad)
+          if (grupo) r.grupo = grupo
+        }
+      }
+    }
+
     return data || []
   },
 
@@ -96,6 +120,12 @@ export const censoNinosService = {
     // Recalcular edad si hay fecha de nacimiento
     if (cleaned.fecha_nacimiento) {
       cleaned.edad = calcularEdadDesdeNacimiento(cleaned.fecha_nacimiento)
+    }
+
+    // Auto-asignar grupo según edad
+    if (cleaned.edad != null) {
+      const grupo = determinarGrupoHerederos(cleaned.edad)
+      if (grupo) cleaned.grupo = grupo
     }
 
     const { data, error } = await supabase
@@ -135,6 +165,12 @@ export const censoNinosService = {
     // Recalcular edad si hay fecha de nacimiento
     if (cleaned.fecha_nacimiento) {
       cleaned.edad = calcularEdadDesdeNacimiento(cleaned.fecha_nacimiento)
+    }
+
+    // Auto-asignar grupo según edad
+    if (cleaned.edad != null) {
+      const grupo = determinarGrupoHerederos(cleaned.edad)
+      if (grupo) cleaned.grupo = grupo
     }
 
     cleaned.updated_at = new Date().toISOString()

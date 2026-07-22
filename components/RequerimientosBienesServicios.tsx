@@ -11,6 +11,7 @@ import { getGlobalConfig, type GlobalConfig } from "@/lib/globalConfig"
 import { authFetch } from "@/lib/auth-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -688,10 +689,9 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
               </div>
               <div>
                 <Label className="text-sm">Fecha de Entrega</Label>
-                <Input
-                  type="date"
+                <SmartDateInput
                   value={formData.fecha_entrega}
-                  onChange={(e) => setFormData({ ...formData, fecha_entrega: e.target.value })}
+                  onChange={(v) => setFormData({ ...formData, fecha_entrega: v })}
                 />
               </div>
             </div>
@@ -735,10 +735,9 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
               </div>
               <div>
                 <Label className="text-sm">Fecha de Entrega</Label>
-                <Input
-                  type="date"
+                <SmartDateInput
                   value={editData.fecha_entrega}
-                  onChange={(e) => setEditData({ ...editData, fecha_entrega: e.target.value })}
+                  onChange={(v) => setEditData({ ...editData, fecha_entrega: v })}
                 />
               </div>
             </div>

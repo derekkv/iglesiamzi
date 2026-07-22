@@ -6,6 +6,7 @@ import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -251,7 +252,7 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
                   </DialogHeader>
                   <div>
                     <Label>Fecha de inicio</Label>
-                    <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+                    <SmartDateInput value={fechaInicio} onChange={(v) => setFechaInicio(v)} />
                     <p className="text-xs text-gray-500 mt-1">Si no es domingo, se ajustará al próximo domingo.</p>
                   </div>
                   <DialogFooter>
@@ -562,7 +563,7 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
               </DialogHeader>
               <div>
                 <Label>Nueva fecha</Label>
-                <Input type="date" value={nuevaFechaEdit} onChange={(e) => setNuevaFechaEdit(e.target.value)} />
+                <SmartDateInput value={nuevaFechaEdit} onChange={(v) => setNuevaFechaEdit(v)} />
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowEditFecha(false)}>Cancelar</Button>

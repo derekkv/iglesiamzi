@@ -6,6 +6,7 @@ import { useRealtime } from "@/hooks/use-realtime"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -335,8 +336,8 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div><Label>Donante</Label><Input placeholder="Buscar por nombre..." value={searchFilters.donador} onChange={(e) => setSearchFilters({ ...searchFilters, donador: e.target.value })} /></div>
-                  <div><Label>Fecha Desde</Label><Input type="date" value={searchFilters.fechaDesde} onChange={(e) => setSearchFilters({ ...searchFilters, fechaDesde: e.target.value })} /></div>
-                  <div><Label>Fecha Hasta</Label><Input type="date" value={searchFilters.fechaHasta} onChange={(e) => setSearchFilters({ ...searchFilters, fechaHasta: e.target.value })} /></div>
+                  <div><Label>Fecha Desde</Label><SmartDateInput value={searchFilters.fechaDesde} onChange={(v) => setSearchFilters({ ...searchFilters, fechaDesde: v })} /></div>
+                  <div><Label>Fecha Hasta</Label><SmartDateInput value={searchFilters.fechaHasta} onChange={(v) => setSearchFilters({ ...searchFilters, fechaHasta: v })} /></div>
                 </div>
                 <Button onClick={handleSearch} disabled={searchLoading} className="w-full md:w-auto"><Search className="w-4 h-4 mr-2" />{searchLoading ? "Buscando..." : "Buscar"}</Button>
               </CardContent>
@@ -390,7 +391,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent>
             <DialogHeader><DialogTitle>Registrar Diezmo / Primicia</DialogTitle><DialogDescription>Ingrese los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
-              <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></div>
+              <div><Label>Fecha</Label><SmartDateInput value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /></div>
               <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
               <div><Label>Valor</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
               <div>
@@ -427,7 +428,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent>
             <DialogHeader><DialogTitle>Editar Registro</DialogTitle><DialogDescription>Modifique los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
-              <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></div>
+              <div><Label>Fecha</Label><SmartDateInput value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /></div>
               <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
               <div><Label>Valor</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
               <div>

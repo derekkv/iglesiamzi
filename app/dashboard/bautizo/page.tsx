@@ -9,6 +9,7 @@ import { useSecurityCheck } from "@/contexts/security-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -573,10 +574,9 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
                   <Label className={`text-sm ${isMissing ? "text-red-600 font-medium" : "text-gray-700"}`}>
                     {field.label} {isMissing && <span className="text-red-500">*</span>}
                   </Label>
-                  <Input
-                    type="date"
+                  <SmartDateInput
                     value={editForm[field.key] || ""}
-                    onChange={(e) => setEditForm({ ...editForm, [field.key]: e.target.value })}
+                    onChange={(v) => setEditForm({ ...editForm, [field.key]: v })}
                     className={isMissing ? "border-red-300 focus:border-red-500" : ""}
                     disabled={!canEdit}
                   />
@@ -613,12 +613,19 @@ function BautizoContent({ canEdit }: { canEdit: boolean }) {
                 <Label className="text-sm text-gray-700">
                   {field.label} {field.required && <span className="text-red-500">*</span>}
                 </Label>
-                <Input
-                  type={field.type || "text"}
-                  value={manualForm[field.key] || ""}
-                  onChange={(e) => setManualForm({ ...manualForm, [field.key]: e.target.value })}
-                  placeholder={`Ingrese ${field.label.toLowerCase()}`}
-                />
+                {field.type === "date" ? (
+                  <SmartDateInput
+                    value={manualForm[field.key] || ""}
+                    onChange={(v) => setManualForm({ ...manualForm, [field.key]: v })}
+                  />
+                ) : (
+                  <Input
+                    type={field.type || "text"}
+                    value={manualForm[field.key] || ""}
+                    onChange={(e) => setManualForm({ ...manualForm, [field.key]: e.target.value })}
+                    placeholder={`Ingrese ${field.label.toLowerCase()}`}
+                  />
+                )}
               </div>
             ))}
           </div>

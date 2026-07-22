@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import {
   censoNinosService,
   calcularEdadDesdeNacimiento,
+  determinarGrupoHerederos,
   type CensoNinoRecord,
   type CensoNinoInput,
 } from "@/lib/mod/censo-ninos-service"
@@ -122,6 +123,9 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
         const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
         updated.fecha_nacimiento = dateStr
         updated.edad = calcularEdadDesdeNacimiento(dateStr)
+        // Auto-asignar grupo según edad
+        const grupo = determinarGrupoHerederos(updated.edad)
+        if (grupo) updated.grupo = grupo
       }
     } else {
       // Si no se puede parsear, limpiar fecha y edad
@@ -313,8 +317,9 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
                     <TableRow>
                       <TableHead className="text-xs w-10">#</TableHead>
                       <TableHead className="text-xs">Nombre</TableHead>
-                      <TableHead className="text-xs">F. Nacimiento</TableHead>
                       <TableHead className="text-xs w-14">Edad</TableHead>
+                      <TableHead className="text-xs">Alergias</TableHead>
+                      <TableHead className="text-xs">Observaciones</TableHead>
                       <TableHead className="text-xs">Grupo</TableHead>
                       <TableHead className="text-xs">Madre</TableHead>
                       <TableHead className="text-xs">Tlf. Madre</TableHead>
@@ -328,8 +333,9 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
                       <TableRow key={record.id}>
                         <TableCell className="text-xs text-gray-500">{idx + 1}</TableCell>
                         <TableCell className="text-xs font-medium">{record.nombre}</TableCell>
-                        <TableCell className="text-xs">{formatDate(record.fecha_nacimiento)}</TableCell>
                         <TableCell className="text-xs text-center">{record.edad ?? "-"}</TableCell>
+                        <TableCell className="text-xs">{record.alergias || "-"}</TableCell>
+                        <TableCell className="text-xs">{record.observaciones || "-"}</TableCell>
                         <TableCell className="text-xs">{record.grupo || "-"}</TableCell>
                         <TableCell className="text-xs">{record.nombre_madre || "-"}</TableCell>
                         <TableCell className="text-xs">{record.telefono_madre || "-"}</TableCell>

@@ -525,7 +525,7 @@ export const eventoParticipantesService = {
   async dividirEquipos(
     eventoId: number,
     audit?: { userId: string; userName: string },
-    options?: { incluirSinCancelar?: boolean }
+    options?: { incluirSinCancelar?: boolean; idsExcluidos?: number[] }
   ): Promise<{
     equipos: Record<Equipo, EventoParticipante[]>
     razones: string[]
@@ -534,12 +534,17 @@ export const eventoParticipantesService = {
     const todos = await this.getByEvento(eventoId)
 
     const incluirSinCancelar = options?.incluirSinCancelar ?? false
+    const idsExcluidos = options?.idsExcluidos ?? []
     let participantes: EventoParticipante[]
     let excluidos: EventoParticipante[]
 
     if (incluirSinCancelar) {
       participantes = todos
       excluidos = []
+    } else if (idsExcluidos.length > 0) {
+      // Exclusión individual por IDs específicos
+      participantes = todos.filter(p => !idsExcluidos.includes(p.id))
+      excluidos = todos.filter(p => idsExcluidos.includes(p.id))
     } else {
       participantes = todos.filter(p => p.valor <= 0 || p.abono >= p.valor)
       excluidos = todos.filter(p => p.valor > 0 && p.abono < p.valor)

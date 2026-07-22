@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -386,8 +387,8 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
                       <div>
                         <Label className="text-sm">Fecha *</Label>
-                        <Input type="date" value={gestionForm.fecha}
-                          onChange={(e) => setGestionForm({ ...gestionForm, fecha: e.target.value })} className="mt-1" />
+                        <SmartDateInput value={gestionForm.fecha}
+                          onChange={(v) => setGestionForm({ ...gestionForm, fecha: v })} className="mt-1" />
                       </div>
                       <div>
                         <Label className="text-sm">Nombre del Responsable *</Label>

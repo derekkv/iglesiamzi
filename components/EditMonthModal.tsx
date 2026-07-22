@@ -9,6 +9,7 @@ import { useState } from "react"
 import { useMonth } from "@/contexts/month-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { toast } from "sonner"
 
 interface EditMonthModalProps {
@@ -40,12 +41,12 @@ export function EditMonthModal({ month, open, setOpen }: EditMonthModalProps) {
         <div className="space-y-3">
           <div>
             <label>Fecha inicio</label>
-            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <SmartDateInput value={startDate} onChange={(v) => setStartDate(v)} />
           </div>
 
           <div>
             <label>Fecha cierre</label>
-            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            <SmartDateInput value={endDate} onChange={(v) => setEndDate(v)} />
           </div>
         </div>
 

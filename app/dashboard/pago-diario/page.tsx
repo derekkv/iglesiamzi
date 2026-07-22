@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -256,7 +257,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
   const renderForm = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div><Label>Fecha *</Label><Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></div>
+        <div><Label>Fecha *</Label><SmartDateInput value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /></div>
         <div><Label>Valor *</Label><Input type="number" min="0" step="0.01" placeholder="0.00" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></div>
       </div>
       <div>
@@ -498,8 +499,8 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div><Label>Beneficiario</Label><Input placeholder="Buscar..." value={searchFilters.nombre} onChange={(e) => setSearchFilters({ ...searchFilters, nombre: e.target.value })} /></div>
-                  <div><Label>Desde</Label><Input type="date" value={searchFilters.fechaDesde} onChange={(e) => setSearchFilters({ ...searchFilters, fechaDesde: e.target.value })} /></div>
-                  <div><Label>Hasta</Label><Input type="date" value={searchFilters.fechaHasta} onChange={(e) => setSearchFilters({ ...searchFilters, fechaHasta: e.target.value })} /></div>
+                  <div><Label>Desde</Label><SmartDateInput value={searchFilters.fechaDesde} onChange={(v) => setSearchFilters({ ...searchFilters, fechaDesde: v })} /></div>
+                  <div><Label>Hasta</Label><SmartDateInput value={searchFilters.fechaHasta} onChange={(v) => setSearchFilters({ ...searchFilters, fechaHasta: v })} /></div>
                   <div>
                     <Label>Ministerio</Label>
                     <Select value={searchFilters.ministerio} onValueChange={(v) => setSearchFilters({ ...searchFilters, ministerio: v })}>
