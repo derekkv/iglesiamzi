@@ -59,7 +59,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
   // Estadísticas generales
   const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0 })
-  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0 })
+  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0, nuevosCreyentes: 0 })
   const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0, nuevosEsteMes: 0 })
   const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosEsteMes: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({ primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } })
@@ -128,6 +128,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         miembros: censoMdgData.filter(c => c.miembro).length,
         activos: censoMdgData.filter(c => c.miembro_activo).length,
         nuevosEsteMes: censoMdgData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosCreyentes: censoMdgData.filter((c: any) => c.nuevo_creyente).length,
       })
       setStatsCensoNinos({
         total: censoNinosData.length,
@@ -308,6 +309,10 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                   <Badge className="bg-violet-100 text-violet-800 text-[10px] px-1.5 py-0">{statsCensoMdg.miembros}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-violet-600">Nuevos creyentes</span>
+                  <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosCreyentes}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
                   <span className="text-[10px] text-violet-600">Nuevos este mes</span>
                   <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoMdg.nuevosEsteMes}</Badge>
                 </div>
@@ -448,6 +453,10 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] text-violet-600">Miembros</span>
                         <span className="text-sm font-bold text-violet-700">{statsCensoMdg.miembros}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-violet-600">Nuevos creyentes</span>
+                        <Badge className="bg-pink-100 text-pink-800 text-[10px]">{statsCensoMdg.nuevosCreyentes}</Badge>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] text-violet-600">Agregados este mes</span>
