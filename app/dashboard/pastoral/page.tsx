@@ -58,10 +58,10 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
 
   // Estadísticas generales
-  const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
-  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0 })
-  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0 })
-  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0 })
+  const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0 })
+  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0 })
+  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0, nuevosEsteMes: 0 })
+  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosEsteMes: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({ primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } })
   const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, censoBautizados: 0 })
   const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, censoMatrimonios: 0 })
@@ -116,16 +116,30 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
     const tick = () => { completed++; setLoadingProgress(Math.round((completed / totalTasks) * 100)) }
 
     const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => []), censoNinosService.getAll().catch(() => []), censoJovenesService.getAll().catch(() => [])]).then(([censoData, censoMdgData, censoNinosData, censoJovenesData]) => {
-      setStatsCenso({ total: censoData.length, miembros: censoData.filter(c => c.miembro).length, activos: censoData.filter(c => c.miembro_activo).length })
-      setStatsCensoMdg({ total: censoMdgData.length, miembros: censoMdgData.filter(c => c.miembro).length, activos: censoMdgData.filter(c => c.miembro_activo).length })
-      setStatsCensoNinos({ total: censoNinosData.length })
       const mesActualStr = `${anioActual}-${String(mesActual).padStart(2, "0")}`
+      setStatsCenso({
+        total: censoData.length,
+        miembros: censoData.filter(c => c.miembro).length,
+        activos: censoData.filter(c => c.miembro_activo).length,
+        nuevosEsteMes: censoData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
+      })
+      setStatsCensoMdg({
+        total: censoMdgData.length,
+        miembros: censoMdgData.filter(c => c.miembro).length,
+        activos: censoMdgData.filter(c => c.miembro_activo).length,
+        nuevosEsteMes: censoMdgData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
+      })
+      setStatsCensoNinos({
+        total: censoNinosData.length,
+        nuevosEsteMes: censoNinosData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
+      })
       setStatsCensoJovenes({
         total: censoJovenesData.length,
         miembros: censoJovenesData.filter(c => c.miembro).length,
         activos: censoJovenesData.filter(c => c.miembro_activo).length,
         nuevos: censoJovenesData.filter(c => c.nuevo_creyente).length,
         primeraVez: censoJovenesData.filter((c: any) => c.primera_vez_iglesia && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosEsteMes: censoJovenesData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
       })
       tick()
       return { censoBautizados: censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length, censoMatrimonios: censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length, totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
@@ -228,14 +242,124 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         </div>
 
 
-        {/* Fila 2: Datos de iglesia */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <Card className="border-indigo-200 bg-indigo-50/50"><CardContent className="pt-4 pb-3"><div className="flex items-center gap-1"><img src="/logo.png" alt="IRDD" className="w-4 h-4 object-contain" /><p className="text-[10px] text-indigo-600 font-medium">Miembros IRDD</p></div><p className="text-2xl font-bold text-indigo-800">{statsCenso.total + statsCensoMdg.total}</p><p className="text-[9px] text-indigo-500">protocolo + MDG</p></CardContent></Card>
-          <Card className="border-violet-200 bg-violet-50/50"><CardContent className="pt-4 pb-3"><p className="text-[10px] text-violet-600 font-medium">Miembros Nuevos</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.total}</p><p className="text-[9px] text-violet-500">{statsCensoMdg.miembros} miembros · {statsCensoMdg.activos} activos</p></CardContent></Card>
+        {/* Fila 2: Censos detallados */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Censo Protocolo */}
+          <Card className="border-indigo-200 bg-indigo-50/50">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <img src="/logo.png" alt="IRDD" className="w-4 h-4 object-contain" />
+                <p className="text-xs text-indigo-700 font-semibold">Censo Protocolo</p>
+              </div>
+              <p className="text-3xl font-bold text-indigo-800">{statsCenso.total}</p>
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-indigo-600">Activos</span>
+                  <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCenso.activos}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-indigo-600">Miembros</span>
+                  <Badge className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0">{statsCenso.miembros}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-indigo-600">Nuevos este mes</span>
+                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCenso.nuevosEsteMes}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Censo Niños */}
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-sm">👶</span>
+                <p className="text-xs text-amber-700 font-semibold">Censo Niños</p>
+              </div>
+              <p className="text-3xl font-bold text-amber-800">{statsCensoNinos.total}</p>
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-amber-600">Herederos del Reino</span>
+                  <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0">{statsCensoNinos.total}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-amber-600">Nuevos este mes</span>
+                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoNinos.nuevosEsteMes}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Censo MDG */}
+          <Card className="border-violet-200 bg-violet-50/50">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-sm">👩</span>
+                <p className="text-xs text-violet-700 font-semibold">Censo MDG</p>
+              </div>
+              <p className="text-3xl font-bold text-violet-800">{statsCensoMdg.total}</p>
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-violet-600">Activos</span>
+                  <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCensoMdg.activos}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-violet-600">Miembros</span>
+                  <Badge className="bg-violet-100 text-violet-800 text-[10px] px-1.5 py-0">{statsCensoMdg.miembros}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-violet-600">Nuevos este mes</span>
+                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoMdg.nuevosEsteMes}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Censo Jóvenes */}
+          <Card className="border-pink-200 bg-pink-50/50">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-sm">🧑‍🤝‍🧑</span>
+                <p className="text-xs text-pink-700 font-semibold">Censo Jóvenes</p>
+              </div>
+              <p className="text-3xl font-bold text-pink-800">{statsCensoJovenes.total}</p>
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-pink-600">Activos</span>
+                  <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.activos}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-pink-600">Nuevos creyentes</span>
+                  <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevos}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-pink-600">Agregados este mes</span>
+                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoJovenes.nuevosEsteMes}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-pink-600">Primera vez (mes)</span>
+                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.primeraVez}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Fila 2b: Resumen total + Datos de iglesia */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <Card className="border-indigo-200 bg-indigo-50/30">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-1">
+                <img src="/logo.png" alt="IRDD" className="w-4 h-4 object-contain" />
+                <p className="text-[10px] text-indigo-600 font-medium">Total IRDD</p>
+              </div>
+              <p className="text-2xl font-bold text-indigo-800">{statsCenso.total + statsCensoMdg.total + statsCensoNinos.total + statsCensoJovenes.total}</p>
+              <p className="text-[9px] text-indigo-500">sumando todos los censos</p>
+            </CardContent>
+          </Card>
           <Card className="border-sky-200 bg-sky-50/50"><CardContent className="pt-4 pb-3"><p className="text-[10px] text-sky-600 font-medium">Discipulado</p><p className="text-2xl font-bold text-sky-800">{Object.values(statsDiscipulado).reduce((s, v) => s + v.inscritos, 0)}</p><p className="text-[9px] text-sky-500">{Object.values(statsDiscipulado).reduce((s, v) => s + v.aprobados, 0)} aprobados · {Object.values(statsDiscipulado).reduce((s, v) => s + v.enCurso, 0)} en curso</p></CardContent></Card>
           <Card className="border-teal-200 bg-teal-50/50"><CardContent className="pt-4 pb-3"><p className="text-[10px] text-teal-600 font-medium">Bautizos</p><p className="text-2xl font-bold text-teal-800">{statsBautizos.censoBautizados}</p><p className="text-[9px] text-teal-500">total · {statsBautizos.esteMes > 0 ? <span className="text-teal-700 font-semibold">+{statsBautizos.esteMes} este mes</span> : <span>0 este mes</span>}</p></CardContent></Card>
           <Card className="border-rose-200 bg-rose-50/50"><CardContent className="pt-4 pb-3"><p className="text-[10px] text-rose-600 font-medium">Matrimonios</p><p className="text-2xl font-bold text-rose-800">{statsMatrimonios.censoMatrimonios}</p><p className="text-[9px] text-rose-500">total · {statsMatrimonios.esteMes > 0 ? <span className="text-rose-700 font-semibold">+{statsMatrimonios.esteMes} este mes</span> : <span>0 este mes</span>}</p></CardContent></Card>
-          <Card className="border-pink-200 bg-pink-50/50"><CardContent className="pt-4 pb-3"><p className="text-[10px] text-pink-600 font-medium">Pres. Niños</p><p className="text-2xl font-bold text-pink-800">{statsPresentaciones.total}</p><p className="text-[9px] text-pink-500">total · {statsPresentaciones.esteMes > 0 ? <span className="text-pink-700 font-semibold">+{statsPresentaciones.esteMes} este mes</span> : <span>0 este mes</span>}</p></CardContent></Card>
           <Card className="border-emerald-200 bg-emerald-50/50"><CardContent className="pt-4 pb-3"><div className="flex items-center gap-1"><Home className="w-3 h-3 text-emerald-600" /><p className="text-[10px] text-emerald-600 font-medium">Células</p></div><p className="text-2xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p><p className="text-[9px] text-emerald-500">miembros · {statsCelulas.asistieronSemana} esta semana</p></CardContent></Card>
         </div>
 
@@ -268,20 +392,106 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
               {/* Censos */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2 mt-3"><Users className="w-4 h-4 text-indigo-600" /> Censos</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                  <div className="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100"><p className="text-[10px] text-indigo-600 font-medium">Protocolo</p><p className="text-2xl font-bold text-indigo-800">{statsCenso.total}</p></div>
-                  <div className="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100"><p className="text-[10px] text-indigo-600 font-medium">Miembros</p><p className="text-2xl font-bold text-indigo-800">{statsCenso.miembros}</p></div>
-                  <div className="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100"><p className="text-[10px] text-indigo-600 font-medium">Activos</p><p className="text-2xl font-bold text-indigo-800">{statsCenso.activos}</p></div>
-                  <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100"><p className="text-[10px] text-violet-600 font-medium">MDG</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.total}</p></div>
-                  <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100"><p className="text-[10px] text-violet-600 font-medium">Miembros MDG</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.miembros}</p></div>
-                  <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100"><p className="text-[10px] text-violet-600 font-medium">Activos MDG</p><p className="text-2xl font-bold text-violet-800">{statsCensoMdg.activos}</p></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Protocolo */}
+                  <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <img src="/logo.png" alt="IRDD" className="w-4 h-4 object-contain" />
+                      <p className="text-xs text-indigo-700 font-semibold">Censo Protocolo</p>
+                    </div>
+                    <p className="text-3xl font-bold text-indigo-800">{statsCenso.total}</p>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-indigo-600">Activos</span>
+                        <span className="text-sm font-bold text-green-700">{statsCenso.activos}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-indigo-600">Miembros</span>
+                        <span className="text-sm font-bold text-indigo-700">{statsCenso.miembros}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-indigo-600">Agregados este mes</span>
+                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCenso.nuevosEsteMes}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Niños */}
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-sm">👶</span>
+                      <p className="text-xs text-amber-700 font-semibold">Censo Niños</p>
+                    </div>
+                    <p className="text-3xl font-bold text-amber-800">{statsCensoNinos.total}</p>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-amber-600">Herederos del Reino</span>
+                        <span className="text-sm font-bold text-amber-700">{statsCensoNinos.total}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-amber-600">Agregados este mes</span>
+                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCensoNinos.nuevosEsteMes}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  {/* MDG */}
+                  <div className="p-4 bg-violet-50 rounded-lg border border-violet-100">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-sm">👩</span>
+                      <p className="text-xs text-violet-700 font-semibold">Censo MDG</p>
+                    </div>
+                    <p className="text-3xl font-bold text-violet-800">{statsCensoMdg.total}</p>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-violet-600">Activos</span>
+                        <span className="text-sm font-bold text-green-700">{statsCensoMdg.activos}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-violet-600">Miembros</span>
+                        <span className="text-sm font-bold text-violet-700">{statsCensoMdg.miembros}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-violet-600">Agregados este mes</span>
+                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCensoMdg.nuevosEsteMes}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Jóvenes */}
+                  <div className="p-4 bg-pink-50 rounded-lg border border-pink-100">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-sm">🧑‍🤝‍🧑</span>
+                      <p className="text-xs text-pink-700 font-semibold">Censo Jóvenes</p>
+                    </div>
+                    <p className="text-3xl font-bold text-pink-800">{statsCensoJovenes.total}</p>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-pink-600">Activos</span>
+                        <span className="text-sm font-bold text-green-700">{statsCensoJovenes.activos}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-pink-600">Nuevos creyentes</span>
+                        <span className="text-sm font-bold text-pink-700">{statsCensoJovenes.nuevos}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-pink-600">Agregados este mes</span>
+                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCensoJovenes.nuevosEsteMes}</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-pink-600">Primera vez (mes)</span>
+                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{statsCensoJovenes.primeraVez}</Badge>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                {/* Niños y Jóvenes */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mt-3">
-                  <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100"><p className="text-[10px] text-amber-600 font-medium">Niños</p><p className="text-2xl font-bold text-amber-800">{statsCensoNinos.total}</p><p className="text-[9px] text-amber-500">Herederos del Reino</p></div>
-                  <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-100"><p className="text-[10px] text-pink-600 font-medium">Jóvenes</p><p className="text-2xl font-bold text-pink-800">{statsCensoJovenes.total}</p><p className="text-[9px] text-pink-500">{statsCensoJovenes.miembros} miembros · {statsCensoJovenes.activos} activos</p></div>
-                  <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-100"><p className="text-[10px] text-pink-600 font-medium">Nuevos Jóvenes</p><p className="text-2xl font-bold text-pink-800">{statsCensoJovenes.nuevos}</p><p className="text-[9px] text-pink-500">Nuevos creyentes</p></div>
-                  <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-100"><p className="text-[10px] text-emerald-600 font-medium">Primera Vez (Mes)</p><p className="text-2xl font-bold text-emerald-800">{statsCensoJovenes.primeraVez}</p><p className="text-[9px] text-emerald-500">Jóvenes nuevos este mes</p></div>
+                {/* Total consolidado */}
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <img src="/logo.png" alt="IRDD" className="w-5 h-5 object-contain" />
+                    <span className="text-sm font-semibold text-gray-700">Total Censados IRDD</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-gray-900">{statsCenso.total + statsCensoMdg.total + statsCensoNinos.total + statsCensoJovenes.total}</span>
+                    <p className="text-[9px] text-gray-500">protocolo + niños + MDG + jóvenes</p>
+                  </div>
                 </div>
               </div>
               {/* Discipulado */}

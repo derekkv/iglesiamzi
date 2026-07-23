@@ -458,8 +458,8 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                       <td className="border border-gray-200 px-2 py-1 text-center">{idx + 1}</td>
                       <td className="border border-gray-200 px-2 py-1 font-medium">{p.nombre}</td>
                       <td className="border border-gray-200 px-2 py-1 text-center">{p.edad ?? "-"}</td>
-                      <td className="border border-gray-200 px-2 py-1 truncate max-w-[100px]">{p.alergias || "-"}</td>
-                      <td className="border border-gray-200 px-2 py-1 truncate max-w-[120px]">{p.observaciones || "-"}</td>
+                      <td className="border border-gray-200 px-2 py-1 whitespace-normal break-words">{p.alergias || "-"}</td>
+                      <td className="border border-gray-200 px-2 py-1 whitespace-normal break-words">{p.observaciones || "-"}</td>
                       {data.fechas.map((f) => {
                         const status = getAttendanceStatus(p.id, f.id)
                         return (
