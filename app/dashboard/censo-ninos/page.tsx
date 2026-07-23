@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useRealtime } from "@/hooks/use-realtime"
 import { PermissionsGuard } from "@/lib/permissions-guard"
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  ArrowLeft, Search, Plus, Pencil, Trash2, Lock, Loader2, Eye,
+  ArrowLeft, Search, Plus, Pencil, Trash2, Lock, Loader2, Eye, Paperclip, Upload, FileText, Image, X, Download,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -27,6 +27,7 @@ import {
   type CensoNinoRecord,
   type CensoNinoInput,
 } from "@/lib/mod/censo-ninos-service"
+import { censoNinosArchivosService, type CensoNinoArchivo } from "@/lib/mod/censo-ninos-archivos-service"
 
 // Tipo interno del formulario con display field para fecha
 interface FormDataWithDisplay extends CensoNinoInput {
@@ -54,6 +55,17 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
   // Modal eliminar
   const [deletingRecord, setDeletingRecord] = useState<CensoNinoRecord | null>(null)
 
+  // Archivos
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [archivoCounts, setArchivoCounts] = useState<Record<number, number>>({})
+  const [viewArchivos, setViewArchivos] = useState<CensoNinoArchivo[]>([])
+  const [loadingArchivos, setLoadingArchivos] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Preview modal
+  const [previewArchivo, setPreviewArchivo] = useState<CensoNinoArchivo | null>(null)
+
   function getEmptyForm(): FormDataWithDisplay {
     return {
       nombre: "",
@@ -79,6 +91,12 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
       if (!silent) setIsLoading(true)
       const data = await censoNinosService.getAll()
       setRecords(data)
+      // Load file counts
+      const ids = data.map(r => r.id!).filter(Boolean)
+      if (ids.length > 0) {
+        const counts = await censoNinosArchivosService.getCountsByNinoIds(ids)
+        setArchivoCounts(counts)
+      }
     } catch (error) {
       console.error("Error cargando censo niños:", error)
       toast.error("Error al cargar registros")
@@ -142,6 +160,7 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
   const openCreateModal = () => {
     setEditingRecord(null)
     setFormData(getEmptyForm())
+    setPendingFiles([])
     setShowFormModal(true)
   }
 
@@ -152,6 +171,7 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
     }
     checkAndExecute(record.created_at || "", () => {
       setEditingRecord(record)
+      setPendingFiles([])
       // Preparar display de fecha
       let fechaDisplay = ""
       if (record.fecha_nacimiento) {
@@ -175,10 +195,6 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
       })
       setShowFormModal(true)
     })
-  }
-
-  const openViewModal = (record: CensoNinoRecord) => {
-    setViewRecord(record)
   }
 
   const handleSave = async () => {
@@ -208,13 +224,38 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
         observaciones: formData.observaciones?.trim() || null,
       }
 
+      let savedId: number
       if (editingRecord) {
         await censoNinosService.update(editingRecord.id!, input, audit)
+        savedId = editingRecord.id!
         toast.success("Registro actualizado")
       } else {
-        await censoNinosService.create(input, audit)
+        const created = await censoNinosService.create(input, audit)
+        savedId = created.id!
         toast.success("Niño(a) registrado(a)")
       }
+
+      // Upload pending files
+      if (pendingFiles.length > 0) {
+        setUploadingFiles(true)
+        const token = localStorage.getItem("authToken")
+        if (token) {
+          let uploaded = 0
+          for (const file of pendingFiles) {
+            try {
+              await censoNinosArchivosService.upload(savedId, file, token)
+              uploaded++
+            } catch (err: any) {
+              console.error("Error subiendo archivo:", err)
+              toast.error(`Error subiendo ${file.name}`)
+            }
+          }
+          if (uploaded > 0) toast.success(`${uploaded} archivo(s) subido(s)`)
+        }
+        setUploadingFiles(false)
+      }
+
+      setPendingFiles([])
       setShowFormModal(false)
       await loadRecords(true)
     } catch (error: any) {
@@ -222,6 +263,99 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
       toast.error(error.message || "Error al guardar")
     } finally {
       setSaving(false)
+    }
+  }
+
+  // === ARCHIVOS ===
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    setPendingFiles(prev => [...prev, ...Array.from(files)])
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const loadViewArchivos = async (ninoId: number) => {
+    setLoadingArchivos(true)
+    try {
+      const archivos = await censoNinosArchivosService.getByNinoId(ninoId)
+      setViewArchivos(archivos)
+    } catch (err) {
+      console.error("Error cargando archivos:", err)
+      setViewArchivos([])
+    } finally {
+      setLoadingArchivos(false)
+    }
+  }
+
+  const handleDeleteArchivo = async (archivoId: number, ninoId: number) => {
+    try {
+      await censoNinosArchivosService.delete(archivoId)
+      toast.success("Archivo eliminado")
+      await loadViewArchivos(ninoId)
+      await loadRecords(true)
+    } catch (err: any) {
+      toast.error("Error eliminando archivo")
+    }
+  }
+
+  const handleUploadFromTable = async (ninoId: number) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.multiple = true
+    input.accept = ".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4,.mov"
+    input.onchange = async (e: any) => {
+      const files = e.target.files as FileList
+      if (!files || files.length === 0) return
+      const token = localStorage.getItem("authToken")
+      if (!token) { toast.error("No autenticado"); return }
+      let uploaded = 0
+      for (const file of Array.from(files)) {
+        try {
+          await censoNinosArchivosService.upload(ninoId, file, token)
+          uploaded++
+        } catch (err: any) {
+          toast.error(`Error subiendo ${file.name}`)
+        }
+      }
+      if (uploaded > 0) {
+        toast.success(`${uploaded} archivo(s) subido(s)`)
+        await loadRecords(true)
+      }
+    }
+    input.click()
+  }
+
+  const openViewModal = (record: CensoNinoRecord) => {
+    setViewRecord(record)
+    setViewArchivos([])
+    if (record.id) loadViewArchivos(record.id)
+  }
+
+  const getFileIcon = (tipo: string | null) => {
+    if (!tipo) return <FileText className="w-4 h-4 text-gray-400" />
+    if (tipo.startsWith("image/")) return <Image className="w-4 h-4 text-blue-500" />
+    return <FileText className="w-4 h-4 text-orange-500" />
+  }
+
+  const forceDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch {
+      // Fallback: abrir en nueva pestaña si falla
+      window.open(url, "_blank")
     }
   }
 
@@ -325,6 +459,7 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
                       <TableHead className="text-xs">Tlf. Madre</TableHead>
                       <TableHead className="text-xs">Padre</TableHead>
                       <TableHead className="text-xs">Tlf. Padre</TableHead>
+                      <TableHead className="text-xs text-center w-16">Archivos</TableHead>
                       <TableHead className="text-xs text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -341,6 +476,20 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
                         <TableCell className="text-xs">{record.telefono_madre || "-"}</TableCell>
                         <TableCell className="text-xs whitespace-normal break-words">{record.nombre_padre || "-"}</TableCell>
                         <TableCell className="text-xs">{record.telefono_padre || "-"}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {archivoCounts[record.id!] > 0 && (
+                              <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">
+                                <Paperclip className="w-3 h-3 mr-0.5" />{archivoCounts[record.id!]}
+                              </Badge>
+                            )}
+                            {canEdit && (
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-blue-600" onClick={() => handleUploadFromTable(record.id!)} title="Subir archivo">
+                                <Upload className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-600" onClick={() => openViewModal(record)}>
@@ -482,11 +631,54 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
                 rows={3}
               />
             </div>
+
+            {/* Archivos */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Archivos</Label>
+              <div className="border border-dashed border-gray-300 rounded-lg p-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4,.mov"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full"
+                >
+                  <Upload className="w-4 h-4 mr-2" /> Seleccionar archivos
+                </Button>
+                <p className="text-[10px] text-gray-400 mt-1 text-center">Imágenes, PDF, documentos, videos (max 50MB c/u)</p>
+
+                {/* Lista de archivos pendientes */}
+                {pendingFiles.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {pendingFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {file.type.startsWith("image/") ? <Image className="w-3.5 h-3.5 text-blue-500 shrink-0" /> : <FileText className="w-3.5 h-3.5 text-orange-500 shrink-0" />}
+                          <span className="text-xs text-gray-700 truncate">{file.name}</span>
+                          <span className="text-[10px] text-gray-400 shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                        </div>
+                        <button type="button" onClick={() => removePendingFile(idx)} className="text-red-500 hover:text-red-700 p-0.5">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowFormModal(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Guardando...</> : editingRecord ? "Guardar cambios" : "Registrar"}
+            <Button variant="outline" onClick={() => setShowFormModal(false)} disabled={saving || uploadingFiles}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving || uploadingFiles}>
+              {saving || uploadingFiles ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> {uploadingFiles ? "Subiendo archivos..." : "Guardando..."}</> : editingRecord ? "Guardar cambios" : "Registrar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -494,7 +686,7 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
 
       {/* Modal: Ver Detalle */}
       <Dialog open={!!viewRecord} onOpenChange={() => setViewRecord(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalle del Niño(a)</DialogTitle>
           </DialogHeader>
@@ -514,6 +706,53 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
               <div className="border-t pt-3">
                 <DetailRow label="Alergias" value={viewRecord.alergias || "Ninguna"} />
                 <DetailRow label="Observaciones" value={viewRecord.observaciones || "-"} />
+              </div>
+              {/* Archivos */}
+              <div className="border-t pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                    <Paperclip className="w-3.5 h-3.5" /> Archivos
+                  </p>
+                  {canEdit && (
+                    <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => handleUploadFromTable(viewRecord.id!)}>
+                      <Upload className="w-3 h-3 mr-1" /> Subir
+                    </Button>
+                  )}
+                </div>
+                {loadingArchivos ? (
+                  <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-gray-400" /></div>
+                ) : viewArchivos.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-2">Sin archivos</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {viewArchivos.map(archivo => (
+                      <div key={archivo.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {getFileIcon(archivo.tipo)}
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-800 truncate">{archivo.nombre_archivo}</p>
+                            <p className="text-[10px] text-gray-400">
+                              {archivo.tamano ? `${(archivo.tamano / 1024).toFixed(0)} KB` : ""} · {new Date(archivo.created_at).toLocaleDateString("es-EC")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setPreviewArchivo(archivo)} className="text-indigo-600 hover:text-indigo-800 p-1" title="Ver">
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => forceDownload(archivo.url, archivo.nombre_archivo)} className="text-blue-600 hover:text-blue-800 p-1" title="Descargar">
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          {canEdit && (
+                            <button onClick={() => handleDeleteArchivo(archivo.id, viewRecord.id!)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -535,6 +774,73 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeletingRecord(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={handleConfirmDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Previsualizar Archivo */}
+      <Dialog open={!!previewArchivo} onOpenChange={() => setPreviewArchivo(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              {previewArchivo && getFileIcon(previewArchivo.tipo)}
+              <span className="truncate">{previewArchivo?.nombre_archivo}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto min-h-0">
+            {previewArchivo && (() => {
+              const tipo = previewArchivo.tipo || ""
+              const url = previewArchivo.url
+
+              // Imagen
+              if (tipo.startsWith("image/")) {
+                return (
+                  <div className="flex items-center justify-center p-2">
+                    <img src={url} alt={previewArchivo.nombre_archivo} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+                  </div>
+                )
+              }
+
+              // PDF
+              if (tipo === "application/pdf" || previewArchivo.nombre_archivo.endsWith(".pdf")) {
+                return (
+                  <iframe
+                    src={url}
+                    className="w-full h-[70vh] rounded-lg border"
+                    title={previewArchivo.nombre_archivo}
+                  />
+                )
+              }
+
+              // Video
+              if (tipo.startsWith("video/")) {
+                return (
+                  <div className="flex items-center justify-center p-2">
+                    <video controls className="max-w-full max-h-[70vh] rounded-lg">
+                      <source src={url} type={tipo} />
+                      Tu navegador no soporta la reproducción de video.
+                    </video>
+                  </div>
+                )
+              }
+
+              // Otros archivos - no se puede previsualizar inline
+              return (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <FileText className="w-16 h-16 text-gray-300" />
+                  <p className="text-sm text-gray-500">Este tipo de archivo no se puede previsualizar directamente.</p>
+                  <Button variant="outline" size="sm" onClick={() => forceDownload(url, previewArchivo.nombre_archivo)}>
+                    <Download className="w-4 h-4 mr-2" /> Descargar archivo
+                  </Button>
+                </div>
+              )
+            })()}
+          </div>
+          <DialogFooter className="flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={() => previewArchivo && forceDownload(previewArchivo.url, previewArchivo.nombre_archivo)}>
+              <Download className="w-4 h-4 mr-1" /> Descargar
+            </Button>
+            <Button variant="outline" onClick={() => setPreviewArchivo(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
