@@ -8,6 +8,7 @@ import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { censoMdgService, type CensoRecord, type CatalogOption } from "@/lib/mod/censo-mdg-service"
+import { validarCedulaEnCensos } from "@/lib/mod/censo-validacion-service"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -128,6 +129,13 @@ function CensoMDGContent({ canEdit }: { canEdit: boolean }) {
     }
     try {
       setIsLoadingB(true)
+      // Validar cédula duplicada en todos los censos
+      const validacion = await validarCedulaEnCensos(formData.cedula, "censo_mdg")
+      if (validacion.existe) {
+        toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
+        setIsLoadingB(false)
+        return
+      }
       await censoMdgService.create(formData, { user_id: user!.id, user_name: user!.username })
       setSavedRecord(formData)
       setIsSavedModalOpen(true)
@@ -147,6 +155,13 @@ function CensoMDGContent({ canEdit }: { canEdit: boolean }) {
     }
     try {
       setIsLoadingB(true)
+      // Validar cédula duplicada en todos los censos (excluyendo registro actual)
+      const validacion = await validarCedulaEnCensos(formData.cedula, "censo_mdg", currentRecord.id)
+      if (validacion.existe) {
+        toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
+        setIsLoadingB(false)
+        return
+      }
       await censoMdgService.update(currentRecord.id, formData, { user_id: user!.id, user_name: user!.username })
       setSavedRecord(formData)
       setIsSavedModalOpen(true)

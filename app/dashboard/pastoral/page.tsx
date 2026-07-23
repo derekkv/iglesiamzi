@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { supabase } from "@/lib/secure-db"
-import { currentMonthNameEcuador, currentMonthEcuador, currentYearEcuador } from "@/lib/timezone"
+import { currentMonthNameEcuador, currentMonthEcuador, currentYearEcuador, todayEcuador } from "@/lib/timezone"
 
 import { ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home, Cake, ClipboardCheck, CalendarDays } from "lucide-react"
 import { censoService } from "@/lib/mod/censo-service"
@@ -58,10 +58,10 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
 
   // Estadísticas generales
-  const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0 })
-  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosEsteMes: 0, nuevosCreyentes: 0 })
-  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0, nuevosEsteMes: 0 })
-  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosEsteMes: 0 })
+  const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
+  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosHoy: 0 })
+  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0 })
+  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosMes: 0, nuevosHoy: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({ primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } })
   const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, censoBautizados: 0 })
   const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, censoMatrimonios: 0 })
@@ -117,30 +117,31 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
     const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => []), censoNinosService.getAll().catch(() => []), censoJovenesService.getAll().catch(() => [])]).then(([censoData, censoMdgData, censoNinosData, censoJovenesData]) => {
       const mesActualStr = `${anioActual}-${String(mesActual).padStart(2, "0")}`
+      const hoyStr = todayEcuador()
       setStatsCenso({
         total: censoData.length,
         miembros: censoData.filter(c => c.miembro).length,
         activos: censoData.filter(c => c.miembro_activo).length,
-        nuevosEsteMes: censoData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
       })
       setStatsCensoMdg({
         total: censoMdgData.length,
         miembros: censoMdgData.filter(c => c.miembro).length,
         activos: censoMdgData.filter(c => c.miembro_activo).length,
-        nuevosEsteMes: censoMdgData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
         nuevosCreyentes: censoMdgData.filter((c: any) => c.nuevo_creyente).length,
+        nuevosMes: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosHoy: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(hoyStr)).length,
       })
       setStatsCensoNinos({
         total: censoNinosData.length,
-        nuevosEsteMes: censoNinosData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
       })
       setStatsCensoJovenes({
         total: censoJovenesData.length,
         miembros: censoJovenesData.filter(c => c.miembro).length,
         activos: censoJovenesData.filter(c => c.miembro_activo).length,
         nuevos: censoJovenesData.filter(c => c.nuevo_creyente).length,
-        primeraVez: censoJovenesData.filter((c: any) => c.primera_vez_iglesia && c.created_at && c.created_at.startsWith(mesActualStr)).length,
-        nuevosEsteMes: censoJovenesData.filter((c: any) => c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        primeraVez: censoJovenesData.filter((c: any) => c.primera_vez_iglesia).length,
+        nuevosMes: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosHoy: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(hoyStr)).length,
       })
       tick()
       return { censoBautizados: censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length, censoMatrimonios: censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length, totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
@@ -262,10 +263,6 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                   <span className="text-[10px] text-indigo-600">Miembros</span>
                   <Badge className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0">{statsCenso.miembros}</Badge>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-indigo-600">Nuevos este mes</span>
-                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCenso.nuevosEsteMes}</Badge>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -282,10 +279,6 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] text-amber-600">Herederos del Reino</span>
                   <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0">{statsCensoNinos.total}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-amber-600">Nuevos este mes</span>
-                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoNinos.nuevosEsteMes}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -309,12 +302,16 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                   <Badge className="bg-violet-100 text-violet-800 text-[10px] px-1.5 py-0">{statsCensoMdg.miembros}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-violet-600">Nuevos creyentes</span>
+                  <span className="text-[10px] text-violet-600">Nuevos creyentes (total)</span>
                   <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosCreyentes}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-violet-600">Nuevos este mes</span>
-                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoMdg.nuevosEsteMes}</Badge>
+                  <span className="text-[10px] text-violet-600">Nuevos del mes</span>
+                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosMes}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-violet-600">Nuevos hoy</span>
+                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosHoy}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -334,16 +331,16 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                   <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.activos}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-pink-600">Nuevos creyentes</span>
+                  <span className="text-[10px] text-pink-600">Nuevos creyentes (total)</span>
                   <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevos}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-pink-600">Agregados este mes</span>
-                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{statsCensoJovenes.nuevosEsteMes}</Badge>
+                  <span className="text-[10px] text-pink-600">Nuevos del mes</span>
+                  <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevosMes}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-pink-600">Primera vez (mes)</span>
-                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.primeraVez}</Badge>
+                  <span className="text-[10px] text-pink-600">Nuevos hoy</span>
+                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevosHoy}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -414,10 +411,6 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                         <span className="text-[10px] text-indigo-600">Miembros</span>
                         <span className="text-sm font-bold text-indigo-700">{statsCenso.miembros}</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-indigo-600">Agregados este mes</span>
-                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCenso.nuevosEsteMes}</Badge>
-                      </div>
                     </div>
                   </div>
                   {/* Niños */}
@@ -431,10 +424,6 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] text-amber-600">Herederos del Reino</span>
                         <span className="text-sm font-bold text-amber-700">{statsCensoNinos.total}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-amber-600">Agregados este mes</span>
-                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCensoNinos.nuevosEsteMes}</Badge>
                       </div>
                     </div>
                   </div>
@@ -455,12 +444,16 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                         <span className="text-sm font-bold text-violet-700">{statsCensoMdg.miembros}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-violet-600">Nuevos creyentes</span>
+                        <span className="text-[10px] text-violet-600">Nuevos creyentes (total)</span>
                         <Badge className="bg-pink-100 text-pink-800 text-[10px]">{statsCensoMdg.nuevosCreyentes}</Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-violet-600">Agregados este mes</span>
-                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCensoMdg.nuevosEsteMes}</Badge>
+                        <span className="text-[10px] text-violet-600">Nuevos del mes</span>
+                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">{statsCensoMdg.nuevosMes}</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-violet-600">Nuevos hoy</span>
+                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{statsCensoMdg.nuevosHoy}</Badge>
                       </div>
                     </div>
                   </div>
@@ -477,16 +470,16 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                         <span className="text-sm font-bold text-green-700">{statsCensoJovenes.activos}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-pink-600">Nuevos creyentes</span>
+                        <span className="text-[10px] text-pink-600">Nuevos creyentes (total)</span>
                         <span className="text-sm font-bold text-pink-700">{statsCensoJovenes.nuevos}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-pink-600">Agregados este mes</span>
-                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">+{statsCensoJovenes.nuevosEsteMes}</Badge>
+                        <span className="text-[10px] text-pink-600">Nuevos del mes</span>
+                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">{statsCensoJovenes.nuevosMes}</Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-pink-600">Primera vez (mes)</span>
-                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{statsCensoJovenes.primeraVez}</Badge>
+                        <span className="text-[10px] text-pink-600">Nuevos hoy</span>
+                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{statsCensoJovenes.nuevosHoy}</Badge>
                       </div>
                     </div>
                   </div>
