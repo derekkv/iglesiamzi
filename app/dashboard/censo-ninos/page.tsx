@@ -206,6 +206,10 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
       toast.error("El nombre es obligatorio")
       return
     }
+    if (!formData.nombre_madre?.trim()) {
+      toast.error("El nombre de la madre es obligatorio")
+      return
+    }
     if (!user) return
 
     setSaving(true)
@@ -574,7 +578,7 @@ function CensoNinosContent({ canEdit }: { canEdit: boolean }) {
             {/* Madre */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-sm">Madre</Label>
+                <Label className="text-sm">Madre *</Label>
                 <Input
                   value={formData.nombre_madre || ""}
                   onChange={(e) => setFormData({ ...formData, nombre_madre: e.target.value })}

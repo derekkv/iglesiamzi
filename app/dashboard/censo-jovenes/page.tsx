@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useRealtime } from "@/hooks/use-realtime"
 import { useToast } from "@/hooks/use-toast"
@@ -9,17 +9,22 @@ import { useAuth } from "@/contexts/auth-context"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { censoJovenesService, type CensoRecord } from "@/lib/mod/censo-jovenes-service"
 import { validarCedulaEnCensos } from "@/lib/mod/censo-validacion-service"
+import { censoJovenesArchivosService, type CensoJovenArchivo } from "@/lib/mod/censo-jovenes-archivos-service"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Pencil, Trash2, Eye, Search, ArrowLeft } from "lucide-react"
+import { Pencil, Trash2, Eye, Search, ArrowLeft, Paperclip, Upload, FileText, Image, Download, Loader2 } from "lucide-react"
 
 import { CensoJovenesForm } from "./components/CensoJovenesForm"
 import { CensoJovenesDetailView } from "./components/CensoJovenesDetailView"
@@ -46,6 +51,16 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
   const { checkAndExecute } = useSecurityCheck()
   const { user } = useAuth()
 
+  // Archivos
+  const [archivoCounts, setArchivoCounts] = useState<Record<number, number>>({})
+  const [viewArchivos, setViewArchivos] = useState<CensoJovenArchivo[]>([])
+  const [loadingArchivos, setLoadingArchivos] = useState(false)
+  const [previewArchivo, setPreviewArchivo] = useState<CensoJovenArchivo | null>(null)
+
+  // Archivos pendientes para el tab "Agregar Nuevo"
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const pendingFileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => { loadRecords() }, [])
 
   useEffect(() => {
@@ -65,6 +80,12 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
       const data = await censoJovenesService.getAll()
       setRecords(data)
       setFilteredRecords(data)
+      // Load file counts
+      const ids = data.map(r => r.id!).filter(Boolean)
+      if (ids.length > 0) {
+        const counts = await censoJovenesArchivosService.getCountsByJovenIds(ids)
+        setArchivoCounts(counts)
+      }
     } catch (error) { console.error("Error loading records:", error) }
     finally { if (!silent) setIsLoading(false) }
   }
@@ -75,26 +96,113 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
   const handleEdit = (record: CensoRecord) => {
     checkAndExecute(record.created_at || "", () => { setCurrentRecord(record); setFormData(record); setIsEditDialogOpen(true) })
   }
-  const handleView = (record: CensoRecord) => { setCurrentRecord(record); setIsViewDialogOpen(true) }
+  const handleView = (record: CensoRecord) => {
+    setCurrentRecord(record)
+    setIsViewDialogOpen(true)
+    setViewArchivos([])
+    if (record.id) loadViewArchivos(record.id)
+  }
   const handleDelete = (record: CensoRecord) => {
     if (!canEdit) return
     checkAndExecute(record.created_at || "", () => { setCurrentRecord(record); setIsDeleteDialogOpen(true) })
   }
 
+  // === ARCHIVOS ===
+  const loadViewArchivos = async (jovenId: number) => {
+    setLoadingArchivos(true)
+    try {
+      const archivos = await censoJovenesArchivosService.getByJovenId(jovenId)
+      setViewArchivos(archivos)
+    } catch { setViewArchivos([]) }
+    finally { setLoadingArchivos(false) }
+  }
+
+  const handleUploadFromTable = async (jovenId: number) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.multiple = true
+    input.accept = ".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4,.mov"
+    input.onchange = async (e: any) => {
+      const files = e.target.files as FileList
+      if (!files || files.length === 0) return
+      const token = localStorage.getItem("authToken")
+      if (!token) { toast({ title: "Error", description: "No autenticado", variant: "destructive" }); return }
+      let uploaded = 0
+      for (const file of Array.from(files)) {
+        try {
+          await censoJovenesArchivosService.upload(jovenId, file, token)
+          uploaded++
+        } catch { toast({ title: "Error", description: `Error subiendo ${file.name}`, variant: "destructive" }) }
+      }
+      if (uploaded > 0) {
+        toast({ title: "Archivos subidos", description: `${uploaded} archivo(s) subido(s)` })
+        await loadRecords(true)
+        if (currentRecord?.id === jovenId) await loadViewArchivos(jovenId)
+      }
+    }
+    input.click()
+  }
+
+  const handleDeleteArchivo = async (archivoId: number, jovenId: number) => {
+    try {
+      await censoJovenesArchivosService.delete(archivoId)
+      toast({ title: "Eliminado", description: "Archivo eliminado" })
+      await loadViewArchivos(jovenId)
+      await loadRecords(true)
+    } catch { toast({ title: "Error", description: "Error eliminando archivo", variant: "destructive" }) }
+  }
+
+  const forceDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = blobUrl; a.download = filename
+      document.body.appendChild(a); a.click()
+      document.body.removeChild(a); window.URL.revokeObjectURL(blobUrl)
+    } catch { window.open(url, "_blank") }
+  }
+
+  const getFileIcon = (tipo: string | null) => {
+    if (!tipo) return <FileText className="w-4 h-4 text-gray-400" />
+    if (tipo.startsWith("image/")) return <Image className="w-4 h-4 text-blue-500" />
+    return <FileText className="w-4 h-4 text-orange-500" />
+  }
+
   const handleSave = async () => {
-    if (!canEdit || !formData.cedula || !formData.apellidos_nombres) {
-      toast({ title: "Error", description: "Cédula y Nombres son obligatorios", variant: "destructive" }); return
+    if (!canEdit || !formData.apellidos_nombres) {
+      toast({ title: "Error", description: "Nombres y Apellidos es obligatorio", variant: "destructive" }); return
     }
     try {
       setIsLoadingB(true)
-      // Validar cédula duplicada en todos los censos
-      const validacion = await validarCedulaEnCensos(formData.cedula, "censo_jovenes")
-      if (validacion.existe) {
-        toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
-        setIsLoadingB(false)
-        return
+      // Validar cédula duplicada en todos los censos (solo si se proporcionó cédula)
+      if (formData.cedula && formData.cedula.trim()) {
+        const validacion = await validarCedulaEnCensos(formData.cedula, "censo_jovenes")
+        if (validacion.existe) {
+          toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
+          setIsLoadingB(false)
+          return
+        }
       }
-      await censoJovenesService.create(formData, { user_id: user!.id, user_name: user!.username })
+      const created = await censoJovenesService.create(formData, { user_id: user!.id, user_name: user!.username })
+      // Subir archivos pendientes si hay
+      if (pendingFiles.length > 0 && created.id) {
+        const token = localStorage.getItem("authToken")
+        if (token) {
+          let uploaded = 0
+          for (const file of pendingFiles) {
+            try {
+              await censoJovenesArchivosService.upload(created.id, file, token)
+              uploaded++
+            } catch { /* silenciar errores individuales */ }
+          }
+          if (uploaded > 0) {
+            toast({ title: "Archivos subidos", description: `${uploaded} archivo(s) subido(s) junto al registro` })
+          }
+        }
+        setPendingFiles([])
+      }
       setSavedRecord(formData); setIsSavedModalOpen(true)
       setFormData({ cedula: "", apellidos_nombres: "" }); loadRecords()
     } catch (error: any) {
@@ -103,17 +211,19 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const handleUpdate = async () => {
-    if (!canEdit || !currentRecord?.id || !formData.cedula || !formData.apellidos_nombres) {
-      toast({ title: "Error", description: "Cédula y Nombres son obligatorios", variant: "destructive" }); return
+    if (!canEdit || !currentRecord?.id || !formData.apellidos_nombres) {
+      toast({ title: "Error", description: "Nombres y Apellidos es obligatorio", variant: "destructive" }); return
     }
     try {
       setIsLoadingB(true)
-      // Validar cédula duplicada en todos los censos (excluyendo registro actual)
-      const validacion = await validarCedulaEnCensos(formData.cedula, "censo_jovenes", currentRecord.id)
-      if (validacion.existe) {
-        toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
-        setIsLoadingB(false)
-        return
+      // Validar cédula duplicada en todos los censos (solo si se proporcionó cédula)
+      if (formData.cedula && formData.cedula.trim()) {
+        const validacion = await validarCedulaEnCensos(formData.cedula, "censo_jovenes", currentRecord.id)
+        if (validacion.existe) {
+          toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
+          setIsLoadingB(false)
+          return
+        }
       }
       await censoJovenesService.update(currentRecord.id, formData, { user_id: user!.id, user_name: user!.username })
       setSavedRecord(formData); setIsSavedModalOpen(true); setIsEditDialogOpen(false); loadRecords()
@@ -181,12 +291,13 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
                           <TableHead>Celular</TableHead>
                           <TableHead>Ministerio</TableHead>
                           <TableHead>Fecha Registro</TableHead>
+                          <TableHead className="text-center">Archivos</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredRecords.length === 0 ? (
-                          <TableRow><TableCell colSpan={7} className="text-center py-8">No hay registros</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={8} className="text-center py-8">No hay registros</TableCell></TableRow>
                         ) : (
                           filteredRecords.map((record) => (
                             <TableRow key={record.id}>
@@ -196,6 +307,20 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
                               <TableCell>{record.celular || "-"}</TableCell>
                               <TableCell>{record.ministerio || "-"}</TableCell>
                               <TableCell>{record.created_at ? new Date(record.created_at).toLocaleDateString("es-EC") : "-"}</TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {archivoCounts[record.id!] > 0 && (
+                                    <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">
+                                      <Paperclip className="w-3 h-3 mr-0.5" />{archivoCounts[record.id!]}
+                                    </Badge>
+                                  )}
+                                  {canEdit && (
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-blue-600" onClick={() => handleUploadFromTable(record.id!)} title="Subir archivo">
+                                      <Upload className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="icon" onClick={() => handleView(record)}><Eye className="h-4 w-4" /></Button>
@@ -227,17 +352,87 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
                     formData={formData}
                     onChangeFormData={setFormData}
                     onSubmit={(e) => { e.preventDefault(); handleSave() }}
-                    onCancel={() => setFormData({ cedula: "", apellidos_nombres: "" })}
+                    onCancel={() => { setFormData({ cedula: "", apellidos_nombres: "" }); setPendingFiles([]) }}
                     isSaving={isLoadingB}
                     submitLabel="Guardar Registro"
                   />
+                </CardContent>
+              </Card>
+
+              {/* Sección de Archivos Adjuntos */}
+              <Card className="border-blue-200 bg-blue-50/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Paperclip className="w-4 h-4 text-blue-600" />
+                    Archivos Adjuntos
+                  </CardTitle>
+                  <CardDescription>Adjunte archivos que se subirán junto al registro al momento de guardar</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <input
+                    ref={pendingFileInputRef}
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4,.mov"
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = e.target.files
+                      if (files && files.length > 0) {
+                        setPendingFiles((prev) => [...prev, ...Array.from(files)])
+                      }
+                      e.target.value = ""
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                    onClick={() => pendingFileInputRef.current?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Seleccionar Archivos
+                  </Button>
+
+                  {pendingFiles.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      <p className="text-xs text-gray-500">{pendingFiles.length} archivo(s) seleccionado(s) — se subirán al guardar el registro</p>
+                      <div className="space-y-1.5">
+                        {pendingFiles.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between bg-white rounded-md border px-3 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {file.type.startsWith("image/") ? <Image className="w-4 h-4 text-blue-500 flex-shrink-0" /> : <FileText className="w-4 h-4 text-orange-500 flex-shrink-0" />}
+                              <span className="text-sm truncate">{file.name}</span>
+                              <span className="text-xs text-gray-400 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700 flex-shrink-0"
+                              onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
           )}
         </Tabs>
 
-        <CensoJovenesDetailView isOpen={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} record={currentRecord} />
+        <CensoJovenesDetailView isOpen={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} record={currentRecord}
+          archivos={viewArchivos} loadingArchivos={loadingArchivos} canEdit={canEdit}
+          onUpload={() => currentRecord?.id && handleUploadFromTable(currentRecord.id)}
+          onDeleteArchivo={(id) => currentRecord?.id && handleDeleteArchivo(id, currentRecord.id)}
+          onPreview={setPreviewArchivo}
+          onDownload={forceDownload}
+          getFileIcon={getFileIcon}
+        />
 
         <AlertDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <AlertDialogContent className="w-[calc(100%-1rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -291,6 +486,32 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Modal: Previsualizar Archivo */}
+        <Dialog open={!!previewArchivo} onOpenChange={() => setPreviewArchivo(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm">
+                {previewArchivo && getFileIcon(previewArchivo.tipo)}
+                <span className="truncate">{previewArchivo?.nombre_archivo}</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto min-h-0">
+              {previewArchivo && (() => {
+                const tipo = previewArchivo.tipo || ""
+                const url = previewArchivo.url
+                if (tipo.startsWith("image/")) return <div className="flex items-center justify-center p-2"><img src={url} alt={previewArchivo.nombre_archivo} className="max-w-full max-h-[70vh] object-contain rounded-lg" /></div>
+                if (tipo === "application/pdf" || previewArchivo.nombre_archivo.endsWith(".pdf")) return <iframe src={url} className="w-full h-[70vh] rounded-lg border" title={previewArchivo.nombre_archivo} />
+                if (tipo.startsWith("video/")) return <div className="flex items-center justify-center p-2"><video controls className="max-w-full max-h-[70vh] rounded-lg"><source src={url} type={tipo} /></video></div>
+                return <div className="flex flex-col items-center justify-center py-12 space-y-4"><FileText className="w-16 h-16 text-gray-300" /><p className="text-sm text-gray-500">No se puede previsualizar este archivo.</p><Button variant="outline" size="sm" onClick={() => forceDownload(url, previewArchivo.nombre_archivo)}><Download className="w-4 h-4 mr-2" /> Descargar</Button></div>
+              })()}
+            </div>
+            <DialogFooter className="flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={() => previewArchivo && forceDownload(previewArchivo.url, previewArchivo.nombre_archivo)}><Download className="w-4 h-4 mr-1" /> Descargar</Button>
+              <Button variant="outline" onClick={() => setPreviewArchivo(null)}>Cerrar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
@@ -298,7 +519,7 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
 
 export default function CensoJovenesPage() {
   return (
-    <PermissionsGuard moduleName="censo-jovenes">
+    <PermissionsGuard moduleName="censo-jovenes" alternateModules={["censo-mdg", "censo-jovenes-mdg"]}>
       {(canEdit) => <CensoJovenesContent canEdit={canEdit} />}
     </PermissionsGuard>
   )

@@ -173,7 +173,11 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: true,
   },
   censo_jovenes: {
-    modules: ["censo-jovenes", "control_mensual", "resumen-pastoral"],
+    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  censo_jovenes_archivos: {
+    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg"],
     requireEditForWrite: true,
   },
   censo_mdg: {

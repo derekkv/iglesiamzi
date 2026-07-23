@@ -149,7 +149,7 @@ export function CensoJovenesForm({
         <div className="space-y-4 sm:space-y-5 bg-green-50 dark:bg-green-950/20 p-3 sm:p-5 rounded-xl border border-green-200">
           <h3 className="text-base font-semibold text-green-800 bg-green-100 dark:bg-green-900 px-3 py-2 rounded-lg">Datos Personales</h3>
           <div className="space-y-4">
-            <div className="space-y-1.5"><Label className="text-sm text-gray-700">Cédula *</Label><Input value={formData.cedula || ""} onChange={(e) => setFormField("cedula", e.target.value)} placeholder="Cédula" /></div>
+            <div className="space-y-1.5"><Label className="text-sm text-gray-700">Cédula</Label><Input value={formData.cedula || ""} onChange={(e) => setFormField("cedula", e.target.value)} placeholder="Cédula (opcional)" /></div>
             <div className="space-y-1.5"><Label className="text-sm text-gray-700">Nombres y Apellidos *</Label><Input value={formData.apellidos_nombres || ""} onChange={(e) => setFormField("apellidos_nombres", e.target.value)} placeholder="Nombres y Apellidos" /></div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5"><Label className="text-sm text-gray-700">Fecha de Nacimiento</Label><Input value={(formData as any).fecha_nacimiento_display || ""} onChange={(e) => handleDateInput(e.target.value, "fecha_nacimiento", "fecha_nacimiento_display")} placeholder="dd / mm / aaaa" noUppercase /></div>
@@ -230,6 +230,7 @@ export function CensoJovenesForm({
           </div>
           <div className="space-y-1.5"><Label className="text-sm text-gray-700">Curso</Label><Input value={formData.curso || ""} onChange={(e) => setFormField("curso", e.target.value)} /></div>
         </div>
+        <div className="space-y-1.5"><Label className="text-sm text-gray-700">Escuela / Colegio</Label><Input value={(formData as any).escuela_colegio || ""} onChange={(e) => onChangeFormData({ ...formData, escuela_colegio: e.target.value } as any)} placeholder="Nombre de la institución educativa" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5"><Label className="text-sm text-gray-700">Alergias o Condición Médica</Label><Input value={(formData as any).capacidad_esp || ""} onChange={(e) => setFormField("capacidad_esp", e.target.value)} placeholder="Alergias, condiciones..." /></div>
           <div className="space-y-1.5"><Label className="text-sm text-gray-700">¿Tomas algún medicamento?</Label><Input value={(formData as any).tipo_discapacidad || ""} onChange={(e) => setFormField("tipo_discapacidad", e.target.value)} placeholder="Nombre del medicamento..." /></div>
@@ -248,9 +249,33 @@ export function CensoJovenesForm({
           {formData.discipulado_irdd && (
             <div className="ml-6 mt-3 space-y-1 border-l-2 border-orange-300 pl-4 py-2 bg-orange-100/50 rounded-r-lg">
               <p className="text-xs text-orange-600 mb-2">¿Qué discipulado hizo?</p>
-              {renderCheckbox("1: Primeros pasos en la vida cristiana", "primeros_pasos")}
-              {renderCheckbox("2: Seguimos avanzando", "seguimos_avanzando")}
-              {renderCheckbox("3: Siendo Iglesia", "siendo_iglesia")}
+              <div className="flex items-center space-x-2 py-1">
+                <Checkbox id="primeros_pasos" checked={formData.primeros_pasos || false} onCheckedChange={(checked) => {
+                  const updated = { ...formData, primeros_pasos: checked as boolean }
+                  if (checked || updated.seguimos_avanzando || updated.siendo_iglesia) updated.miembro_activo = true
+                  else if (!updated.seguimos_avanzando && !updated.siendo_iglesia) updated.miembro_activo = false
+                  onChangeFormData(updated)
+                }} />
+                <Label htmlFor="primeros_pasos" className="cursor-pointer text-sm font-normal text-gray-700">1: Primeros pasos en la vida cristiana</Label>
+              </div>
+              <div className="flex items-center space-x-2 py-1">
+                <Checkbox id="seguimos_avanzando" checked={formData.seguimos_avanzando || false} onCheckedChange={(checked) => {
+                  const updated = { ...formData, seguimos_avanzando: checked as boolean }
+                  if (checked || updated.primeros_pasos || updated.siendo_iglesia) updated.miembro_activo = true
+                  else if (!updated.primeros_pasos && !updated.siendo_iglesia) updated.miembro_activo = false
+                  onChangeFormData(updated)
+                }} />
+                <Label htmlFor="seguimos_avanzando" className="cursor-pointer text-sm font-normal text-gray-700">2: Seguimos avanzando</Label>
+              </div>
+              <div className="flex items-center space-x-2 py-1">
+                <Checkbox id="siendo_iglesia" checked={formData.siendo_iglesia || false} onCheckedChange={(checked) => {
+                  const updated = { ...formData, siendo_iglesia: checked as boolean }
+                  if (checked || updated.primeros_pasos || updated.seguimos_avanzando) updated.miembro_activo = true
+                  else if (!updated.primeros_pasos && !updated.seguimos_avanzando) updated.miembro_activo = false
+                  onChangeFormData(updated)
+                }} />
+                <Label htmlFor="siendo_iglesia" className="cursor-pointer text-sm font-normal text-gray-700">3: Siendo Iglesia</Label>
+              </div>
             </div>
           )}
         </div>
@@ -271,7 +296,20 @@ export function CensoJovenesForm({
         <div className="border-t border-orange-200 pt-4">
           <p className="text-sm font-medium text-orange-700 mb-3">Membresía</p>
           {renderCheckbox("Miembro", "miembro")}
-          {renderCheckbox("Miembro Activo", "miembro_activo")}
+          <div className="flex items-center space-x-2 py-1">
+            <Checkbox
+              id="miembro_activo"
+              checked={formData.miembro_activo || false}
+              disabled={!!(formData.primeros_pasos || formData.seguimos_avanzando || formData.siendo_iglesia)}
+              onCheckedChange={(checked) => setFormField("miembro_activo", checked as boolean)}
+            />
+            <Label htmlFor="miembro_activo" className="cursor-pointer text-sm font-normal text-gray-700">
+              Miembro Activo
+              {!!(formData.primeros_pasos || formData.seguimos_avanzando || formData.siendo_iglesia) && (
+                <span className="text-[10px] text-green-600 ml-2">(activo por discipulado)</span>
+              )}
+            </Label>
+          </div>
         </div>
 
         {/* Servicio en la iglesia */}

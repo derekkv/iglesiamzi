@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { CensoRecord } from "@/lib/mod/censo-jovenes-service"
+import type { CensoJovenArchivo } from "@/lib/mod/censo-jovenes-archivos-service"
 import { supabase } from "@/lib/secure-db"
+import { Paperclip, Upload, Download, Trash2, Eye, Loader2, FileText } from "lucide-react"
 
 interface AuditEntry { timestamp: string; user_name: string; action: string }
 
@@ -13,9 +15,17 @@ interface Props {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   record: CensoRecord | null
+  archivos?: CensoJovenArchivo[]
+  loadingArchivos?: boolean
+  canEdit?: boolean
+  onUpload?: () => void
+  onDeleteArchivo?: (id: number) => void
+  onPreview?: (archivo: CensoJovenArchivo) => void
+  onDownload?: (url: string, filename: string) => void
+  getFileIcon?: (tipo: string | null) => React.ReactNode
 }
 
-export function CensoJovenesDetailView({ isOpen, onOpenChange, record }: Props) {
+export function CensoJovenesDetailView({ isOpen, onOpenChange, record, archivos = [], loadingArchivos = false, canEdit = false, onUpload, onDeleteArchivo, onPreview, onDownload, getFileIcon }: Props) {
   const [auditInfo, setAuditInfo] = useState<AuditEntry | null>(null)
   const [lastEditInfo, setLastEditInfo] = useState<AuditEntry | null>(null)
 
@@ -145,6 +155,52 @@ export function CensoJovenesDetailView({ isOpen, onOpenChange, record }: Props) 
               </div>
             </div>
           </div>
+        </div>
+
+        {/* ARCHIVOS */}
+        <div className="col-span-1 md:col-span-2 space-y-3 bg-gray-50/50 p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-md font-bold text-gray-800 flex items-center gap-2">
+              <Paperclip className="w-4 h-4" /> Archivos
+            </h3>
+            {canEdit && onUpload && (
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onUpload}>
+                <Upload className="w-3 h-3 mr-1" /> Subir
+              </Button>
+            )}
+          </div>
+          {loadingArchivos ? (
+            <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-gray-400" /></div>
+          ) : archivos.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-2">Sin archivos</p>
+          ) : (
+            <div className="space-y-1.5">
+              {archivos.map(archivo => (
+                <div key={archivo.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {getFileIcon ? getFileIcon(archivo.tipo) : <FileText className="w-4 h-4 text-gray-400" />}
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-800 truncate">{archivo.nombre_archivo}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {archivo.tamano ? `${(archivo.tamano / 1024).toFixed(0)} KB` : ""} · {new Date(archivo.created_at).toLocaleDateString("es-EC")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {onPreview && (
+                      <button onClick={() => onPreview(archivo)} className="text-indigo-600 hover:text-indigo-800 p-1" title="Ver"><Eye className="w-3.5 h-3.5" /></button>
+                    )}
+                    {onDownload && (
+                      <button onClick={() => onDownload(archivo.url, archivo.nombre_archivo)} className="text-blue-600 hover:text-blue-800 p-1" title="Descargar"><Download className="w-3.5 h-3.5" /></button>
+                    )}
+                    {canEdit && onDeleteArchivo && (
+                      <button onClick={() => onDeleteArchivo(archivo.id)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Auditoría */}

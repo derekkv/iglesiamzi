@@ -11,10 +11,11 @@ import { useAuth } from "@/contexts/auth-context"
 interface PermissionsGuardProps {
   children: (canEdit: boolean, canAdmin?: boolean, canLeader?: boolean) => React.ReactNode
   moduleName: string
+  alternateModules?: string[]
   fallbackPath?: string
 }
 
-export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashboard" }: PermissionsGuardProps) {
+export function PermissionsGuard({ children, moduleName, alternateModules, fallbackPath = "/dashboard" }: PermissionsGuardProps) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const [permState, setPermState] = useState<{ canView: boolean; canEdit: boolean; canAdmin: boolean; canLeader: boolean } | null>(null)
@@ -29,19 +30,31 @@ export function PermissionsGuard({ children, moduleName, fallbackPath = "/dashbo
         return
       }
 
+      // Check primary module first
       const result = await checkUserEditPermission(user.id, moduleName)
 
-      if (!result.success || !result.canView) {
-        toast.error("No tiene permiso para acceder a este módulo")
-        router.push(fallbackPath)
+      if (result.success && result.canView) {
+        setPermState({ canView: result.canView, canEdit: result.canEdit, canAdmin: result.canAdmin, canLeader: result.canLeader })
         return
       }
 
-      setPermState({ canView: result.canView, canEdit: result.canEdit, canAdmin: result.canAdmin, canLeader: result.canLeader })
+      // Check alternate modules if primary didn't grant access
+      if (alternateModules && alternateModules.length > 0) {
+        for (const altModule of alternateModules) {
+          const altResult = await checkUserEditPermission(user.id, altModule)
+          if (altResult.success && altResult.canView) {
+            setPermState({ canView: altResult.canView, canEdit: altResult.canEdit, canAdmin: altResult.canAdmin, canLeader: altResult.canLeader })
+            return
+          }
+        }
+      }
+
+      toast.error("No tiene permiso para acceder a este módulo")
+      router.push(fallbackPath)
     }
 
     checkPermission()
-  }, [user, isLoading, moduleName, router, fallbackPath])
+  }, [user, isLoading, moduleName, alternateModules, router, fallbackPath])
 
   if (isLoading || permState === null) {
     return (

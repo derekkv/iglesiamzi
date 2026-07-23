@@ -16,6 +16,8 @@ function cleanRecordForInsert(record: Partial<CensoRecord>): Record<string, any>
   }
   if (cleaned.edad === 0) cleaned.edad = null
   if (cleaned.porcentaje === 0) cleaned.porcentaje = null
+  // cedula es NOT NULL en la DB, asegurar que nunca sea null
+  if (cleaned.cedula === null || cleaned.cedula === undefined) cleaned.cedula = ""
   return cleaned
 }
 
