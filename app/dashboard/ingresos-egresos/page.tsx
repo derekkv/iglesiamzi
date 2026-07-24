@@ -992,14 +992,7 @@ function formatDateForTable(dateString: string) {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-lg font-bold text-red-600">${totalEgresos.toLocaleString()}</p>
-                <p className="text-xs text-gray-600">Total Egresos</p>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
         {(() => {
           const egresosPorCategoria = records
