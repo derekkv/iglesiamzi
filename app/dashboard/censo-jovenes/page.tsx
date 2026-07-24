@@ -42,6 +42,7 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false)
+  const [cedulaDuplicadaInfo, setCedulaDuplicadaInfo] = useState<{ open: boolean; tabla: string; nombre: string }>({ open: false, tabla: "", nombre: "" })
 
   const [currentRecord, setCurrentRecord] = useState<CensoRecord | null>(null)
   const [formData, setFormData] = useState<CensoRecord>({ cedula: "", apellidos_nombres: "" })
@@ -180,7 +181,7 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
       if (formData.cedula && formData.cedula.trim()) {
         const validacion = await validarCedulaEnCensos(formData.cedula, "censo_jovenes")
         if (validacion.existe) {
-          toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
+          setCedulaDuplicadaInfo({ open: true, tabla: validacion.tabla!, nombre: validacion.nombre! })
           setIsLoadingB(false)
           return
         }
@@ -220,7 +221,7 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
       if (formData.cedula && formData.cedula.trim()) {
         const validacion = await validarCedulaEnCensos(formData.cedula, "censo_jovenes", currentRecord.id)
         if (validacion.existe) {
-          toast({ title: "Cédula ya registrada", description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`, variant: "destructive" })
+          setCedulaDuplicadaInfo({ open: true, tabla: validacion.tabla!, nombre: validacion.nombre! })
           setIsLoadingB(false)
           return
         }
@@ -487,6 +488,21 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Modal de Cédula Duplicada */}
+        <AlertDialog open={cedulaDuplicadaInfo.open} onOpenChange={(open) => setCedulaDuplicadaInfo(prev => ({ ...prev, open }))}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cédula ya registrada</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta cédula ya se encuentra registrada en <strong>{cedulaDuplicadaInfo.tabla}</strong> a nombre de <strong>{cedulaDuplicadaInfo.nombre}</strong>. No se puede duplicar en otro censo.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setCedulaDuplicadaInfo({ open: false, tabla: "", nombre: "" })}>Entendido</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Modal: Previsualizar Archivo */}
         <Dialog open={!!previewArchivo} onOpenChange={() => setPreviewArchivo(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -519,7 +535,7 @@ function CensoJovenesContent({ canEdit }: { canEdit: boolean }) {
 
 export default function CensoJovenesPage() {
   return (
-    <PermissionsGuard moduleName="censo-jovenes" alternateModules={["censo-mdg", "censo-jovenes-mdg"]}>
+    <PermissionsGuard moduleName="censo-jovenes" alternateModules={["censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo"]}>
       {(canEdit) => <CensoJovenesContent canEdit={canEdit} />}
     </PermissionsGuard>
   )

@@ -70,7 +70,7 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
   // Estadísticas generales
   const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
   const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosHoy: 0 })
-  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0 })
+  const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0, baby: 0, kids: 0, explores: 0, champions: 0 })
   const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosMes: 0, nuevosHoy: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({
     primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
@@ -200,6 +200,10 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
       })
       setStatsCensoNinos({
         total: censoNinosData.length,
+        baby: censoNinosData.filter((c: any) => c.grupo === "HEREDEROS BABY").length,
+        kids: censoNinosData.filter((c: any) => c.grupo === "HEREDEROS KIDS").length,
+        explores: censoNinosData.filter((c: any) => c.grupo === "HEREDEROS EXPLORES").length,
+        champions: censoNinosData.filter((c: any) => c.grupo === "HEREDEROS CHAMPIONS").length,
       })
       setStatsCensoJovenes({
         total: censoJovenesData.length,
@@ -459,16 +463,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                     <p className="text-xs text-indigo-700 font-semibold">Censo Protocolo</p>
                   </div>
                   <p className="text-3xl font-bold text-indigo-800">{statsCenso.total}</p>
-                  <div className="mt-2 space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-indigo-600">Activos</span>
-                      <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCenso.activos}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-indigo-600">Miembros</span>
-                      <Badge className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0">{statsCenso.miembros}</Badge>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
 
@@ -482,43 +476,33 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                   <p className="text-3xl font-bold text-amber-800">{statsCensoNinos.total}</p>
                   <div className="mt-2 space-y-1">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-amber-600">Herederos del Reino</span>
-                      <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0">{statsCensoNinos.total}</Badge>
+                      <span className="text-[10px] text-amber-600">Baby (0-2)</span>
+                      <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoNinos.baby}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-amber-600">Kids (3-5)</span>
+                      <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">{statsCensoNinos.kids}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-amber-600">Explores (6-8)</span>
+                      <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCensoNinos.explores}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-amber-600">Champions (9-11)</span>
+                      <Badge className="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0">{statsCensoNinos.champions}</Badge>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Censo MDG */}
+              {/* Nuevos creyentes */}
               <Card className="border-violet-200 bg-violet-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/censo-mdg")}>
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="text-sm">👩</span>
-                    <p className="text-xs text-violet-700 font-semibold">Censo MDG</p>
+                    <p className="text-xs text-violet-700 font-semibold">Nuevos creyentes</p>
                   </div>
                   <p className="text-3xl font-bold text-violet-800">{statsCensoMdg.total}</p>
-                  <div className="mt-2 space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-violet-600">Activos</span>
-                      <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCensoMdg.activos}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-violet-600">Miembros</span>
-                      <Badge className="bg-violet-100 text-violet-800 text-[10px] px-1.5 py-0">{statsCensoMdg.miembros}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-violet-600">Nuevos creyentes (total)</span>
-                      <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosCreyentes}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-violet-600">Nuevos del mes</span>
-                      <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosMes}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-violet-600">Nuevos hoy</span>
-                      <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">{statsCensoMdg.nuevosHoy}</Badge>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
 
@@ -530,24 +514,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                     <p className="text-xs text-pink-700 font-semibold">Censo Jóvenes</p>
                   </div>
                   <p className="text-3xl font-bold text-pink-800">{statsCensoJovenes.total}</p>
-                  <div className="mt-2 space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-pink-600">Activos</span>
-                      <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.activos}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-pink-600">Nuevos creyentes (total)</span>
-                      <Badge className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevos}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-pink-600">Nuevos del mes</span>
-                      <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevosMes}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-pink-600">Nuevos hoy</span>
-                      <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">{statsCensoJovenes.nuevosHoy}</Badge>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -561,7 +527,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                     <p className="text-[10px] text-indigo-600 font-medium">Total IRDD</p>
                   </div>
                   <p className="text-2xl font-bold text-indigo-800">{statsCenso.total + statsCensoMdg.total + statsCensoNinos.total + statsCensoJovenes.total}</p>
-                  <p className="text-[9px] text-indigo-500">sumando todos los censos</p>
                 </CardContent>
               </Card>
               <Card className="border-sky-200 bg-sky-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/discipulado-primeros-pasos")}>
@@ -737,16 +702,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                                 <p className="text-xs text-indigo-700 font-semibold">Censo Protocolo</p>
                               </div>
                               <p className="text-3xl font-bold text-indigo-800">{statsCenso.total}</p>
-                              <div className="mt-2 space-y-1.5">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-indigo-600">Activos</span>
-                                  <span className="text-sm font-bold text-green-700">{statsCenso.activos}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-indigo-600">Miembros</span>
-                                  <span className="text-sm font-bold text-indigo-700">{statsCenso.miembros}</span>
-                                </div>
-                              </div>
                             </div>
                             {/* Niños */}
                             <div className="p-4 bg-amber-50 rounded-lg border border-amber-100">
@@ -757,40 +712,30 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                               <p className="text-3xl font-bold text-amber-800">{statsCensoNinos.total}</p>
                               <div className="mt-2 space-y-1.5">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-amber-600">Herederos del Reino</span>
-                                  <span className="text-sm font-bold text-amber-700">{statsCensoNinos.total}</span>
+                                  <span className="text-[10px] text-amber-600">Baby (0-2)</span>
+                                  <span className="text-sm font-bold text-pink-700">{statsCensoNinos.baby}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] text-amber-600">Kids (3-5)</span>
+                                  <span className="text-sm font-bold text-blue-700">{statsCensoNinos.kids}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] text-amber-600">Explores (6-8)</span>
+                                  <span className="text-sm font-bold text-green-700">{statsCensoNinos.explores}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] text-amber-600">Champions (9-11)</span>
+                                  <span className="text-sm font-bold text-purple-700">{statsCensoNinos.champions}</span>
                                 </div>
                               </div>
                             </div>
-                            {/* MDG */}
+                            {/* Nuevos creyentes */}
                             <div className="p-4 bg-violet-50 rounded-lg border border-violet-100">
                               <div className="flex items-center gap-1.5 mb-2">
                                 <span className="text-sm">👩</span>
-                                <p className="text-xs text-violet-700 font-semibold">Censo MDG</p>
+                                <p className="text-xs text-violet-700 font-semibold">Nuevos creyentes</p>
                               </div>
                               <p className="text-3xl font-bold text-violet-800">{statsCensoMdg.total}</p>
-                              <div className="mt-2 space-y-1.5">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-violet-600">Activos</span>
-                                  <span className="text-sm font-bold text-green-700">{statsCensoMdg.activos}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-violet-600">Miembros</span>
-                                  <span className="text-sm font-bold text-violet-700">{statsCensoMdg.miembros}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-violet-600">Nuevos creyentes (total)</span>
-                                  <Badge className="bg-pink-100 text-pink-800 text-[10px]">{statsCensoMdg.nuevosCreyentes}</Badge>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-violet-600">Nuevos del mes</span>
-                                  <Badge className="bg-blue-100 text-blue-800 text-[10px]">{statsCensoMdg.nuevosMes}</Badge>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-violet-600">Nuevos hoy</span>
-                                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{statsCensoMdg.nuevosHoy}</Badge>
-                                </div>
-                              </div>
                             </div>
                             {/* Jóvenes */}
                             <div className="p-4 bg-pink-50 rounded-lg border border-pink-100">
@@ -799,24 +744,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                                 <p className="text-xs text-pink-700 font-semibold">Censo Jóvenes</p>
                               </div>
                               <p className="text-3xl font-bold text-pink-800">{statsCensoJovenes.total}</p>
-                              <div className="mt-2 space-y-1.5">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-pink-600">Activos</span>
-                                  <span className="text-sm font-bold text-green-700">{statsCensoJovenes.activos}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-pink-600">Nuevos creyentes (total)</span>
-                                  <span className="text-sm font-bold text-pink-700">{statsCensoJovenes.nuevos}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-pink-600">Nuevos del mes</span>
-                                  <Badge className="bg-blue-100 text-blue-800 text-[10px]">{statsCensoJovenes.nuevosMes}</Badge>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-pink-600">Nuevos hoy</span>
-                                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{statsCensoJovenes.nuevosHoy}</Badge>
-                                </div>
-                              </div>
                             </div>
                           </div>
                           {/* Total consolidado */}
@@ -827,7 +754,6 @@ function ControlMensualContent({ canEdit }: { canEdit: boolean }) {
                             </div>
                             <div className="text-right">
                               <span className="text-2xl font-bold text-gray-900">{statsCenso.total + statsCensoMdg.total + statsCensoNinos.total + statsCensoJovenes.total}</span>
-                              <p className="text-[9px] text-gray-500">protocolo + niños + MDG + jóvenes</p>
                             </div>
                           </div>
                         </div>

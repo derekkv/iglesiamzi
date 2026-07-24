@@ -11,7 +11,7 @@ export interface ValidacionCedulaResult {
  * Permite excluir un registro específico (para edición).
  * 
  * @param cedula - Número de cédula a validar
- * @param excluirTabla - Tabla a excluir de la búsqueda (ej: "censo" cuando se edita en censo protocolo)
+ * @param excluirTabla - Tabla de origen (para saber cuál es "la misma tabla")
  * @param excluirId - ID del registro a excluir (para no detectarse a sí mismo al editar)
  */
 export async function validarCedulaEnCensos(
@@ -26,67 +26,52 @@ export async function validarCedulaEnCensos(
   const cedulaLimpia = cedula.trim()
 
   // Buscar en censo protocolo
-  if (excluirTabla !== "censo") {
-    const { data } = await supabase
+  {
+    let query = supabase
       .from("censo")
       .select("id, cedula, apellidos_nombres")
       .eq("cedula", cedulaLimpia)
-      .limit(1)
-    if (data && data.length > 0) {
-      return { existe: true, tabla: "Censo Protocolo", nombre: data[0].apellidos_nombres }
+
+    // Si estamos editando en esta misma tabla, excluir el registro actual
+    if (excluirTabla === "censo" && excluirId) {
+      query = query.neq("id", excluirId)
     }
-  } else if (excluirId) {
-    // Buscar en la misma tabla pero excluyendo el registro actual
-    const { data } = await supabase
-      .from("censo")
-      .select("id, cedula, apellidos_nombres")
-      .eq("cedula", cedulaLimpia)
-      .neq("id", excluirId)
-      .limit(1)
+
+    const { data } = await query.limit(1)
     if (data && data.length > 0) {
       return { existe: true, tabla: "Censo Protocolo", nombre: data[0].apellidos_nombres }
     }
   }
 
   // Buscar en censo MDG
-  if (excluirTabla !== "censo_mdg") {
-    const { data } = await supabase
+  {
+    let query = supabase
       .from("censo_mdg")
       .select("id, cedula, apellidos_nombres")
       .eq("cedula", cedulaLimpia)
-      .limit(1)
-    if (data && data.length > 0) {
-      return { existe: true, tabla: "Censo MDG", nombre: data[0].apellidos_nombres }
+
+    if (excluirTabla === "censo_mdg" && excluirId) {
+      query = query.neq("id", excluirId)
     }
-  } else if (excluirId) {
-    const { data } = await supabase
-      .from("censo_mdg")
-      .select("id, cedula, apellidos_nombres")
-      .eq("cedula", cedulaLimpia)
-      .neq("id", excluirId)
-      .limit(1)
+
+    const { data } = await query.limit(1)
     if (data && data.length > 0) {
-      return { existe: true, tabla: "Censo MDG", nombre: data[0].apellidos_nombres }
+      return { existe: true, tabla: "Nuevos creyentes", nombre: data[0].apellidos_nombres }
     }
   }
 
   // Buscar en censo jóvenes
-  if (excluirTabla !== "censo_jovenes") {
-    const { data } = await supabase
+  {
+    let query = supabase
       .from("censo_jovenes")
       .select("id, cedula, apellidos_nombres")
       .eq("cedula", cedulaLimpia)
-      .limit(1)
-    if (data && data.length > 0) {
-      return { existe: true, tabla: "Censo Jóvenes", nombre: data[0].apellidos_nombres }
+
+    if (excluirTabla === "censo_jovenes" && excluirId) {
+      query = query.neq("id", excluirId)
     }
-  } else if (excluirId) {
-    const { data } = await supabase
-      .from("censo_jovenes")
-      .select("id, cedula, apellidos_nombres")
-      .eq("cedula", cedulaLimpia)
-      .neq("id", excluirId)
-      .limit(1)
+
+    const { data } = await query.limit(1)
     if (data && data.length > 0) {
       return { existe: true, tabla: "Censo Jóvenes", nombre: data[0].apellidos_nombres }
     }

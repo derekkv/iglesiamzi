@@ -319,8 +319,8 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Módulos del Sistema</h2>
-                <p className="text-sm sm:text-base text-gray-600">Seleccione el módulo</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Ministerios de la Iglesia</h2>
+                <p className="text-sm sm:text-base text-gray-600">Seleccione el ministerio</p>
               </div>
             )}
           </div>

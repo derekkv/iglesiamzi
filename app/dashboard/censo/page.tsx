@@ -50,6 +50,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
   const [isCatalogDialogOpen, setIsCatalogDialogOpen] = useState(false)
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false)
   const [savedRecord, setSavedRecord] = useState<CensoRecord | null>(null)
+  const [cedulaDuplicadaInfo, setCedulaDuplicadaInfo] = useState<{ open: boolean; tabla: string; nombre: string }>({ open: false, tabla: "", nombre: "" })
 
   // Current record y datos del formulario
   const [currentRecord, setCurrentRecord] = useState<CensoRecord | null>(null)
@@ -178,11 +179,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
       // Validar cédula duplicada en todos los censos
       const validacion = await validarCedulaEnCensos(formData.cedula, "censo")
       if (validacion.existe) {
-        toast({
-          title: "Cédula ya registrada",
-          description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`,
-          variant: "destructive",
-        })
+        setCedulaDuplicadaInfo({ open: true, tabla: validacion.tabla!, nombre: validacion.nombre! })
         setIsLoadingB(false)
         return
       }
@@ -223,11 +220,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
       // Validar cédula duplicada en todos los censos (excluyendo el registro actual)
       const validacion = await validarCedulaEnCensos(formData.cedula, "censo", currentRecord.id)
       if (validacion.existe) {
-        toast({
-          title: "Cédula ya registrada",
-          description: `Esta cédula ya existe en ${validacion.tabla} (${validacion.nombre}). No se puede duplicar.`,
-          variant: "destructive",
-        })
+        setCedulaDuplicadaInfo({ open: true, tabla: validacion.tabla!, nombre: validacion.nombre! })
         setIsLoadingB(false)
         return
       }
@@ -530,6 +523,21 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
           onOpenChange={setIsSavedModalOpen}
           record={savedRecord}
         />
+
+        {/* Modal de Cédula Duplicada */}
+        <AlertDialog open={cedulaDuplicadaInfo.open} onOpenChange={(open) => setCedulaDuplicadaInfo(prev => ({ ...prev, open }))}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cédula ya registrada</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta cédula ya se encuentra registrada en <strong>{cedulaDuplicadaInfo.tabla}</strong> a nombre de <strong>{cedulaDuplicadaInfo.nombre}</strong>. No se puede duplicar en otro censo.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setCedulaDuplicadaInfo({ open: false, tabla: "", nombre: "" })}>Entendido</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         </main>
       </div>
   )

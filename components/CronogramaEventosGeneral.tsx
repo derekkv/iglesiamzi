@@ -130,7 +130,7 @@ export function CronogramaEventosGeneral({ moduloKey, title }: CronogramaEventos
                             <TableCell className="font-medium text-sm bg-gray-50">{ministerio}</TableCell>
                             {Array.from({ length: maxPersonas }).map((_, i) => {
                               const person = byMinisterio[ministerio][i]
-                              return (<TableCell key={i} className="text-sm text-center">{person ? person.user_name : ""}</TableCell>)
+                              return (<TableCell key={i} className="text-sm text-center">{person ? (<>{person.user_name}{person.asignacion && <span className="block text-[10px] text-purple-600">{person.asignacion}</span>}</>) : ""}</TableCell>)
                             })}
                           </TableRow>
                         ))}

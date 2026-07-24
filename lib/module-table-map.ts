@@ -162,7 +162,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === DATOS PERSONALES ===
   censo: {
-    modules: ["censo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
+    modules: ["censo", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
   },
   censo_ninos: {
     modules: ["censo-ninos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "control_mensual", "resumen-pastoral"],
@@ -170,21 +170,21 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   },
   censo_ninos_archivos: {
     modules: ["censo-ninos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions"],
-    requireEditForWrite: true,
+    requireEditForWrite: false,
   },
   censo_jovenes: {
-    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "control_mensual", "resumen-pastoral"],
+    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
   censo_jovenes_archivos: {
-    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg"],
-    requireEditForWrite: true,
+    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo"],
+    requireEditForWrite: false,
   },
   censo_mdg: {
-    modules: ["censo-mdg", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
+    modules: ["censo-mdg", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
   },
   censo_catalogos: {
-    modules: ["censo", "censo-mdg"],
+    modules: ["censo", "censo-mdg", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo"],
   },
   censo_configuraciones: {
     modules: ["censo", "censo-mdg"],
@@ -249,20 +249,26 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === HEREDEROS DEL REINO (CICLOS) ===
   herederos_ciclos: {
-    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
   },
   herederos_ciclo_participantes: {
-    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
   },
   herederos_ciclo_fechas: {
-    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
   },
   herederos_ciclo_asistencia: {
-    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos"],
+    modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
+  },
+
+  // === CONSOLIDACIÓN HEREDEROS ===
+  consolidacion_herederos: {
+    modules: ["consolidacion_herederos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions"],
+    requireEditForWrite: false,
   },
 
   // === MENSAJES Y CITACIONES ===

@@ -1001,6 +1001,43 @@ function formatDateForTable(dateString: string) {
             </CardContent>
           </Card>
         </div>
+        {(() => {
+          const egresosPorCategoria = records
+            .filter((r) => r.tipo === "Egreso")
+            .reduce((acc, r) => {
+              const cat = r.categoria_principal || "Sin categoría"
+              acc[cat] = (acc[cat] || 0) + Number(r.monto || 0)
+              return acc
+            }, {} as Record<string, number>)
+
+          const categoriasOrdenadas = Object.entries(egresosPorCategoria).sort(([, a], [, b]) => b - a)
+
+          if (categoriasOrdenadas.length > 0) {
+            return (
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 mb-8">
+                {categoriasOrdenadas.map(([cat, monto]) => (
+                  <Card key={cat} className="border-red-100">
+                    <CardContent className="p-2.5">
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-red-600">${monto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[9px] text-gray-600 leading-tight mt-0.5">{cat}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Card className="border-red-300 bg-red-50">
+                  <CardContent className="p-2.5">
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-red-700">${totalEgresos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[9px] font-semibold text-red-600 mt-0.5">TOTAL EGRESOS</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          }
+          return null
+        })()}
 
         <Card>
           <CardHeader>

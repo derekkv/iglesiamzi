@@ -60,6 +60,8 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
   const [data, setData] = useState<HerederosCicloCompleto | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [asignacionesCronograma, setAsignacionesCronograma] = useState<Record<string, string[]>>({})
+  const [servidorHoy, setServidorHoy] = useState<string[]>([])
 
   // Modals
   const [showIniciar, setShowIniciar] = useState(false)
@@ -92,17 +94,44 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
           if (importados > 0) {
             const updated = await herederosCiclosService.getCicloActivoCompleto(tipo)
             setData(updated)
+            loadAsignaciones(updated)
             return
           }
         } catch { /* silencioso */ }
       }
       setData(result)
+      loadAsignaciones(result)
     } catch (error) {
       console.error("Error loading herederos ciclo:", error)
     } finally {
       setLoading(false)
     }
   }, [tipo])
+
+  const loadAsignaciones = async (cicloData: HerederosCicloCompleto | null) => {
+    if (!cicloData || cicloData.fechas.length === 0) return
+    try {
+      const fechas = cicloData.fechas.map((f) => f.fecha)
+      const { data: cronograma } = await (await import("@/lib/secure-db")).supabase
+        .from("cronograma_servicio")
+        .select("user_name, asignacion, fecha")
+        .eq("modulo", "herederos")
+        .eq("asignacion", config.label)
+        .in("fecha", fechas)
+      if (cronograma) {
+        const map: Record<string, string[]> = {}
+        for (const c of cronograma) {
+          if (!map[c.fecha]) map[c.fecha] = []
+          map[c.fecha].push(c.user_name)
+        }
+        setAsignacionesCronograma(map)
+
+        // Servidor de hoy
+        const hoy = new Date().toISOString().split("T")[0]
+        setServidorHoy(map[hoy] || [])
+      }
+    } catch { /* silencioso */ }
+  }
 
   useEffect(() => { loadData(true) }, [loadData])
 
@@ -254,9 +283,82 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
     if (!data) return
     try {
       await herederosCiclosService.upsertAsistencia(data.ciclo.id, participanteId, fechaId, status as any)
+
+      // Si el niño asistió o llegó atrasado, notificar al servidor asignado a su salón
+      if (status === "A" || status === "AT") {
+        const participante = data.participantes.find((p) => p.id === participanteId)
+        if (participante) {
+          const salonNombre = config.label // Ej: "Herederos Baby"
+          notificarAsignado(participante, salonNombre, status)
+        }
+      }
+
       await loadData()
     } catch (error: any) {
       toast.error("Error: " + error.message)
+    }
+  }
+
+  /**
+   * Notifica por WhatsApp y email al servidor asignado al salón del niño.
+   * Busca en el cronograma de herederos quién está asignado hoy a este salón.
+   */
+  const notificarAsignado = async (participante: HerederosParticipante, salon: string, status: string) => {
+    try {
+      const token = localStorage.getItem("authToken")
+      if (!token) return
+
+      // Buscar en el cronograma de hoy quién está asignado a este salón
+      const hoy = new Date().toISOString().split("T")[0]
+      const { data: cronogramaEntries } = await (await import("@/lib/secure-db")).supabase
+        .from("cronograma_servicio")
+        .select("user_id, user_name, asignacion")
+        .eq("modulo", "herederos")
+        .eq("fecha", hoy)
+        .eq("asignacion", salon)
+
+      if (!cronogramaEntries || cronogramaEntries.length === 0) return
+
+      // Obtener datos de contacto del servidor asignado
+      for (const entry of cronogramaEntries) {
+        const { data: userData } = await (await import("@/lib/secure-db")).supabase
+          .from("users")
+          .select("email, phone")
+          .eq("id", entry.user_id)
+          .maybeSingle()
+
+        if (!userData) continue
+
+        const statusText = status === "A" ? "ha llegado" : "ha llegado atrasado"
+        const alergias = participante.alergias ? `\n⚠️ ALERGIAS: ${participante.alergias}` : ""
+        const observaciones = participante.observaciones ? `\n📝 Observaciones: ${participante.observaciones}` : ""
+        const mensaje = `👶 *${participante.nombre}* ${statusText} a *${salon}*${alergias}${observaciones}\n\n¡Tener cuidado y atención!`
+
+        // Enviar por WhatsApp si tiene teléfono
+        if (userData.phone) {
+          fetch("/api/whatsapp/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ phone: userData.phone, message: mensaje }),
+          }).catch(() => {})
+        }
+
+        // Enviar por email si tiene correo
+        if (userData.email) {
+          fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              to: userData.email,
+              subject: `${participante.nombre} ${statusText} a ${salon}`,
+              html: `<p><strong>${participante.nombre}</strong> ${statusText} a <strong>${salon}</strong></p>${alergias ? `<p style="color:red">⚠️ ALERGIAS: ${participante.alergias}</p>` : ""}${observaciones ? `<p>📝 Observaciones: ${participante.observaciones}</p>` : ""}<p><em>¡Tener cuidado y atención!</em></p>`,
+            }),
+          }).catch(() => {})
+        }
+      }
+    } catch (error) {
+      // No bloquear la asistencia si la notificación falla
+      console.error("Error enviando notificación:", error)
     }
   }
 
@@ -362,6 +464,12 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {servidorHoy.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1">
+                  <span className="text-sm font-bold text-purple-700">{servidorHoy.join(", ")}</span>
+                  <span className="text-[10px] text-purple-500">hoy</span>
+                </div>
+              )}
               {!canEdit && <Badge variant="outline" className="text-yellow-600 border-yellow-300 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo lectura</Badge>}
               {!cicloTerminado && <Badge className="bg-blue-100 text-blue-800">En curso</Badge>}
               {cicloTerminado && <Badge className="bg-green-100 text-green-800">Completado</Badge>}
@@ -437,6 +545,9 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
                         <div className="flex flex-col items-center">
                           <span className="font-semibold">C{f.numero_clase}</span>
                           <span className="text-[9px] text-gray-500">{formatDateShort(f.fecha)}</span>
+                          {asignacionesCronograma[f.fecha] && (
+                            <span className="text-[8px] text-purple-600 font-medium leading-tight">{asignacionesCronograma[f.fecha].join(", ")}</span>
+                          )}
                           {canEdit && (
                             <button className="text-blue-500 hover:text-blue-700 mt-0.5" onClick={() => { setEditingFecha(f); setNuevaFechaEdit(f.fecha); setShowEditFecha(true) }}>
                               <Edit className="w-2.5 h-2.5" />

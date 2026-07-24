@@ -544,11 +544,26 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
 
                 <div className="space-y-1.5">
                   <Label>Asignación</Label>
-                  <Input
-                    value={asignacion}
-                    onChange={(e) => setAsignacion(e.target.value)}
-                    placeholder="Ej: Salón / Auditorio / Puerta..."
-                  />
+                  {moduloKey === "herederos" ? (
+                    <Select value={asignacion} onValueChange={setAsignacion}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione salón" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Herederos Baby">Herederos Baby</SelectItem>
+                        <SelectItem value="Herederos Kids">Herederos Kids</SelectItem>
+                        <SelectItem value="Herederos Explores">Herederos Explores</SelectItem>
+                        <SelectItem value="Herederos Champions">Herederos Champions</SelectItem>
+                        <SelectItem value="Recepción de Niños">Recepción de Niños</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      value={asignacion}
+                      onChange={(e) => setAsignacion(e.target.value)}
+                      placeholder="Ej: Salón / Auditorio / Puerta..."
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -642,7 +657,12 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                       return (
                         <TableRow key={entry.id} className={isPast ? "opacity-50" : ""}>
                           <TableCell className="text-xs text-gray-500">{entry.ministerio || "-"}</TableCell>
-                          <TableCell className="font-medium">{entry.user_name}</TableCell>
+                          <TableCell className="font-medium">
+                            {entry.user_name}
+                            {moduloKey === "herederos" && entry.asignacion && (
+                              <span className="block text-[10px] text-purple-600 font-normal">{entry.asignacion}</span>
+                            )}
+                          </TableCell>
                           <TableCell>{entry.asignacion}</TableCell>
                           <TableCell className="text-xs">{formatDate(entry.fecha)}</TableCell>
                           <TableCell className="text-xs">{entry.hora_entrada || "-"}</TableCell>
@@ -771,11 +791,26 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
             </div>
             <div className="grid gap-2">
               <Label>Asignación *</Label>
-              <Input
-                value={editForm.asignacion}
-                onChange={(e) => setEditForm({ ...editForm, asignacion: e.target.value })}
-                placeholder="Ej: Salón / Auditorio / Puerta..."
-              />
+              {moduloKey === "herederos" ? (
+                <Select value={editForm.asignacion} onValueChange={(v) => setEditForm({ ...editForm, asignacion: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione salón" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Herederos Baby">Herederos Baby</SelectItem>
+                    <SelectItem value="Herederos Kids">Herederos Kids</SelectItem>
+                    <SelectItem value="Herederos Explores">Herederos Explores</SelectItem>
+                    <SelectItem value="Herederos Champions">Herederos Champions</SelectItem>
+                    <SelectItem value="Recepción de Niños">Recepción de Niños</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={editForm.asignacion}
+                  onChange={(e) => setEditForm({ ...editForm, asignacion: e.target.value })}
+                  placeholder="Ej: Salón / Auditorio / Puerta..."
+                />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
