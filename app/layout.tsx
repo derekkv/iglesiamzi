@@ -1,0 +1,58 @@
+import type React from "react";
+import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import { MonthProvider } from "@/contexts/month-context";
+import { Suspense } from "react";
+//@ts-ignore
+import './globals.css'
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/contexts/auth-context";
+import { SecurityCheckProvider } from "@/contexts/security-context";
+import { SecurityKeyDialog } from "@/components/SecurityKeyDialog";
+import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
+import { ServiceAcknowledgeModal } from "@/components/ServiceAcknowledgeModal";
+import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
+import { NotificacionModal } from "@/components/NotificacionModal";
+import { ErrorReporter } from "@/components/ErrorReporter";
+import { CHURCH } from "@/lib/branding";
+
+export const metadata: Metadata = {
+  title: CHURCH.appTitle,
+  description: CHURCH.appDescription,
+  robots: {
+    index: false,
+    follow: false,
+  },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: CHURCH.logoUrl,
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="es">
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <Suspense fallback={null}>
+          <AuthProvider>
+                    <SecurityCheckProvider>
+            <MonthProvider>{children}</MonthProvider>
+              <SecurityKeyDialog />
+              <ServiceAcknowledgeModal />
+              <PushNotificationPrompt />
+              <NotificacionModal />
+        </SecurityCheckProvider>
+          </AuthProvider>
+          <Toaster />
+          <ServiceWorkerUpdater />
+          <ErrorReporter />
+        </Suspense>
+      </body>
+    </html>
+  );
+}

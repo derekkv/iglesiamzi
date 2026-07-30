@@ -1,0 +1,341 @@
+LICENCIA COMUNITARIA DE SOFTWARE PARA IGLESIAS — ECUADOR
+Versión 1.0 — 2026
+
+Copyright © 2026 SALAS ORTIZ JAIME VICENTE
+Correo: jaimesalasortiz@hotmail.com
+Domicilio: URBANIZACION ALTOS DE MANTA BEACH, TORRE 3, DPTO 4,
+MANTA, MANABÍ, ECUADOR
+
+PREÁMBULO
+
+El propósito de esta licencia es permitir que iglesias, congregaciones,
+ministerios y otras organizaciones religiosas utilicen, estudien, copien,
+adapten y compartan gratuitamente el Software, y que cualquier persona pueda
+mejorarlo para beneficio de dichas organizaciones, evitando su venta o
+explotación comercial.
+
+Esta es una licencia personalizada de código fuente disponible. Debido a sus
+restricciones sobre comercialización y beneficiarios, no constituye una
+licencia de código abierto conforme a la definición de la Open Source
+Initiative ni una licencia de software libre conforme a la Free Software
+Foundation.
+
+1. DEFINICIONES
+
+A efectos de esta licencia:
+
+1.1. “Software” significa el código fuente, código objeto o compilado,
+documentación técnica, scripts, configuraciones, esquemas de bases de datos y
+demás archivos distribuidos junto con esta licencia.
+
+1.2. “Titular” significa SALAS ORTIZ JAIME VICENTE, en calidad de titular
+declarado de los derechos patrimoniales sobre el Software original, sin
+perjuicio de los derechos que correspondan a otros autores, contribuidores o
+terceros sobre sus respectivos aportes.
+
+1.3. “Entidad Religiosa Autorizada” significa una iglesia, congregación,
+comunidad de fe, ministerio u organización religiosa, con o sin personalidad
+jurídica, cuya actividad principal sea religiosa, pastoral, comunitaria,
+educativa, benéfica o de asistencia social y que no tenga como finalidad la
+venta o explotación comercial del Software.
+
+1.4. “Persona Colaboradora” significa cualquier persona natural o jurídica que
+use, instale, administre o modifique el Software por encargo o en beneficio de
+una Entidad Religiosa Autorizada.
+
+1.5. “Modificación” significa cualquier corrección, adaptación, traducción,
+ampliación, integración o trabajo derivado realizado a partir del Software.
+
+1.6. “Contribución” significa cualquier código, documentación, corrección,
+diseño, prueba o mejora enviada voluntariamente al repositorio principal del
+Software.
+
+1.7. “Explotación Comercial” significa vender, revender, alquilar, sublicenciar
+por precio, cobrar por el derecho de uso o acceso, ofrecer como servicio
+comercial o incorporar el Software a un producto o servicio cuyo precio
+incluya directa o indirectamente el acceso al Software.
+
+2. CONCESIÓN DE LA LICENCIA
+
+Sujeto al cumplimiento de todas sus condiciones, el Titular concede de manera
+gratuita, mundial, no exclusiva y no transferible fuera de los supuestos aquí
+permitidos una licencia para:
+
+2.1. Ejecutar y utilizar el Software en beneficio de una o varias Entidades
+Religiosas Autorizadas.
+
+2.2. Estudiar, reproducir y realizar copias del Software.
+
+2.3. Corregir, adaptar, traducir, integrar y modificar el Software para las
+necesidades de una Entidad Religiosa Autorizada.
+
+2.4. Instalar y administrar el Software en infraestructura propia o contratada
+por una Entidad Religiosa Autorizada.
+
+2.5. Distribuir copias originales o modificadas exclusivamente a Entidades
+Religiosas Autorizadas, conforme a esta licencia.
+
+2.6. Permitir que Personas Colaboradoras ejerzan estos derechos únicamente por
+encargo o en beneficio de una Entidad Religiosa Autorizada.
+
+Esta licencia no transfiere la titularidad de los derechos de autor ni concede
+derechos distintos de los expresamente indicados.
+
+3. CONDICIONES DE DISTRIBUCIÓN
+
+Quien distribuya una copia original o modificada del Software deberá:
+
+3.1. Incluir una copia completa e inalterada de esta licencia.
+
+3.2. Conservar los avisos de autoría, derechos de autor y atribución existentes.
+
+3.3. Identificar de forma razonable las modificaciones efectuadas, sus autores
+y sus fechas, cuando esa información esté disponible.
+
+3.4. Entregar el código fuente correspondiente junto con la versión distribuida
+o facilitar a la entidad receptora un medio gratuito, funcional y razonable
+para obtenerlo.
+
+3.5. Distribuir el Software y sus Modificaciones bajo esta misma versión de la
+licencia, sin añadir condiciones incompatibles.
+
+3.6. No cobrar por la licencia, copia, descarga, activación, distribución o
+derecho de uso del Software.
+
+3.7. No aplicar medidas técnicas o contractuales que impidan a la entidad
+receptora ejercer los derechos concedidos por esta licencia.
+
+No existe obligación de publicar las Modificaciones para el público en general.
+Sin embargo, toda Entidad Religiosa Autorizada que reciba o utilice una versión
+modificada tendrá derecho a recibir gratuitamente su código fuente
+correspondiente.
+
+4. PROHIBICIÓN DE VENTA Y EXPLOTACIÓN COMERCIAL
+
+Queda expresamente prohibido:
+
+4.1. Vender o revender el Software, total o parcialmente, en su versión original
+o modificada.
+
+4.2. Alquilarlo o sublicenciarlo a cambio de dinero, bienes, servicios u otra
+contraprestación.
+
+4.3. Cobrar por descargarlo, copiarlo, activarlo, distribuirlo o utilizarlo.
+
+4.4. Cobrar una membresía, suscripción, donación obligatoria o cargo
+administrativo cuyo objeto principal o efecto sea permitir el acceso al
+Software.
+
+4.5. Ofrecer a terceros acceso al Software como servicio alojado, plataforma o
+Software como Servicio (SaaS) con fines de lucro.
+
+4.6. Incorporarlo en un producto, paquete o servicio comercial cuando el precio
+incluya directa o indirectamente la licencia o el acceso al Software.
+
+4.7. Ocultar el precio del Software dentro de cargos por soporte,
+infraestructura, administración u otros conceptos.
+
+Las donaciones auténticamente voluntarias al proyecto o a sus colaboradores no
+se consideran venta, siempre que no sean condición para acceder al Software o
+ejercer los derechos concedidos por esta licencia.
+
+5. SERVICIOS PROFESIONALES PERMITIDOS
+
+Se permite cobrar una remuneración razonable por servicios independientes
+relacionados con el Software, incluidos:
+
+- instalación y configuración;
+- migración de información;
+- desarrollo de Modificaciones solicitadas por una iglesia;
+- capacitación;
+- mantenimiento y soporte técnico;
+- administración de servidores; y
+- alojamiento e infraestructura tecnológica dedicados a una Entidad Religiosa
+  Autorizada.
+
+El proveedor deberá diferenciar de manera clara el precio de sus servicios del
+valor del Software. No podrá cobrar por la licencia ni restringir los derechos
+de la Entidad Religiosa Autorizada.
+
+Cuando un proveedor desarrolle una Modificación para una Entidad Religiosa
+Autorizada, deberá entregarle el código fuente correspondiente sin exigir un
+pago adicional por la licencia o liberación del código. Esto no impide cobrar
+por el trabajo profesional efectivamente realizado.
+
+El alojamiento pagado está permitido cuando se presta por encargo de una
+Entidad Religiosa Autorizada y el cobro corresponde a infraestructura,
+administración o soporte. No está permitido cobrar a terceros por el mero
+acceso al Software ni operar una plataforma comercial multiusuario basada
+principalmente en este.
+
+6. USO POR LAS ENTIDADES AUTORIZADAS
+
+Una Entidad Religiosa Autorizada podrá permitir el acceso al Software a sus
+miembros, empleados, líderes, voluntarios, contratistas y proveedores
+tecnológicos cuando el acceso esté relacionado con sus actividades y no
+implique Explotación Comercial.
+
+Las actividades ocasionales de recaudación de fondos de una iglesia no
+convierten automáticamente el uso interno del Software en Explotación
+Comercial, siempre que no se venda ni se cobre por acceder al Software.
+
+7. CONTRIBUCIONES AL REPOSITORIO PRINCIPAL
+
+Las mejoras y correcciones podrán enviarse voluntariamente al repositorio
+principal mediante issues, pull requests, parches u otros mecanismos
+establecidos por el proyecto.
+
+Al enviar una Contribución, la persona contribuyente declara que:
+
+7.1. Es autora de la Contribución o cuenta con autorización suficiente para
+compartirla.
+
+7.2. La Contribución no incorpora deliberadamente material de terceros
+incompatible con esta licencia.
+
+7.3. Autoriza al Titular y a los usuarios legítimos del Software a reproducir,
+modificar, integrar y distribuir la Contribución como parte del Software bajo
+esta licencia.
+
+7.4. La autorización es gratuita, mundial, no exclusiva y, en la máxima medida
+permitida por la ley aplicable, irrevocable respecto de las copias y versiones
+válidamente distribuidas.
+
+7.5. Conserva sus derechos morales en la medida reconocida por la legislación
+ecuatoriana y comunitaria andina.
+
+El envío de una Contribución no obliga al Titular a aceptarla, integrarla,
+publicarla o mantenerla. El proyecto podrá requerir una certificación
+Signed-off-by basada en el Developer Certificate of Origin o un acuerdo de
+contribución separado.
+
+8. PATENTES DE LAS PERSONAS CONTRIBUYENTES
+
+En la medida en que una Contribución esté cubierta por una patente controlada
+por quien la aporta, esa persona concede a los usuarios legítimos del Software
+una licencia de patente gratuita, mundial y no exclusiva, limitada a los actos
+necesarios para usar, modificar y distribuir la Contribución como parte del
+Software conforme a esta licencia.
+
+Esta concesión terminará para quien inicie una reclamación de patente alegando
+que el Software o una Contribución infringe una patente, salvo que la ley
+aplicable disponga otra cosa.
+
+9. DERECHOS MORALES Y ATRIBUCIÓN
+
+Los avisos razonables de autoría deberán conservarse. Nada en esta licencia se
+interpretará como renuncia a derechos morales cuando sean irrenunciables
+conforme a la legislación ecuatoriana o a la normativa de la Comunidad Andina.
+
+Las Modificaciones deberán distinguirse razonablemente del trabajo original
+para no atribuir al autor original cambios que no realizó.
+
+10. MARCAS Y ELEMENTOS DE IDENTIDAD
+
+Esta licencia no autoriza el uso de nombres comerciales, marcas, logotipos,
+emblemas u otros elementos de identidad del Titular o de las iglesias, salvo
+cuando sea necesario mencionarlos para reconocer el origen del Software.
+
+Las versiones modificadas no podrán presentarse como versiones oficiales ni
+sugerir aprobación del Titular sin autorización previa y escrita.
+
+11. COMPONENTES DE TERCEROS
+
+El Software puede utilizar bibliotecas, herramientas u otros componentes de
+terceros. Esos componentes permanecen sujetos a sus propias licencias y avisos.
+Esta licencia no sustituye, amplía ni restringe los derechos y obligaciones
+aplicables a dichos componentes.
+
+12. DATOS PERSONALES Y CUMPLIMIENTO NORMATIVO
+
+Esta licencia regula derechos sobre el Software. No autoriza por sí misma el
+tratamiento de datos personales ni garantiza el cumplimiento de obligaciones
+sobre privacidad, seguridad, archivos, contabilidad, comunicaciones
+electrónicas o información de menores.
+
+Cada entidad que instale o utilice el Software será responsable de cumplir la
+normativa aplicable, incluida la legislación ecuatoriana de protección de datos
+personales.
+
+13. AUSENCIA DE GARANTÍA
+
+EL SOFTWARE SE ENTREGA “TAL CUAL” Y SEGÚN SU DISPONIBILIDAD.
+
+EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEGISLACIÓN ECUATORIANA, EL TITULAR Y LAS
+PERSONAS CONTRIBUYENTES NO OTORGAN GARANTÍAS EXPRESAS O IMPLÍCITAS SOBRE
+FUNCIONAMIENTO ININTERRUMPIDO, AUSENCIA DE ERRORES, SEGURIDAD, COMERCIABILIDAD O
+IDONEIDAD PARA UN PROPÓSITO PARTICULAR.
+
+La persona o entidad usuaria es responsable de realizar copias de seguridad,
+implementar controles de acceso y verificar que el Software sea adecuado para
+su operación.
+
+14. LIMITACIÓN DE RESPONSABILIDAD
+
+En la máxima medida permitida por la legislación ecuatoriana, el Titular y las
+personas contribuyentes no serán responsables por pérdida de información,
+interrupción de actividades, pérdida de ingresos ni daños indirectos derivados
+del uso o imposibilidad de uso del Software.
+
+Nada en esta licencia excluirá o limitará responsabilidades que legalmente no
+puedan excluirse o limitarse, incluidas las que correspondan por dolo, culpa
+grave u otros supuestos imperativos.
+
+15. VIGENCIA Y TERMINACIÓN
+
+Esta licencia permanecerá vigente mientras se cumplan sus condiciones.
+
+Los derechos concedidos terminarán automáticamente para quien incumpla la
+licencia. Cuando sea el primer incumplimiento y pueda corregirse, los derechos
+se restablecerán provisionalmente si el incumplimiento cesa y se corrige dentro
+de los treinta (30) días siguientes a la notificación escrita del Titular.
+
+Un incumplimiento posterior o deliberado podrá dar lugar a terminación
+inmediata, sin perjuicio de los derechos y acciones previstos por la ley.
+
+La terminación no afectará a terceros que hayan recibido válidamente el
+Software y continúen cumpliendo esta licencia.
+
+16. LEGISLACIÓN APLICABLE Y CONTROVERSIAS
+
+Esta licencia se interpretará conforme a las leyes de la República del Ecuador,
+incluido el régimen aplicable a programas de ordenador del Código Orgánico de
+la Economía Social de los Conocimientos, Creatividad e Innovación, y conforme a
+la normativa de propiedad intelectual de la Comunidad Andina, incluida la
+Decisión 351, cuando corresponda.
+
+Antes de iniciar un procedimiento judicial, las partes procurarán resolver la
+controversia mediante negociación directa durante treinta (30) días contados
+desde una notificación escrita. De común acuerdo, podrán acudir a un centro de
+mediación legalmente autorizado en Ecuador.
+
+Si no alcanzan un acuerdo, se someten a los jueces competentes del cantón Manta,
+provincia de Manabí, República del Ecuador, sin perjuicio de las normas
+imperativas sobre competencia.
+
+17. DIVISIBILIDAD Y NO RENUNCIA
+
+Si una disposición fuese declarada inválida o inaplicable, se interpretará o
+reducirá en la medida necesaria para aproximarse a su finalidad legítima. Las
+demás disposiciones continuarán vigentes.
+
+La falta de ejercicio inmediato de un derecho no se interpretará como renuncia
+a ese derecho.
+
+18. ACUERDO COMPLETO, IDIOMA Y ACEPTACIÓN
+
+Esta licencia constituye el acuerdo aplicable al uso, modificación y
+distribución del Software, salvo que exista un acuerdo escrito diferente con
+el Titular.
+
+La versión en español es la versión jurídicamente rectora. Cualquier traducción
+se proporciona únicamente con fines informativos.
+
+La mera consulta pública del código no implica aceptación. Copiar, modificar,
+distribuir o ejercer cualquiera de los permisos especiales concedidos por esta
+licencia supone su aceptación.
+
+Los usos no autorizados por esta licencia requieren permiso previo y escrito
+del Titular.
+
+FIN DE LA LICENCIA
