@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   // 1. Leer el cuerpo CRUDO (necesario para validar la firma)
   const rawBody = await request.text()
+  console.log(`[wa-webhook] 🔔 POST recibido | tamaño: ${rawBody.length} bytes`)
 
   let signatureValid = false
   try {
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest) {
 
 async function processPayload(payload: any, signatureValid: boolean) {
   if (payload?.object !== "whatsapp_business_account") {
+    console.log("[wa-webhook] Evento ignorado: object =", payload?.object)
     await logEvent("unknown_object", payload, signatureValid)
     return
   }
@@ -124,15 +126,20 @@ async function processPayload(payload: any, signatureValid: boolean) {
 
       // --- Mensajes entrantes ---
       if (Array.isArray(value.messages) && value.messages.length > 0) {
-        await logEvent("messages", change, signatureValid)
         const contacts = value.contacts || []
 
         for (const msg of value.messages) {
           const waId: string = msg.from
           const profile = contacts.find((c: any) => c.wa_id === waId)
           const profileName = profile?.profile?.name
-
           const { type, body, caption, mediaId, mediaMime, mediaFilename } = extractContent(msg)
+
+          console.log(
+            `[wa-webhook] 📩 Mensaje entrante | de: ${waId} (${profileName || "sin nombre"}) | tipo: ${type} | wamid: ${msg.id}` +
+            (body ? ` | body: "${body.slice(0, 80)}"` : "") +
+            (caption ? ` | caption: "${caption.slice(0, 50)}"` : "") +
+            (mediaId ? ` | media: ${mediaId}` : "")
+          )
 
           await logInbound({
             wamid: msg.id,
@@ -151,15 +158,24 @@ async function processPayload(payload: any, signatureValid: boolean) {
             raw: msg,
           })
         }
+
+        console.log(`[wa-webhook] ✅ ${value.messages.length} mensaje(s) entrante(s) procesado(s)`)
+        await logEvent("messages", change, signatureValid)
         continue
       }
 
       // --- Estados de mensajes enviados ---
       if (Array.isArray(value.statuses) && value.statuses.length > 0) {
-        await logEvent("statuses", change, signatureValid)
-
         for (const st of value.statuses) {
           const error = Array.isArray(st.errors) ? st.errors[0] : undefined
+
+          console.log(
+            `[wa-webhook] 📬 Status | wamid: ${st.id} | status: ${st.status}` +
+            (st.conversation?.id ? ` | conv: ${st.conversation.id}` : "") +
+            (st.pricing?.category ? ` | pricing: ${st.pricing.category}` : "") +
+            (error ? ` | ❌ error: ${error.code} ${error.title}` : "")
+          )
+
           await updateMessageStatus({
             wamid: st.id,
             status: st.status,
@@ -174,15 +190,24 @@ async function processPayload(payload: any, signatureValid: boolean) {
             billable: st.pricing?.billable,
           })
         }
+
+        console.log(`[wa-webhook] ✅ ${value.statuses.length} status(es) procesado(s)`)
+        await logEvent("statuses", change, signatureValid)
         continue
       }
 
       // --- Cambios de estado de plantillas ---
       if (field === "message_template_status_update") {
-        await logEvent("template_status", change, signatureValid)
         const name = value.message_template_name
         const language = value.message_template_language
         const status = value.event
+
+        console.log(
+          `[wa-webhook] 📋 Template status | nombre: ${name} | idioma: ${language} | nuevo estado: ${status}` +
+          (value.reason ? ` | razón: ${value.reason}` : "")
+        )
+
+        await logEvent("template_status", change, signatureValid)
 
         if (name && status) {
           const patch: Record<string, any> = { status }
@@ -194,6 +219,8 @@ async function processPayload(payload: any, signatureValid: boolean) {
         continue
       }
 
+      // --- Evento no reconocido ---
+      console.log(`[wa-webhook] ⚠️ Evento no procesado | field: ${field || "unknown"} | keys: ${Object.keys(value).join(", ")}`)
       await logEvent(field || "unknown", change, signatureValid)
     }
   }

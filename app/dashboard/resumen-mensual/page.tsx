@@ -121,6 +121,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
   const [statsPresentaciones, setStatsPresentaciones] = useState({ total: 0, esteMes: 0 })
   const [statsAtrasados, setStatsAtrasados] = useState({ total: 0, sinGestionar: 0 })
   const [statsCelulas, setStatsCelulas] = useState({ totalMiembros: 0, asistieronSemana: 0 })
+  const [statsAsistenciaCulto, setStatsAsistenciaCulto] = useState({ asistieron: 0, faltaron: 0, enSeguimiento: 0, sinGestionar: 0 })
   const [statsProyectoMario, setStatsProyectoMario] = useState<Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }>>({
     belleza_integral_sabados: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
     belleza_integral_viernes: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
@@ -217,7 +218,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
     const lunesSemana = getLunesSemanaActual()
 
     let completed = 0
-    const totalTasks = 13
+    const totalTasks = 14
     const tick = () => { completed++; setLoadingProgress(Math.round((completed / totalTasks) * 100)) }
 
     // Cada sección se lanza en paralelo y actualiza su estado apenas resuelve
@@ -288,8 +289,19 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
       const evts=res.data||[];if(evts.length>0){const parts=await Promise.all(evts.map((ev:any)=>supabase.from("evento_participantes").select("id, valor, abono").eq("evento_id",ev.id).then(r=>({id:ev.id,nombre:ev.nombre,parts:r.data||[]}))));setStatsEventos(parts.map(({id,nombre,parts:pp})=>{const ins=pp.length;const pag=pp.filter((p:any)=>Number(p.valor)<=0||Number(p.abono)>=Number(p.valor)).length;return{id,nombre,inscritos:ins,pagadosCompleto:pag,pendientesPago:ins-pag,totalRecaudado:pp.reduce((s:number,p:any)=>s+Number(p.abono||0),0),totalValor:pp.reduce((s:number,p:any)=>s+Number(p.valor||0),0)}}))}else{setStatsEventos([])}
       tick()
     })
+    const p13 = Promise.all([
+      supabase.from("asistencia_culto").select("persona_id, fuente, asistio").eq("mes_id", currentMonth?.id || ""),
+      supabase.from("asistencia_culto_seguimiento").select("id, gestionado").eq("mes_id", currentMonth?.id || ""),
+    ]).then(([acRes, segRes]) => {
+      const regs = acRes.data || []
+      const seg = segRes.data || []
+      const asistieron = new Set(regs.filter(r => r.asistio === true).map(r => `${r.persona_id}-${r.fuente}`)).size
+      const faltaron = new Set(regs.filter(r => r.asistio === false).map(r => `${r.persona_id}-${r.fuente}`)).size
+      setStatsAsistenciaCulto({ asistieron, faltaron, enSeguimiento: seg.length, sinGestionar: seg.filter(s => !s.gestionado).length })
+      tick()
+    })
 
-    await Promise.allSettled([p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12])
+    await Promise.allSettled([p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13])
     setLoadingProgress(100)
     setLoadingStats(false)
   }
@@ -688,6 +700,23 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                       <p className="text-[9px] text-red-600">{statsAtrasados.sinGestionar} sin gestionar · {statsAtrasados.total - statsAtrasados.sinGestionar} gestionados</p>
                     </div>
                     <AlertTriangle className="w-6 h-6 text-amber-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Asistencia al Culto */}
+              <Card className="border-purple-200 bg-purple-50/50">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-purple-700">Asistencia al Culto</p>
+                      <p className="text-xl font-bold text-purple-700">{statsAsistenciaCulto.asistieron}</p>
+                      <p className="text-[9px] text-purple-600">{statsAsistenciaCulto.faltaron} faltaron · {statsAsistenciaCulto.enSeguimiento} seguimiento</p>
+                      {statsAsistenciaCulto.sinGestionar > 0 && (
+                        <p className="text-[9px] text-red-600">{statsAsistenciaCulto.sinGestionar} sin gestionar</p>
+                      )}
+                    </div>
+                    <ClipboardCheck className="w-6 h-6 text-purple-400" />
                   </div>
                 </CardContent>
               </Card>

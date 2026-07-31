@@ -162,7 +162,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
 
   // === DATOS PERSONALES ===
   censo: {
-    modules: ["censo", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
+    modules: ["censo", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral", "asistencia_culto"],
   },
   censo_ninos: {
     modules: ["censo-ninos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "control_mensual", "resumen-pastoral"],
@@ -173,7 +173,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: false,
   },
   censo_jovenes: {
-    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo", "control_mensual", "resumen-pastoral"],
+    modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo", "control_mensual", "resumen-pastoral", "asistencia_culto"],
     requireEditForWrite: true,
   },
   censo_jovenes_archivos: {
@@ -189,7 +189,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: false,
   },
   censo_mdg: {
-    modules: ["censo-mdg", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral"],
+    modules: ["censo-mdg", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo", "bautizo", "matrimonio", "celulas", "cumpleanos-comunicacion", "listados", "control_mensual", "resumen-pastoral", "asistencia_culto"],
   },
   censo_catalogos: {
     modules: ["censo", "censo-mdg", "censo-jovenes", "censo-jovenes-mdg", "censo-jovenes-protocolo"],
@@ -332,6 +332,16 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   bautizos_pdf_generados: {
     modules: ["bautizo"],
     requireEditForWrite: false,
+  },
+
+  // === ASISTENCIA AL CULTO ===
+  asistencia_culto: {
+    modules: ["asistencia_culto", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  asistencia_culto_seguimiento: {
+    modules: ["asistencia_culto", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
   },
 
   // === PAGO DIARIO ===

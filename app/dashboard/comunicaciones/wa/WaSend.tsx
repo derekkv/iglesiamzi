@@ -120,8 +120,10 @@ export function WaSend({
         const data: Record<string, string> = {}
         const map = selectedTemplate.variable_map || {}
         for (const [index, value] of Object.entries(templateVars)) {
-          const field = map[index] || `var${index}`
-          data[field] = value
+          const field = map[index]
+          if (field) data[field] = value
+          // Siempre incluir el valor por índice como fallback para el backend
+          data[index] = value
         }
 
         const res = await authFetch("/api/whatsapp/send-template", {

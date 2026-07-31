@@ -294,16 +294,27 @@ export function buildTemplateComponents(
   }
 
   const map = template.variable_map || {}
-  const indices = Object.keys(map)
+  const mapIndices = Object.keys(map)
     .map((k) => Number(k))
     .filter((n) => Number.isFinite(n) && n > 0)
     .sort((a, b) => a - b)
 
+  // Usar variable_count como fuente de verdad para la cantidad de parámetros.
+  // Si variable_map tiene menos llaves de las que la plantilla declara,
+  // Meta rechaza el envío por discrepancia en el número de parámetros.
+  const expectedCount = template.variable_count || 0
+  const indices =
+    mapIndices.length >= expectedCount
+      ? mapIndices
+      : Array.from({ length: expectedCount }, (_, i) => i + 1)
+
   if (indices.length > 0) {
-    const parameters = indices.map((i) => ({
-      type: "text",
-      text: sanitizeTemplateParam(data?.[map[String(i)]]),
-    }))
+    const parameters = indices.map((i) => {
+      const field = map[String(i)]
+      // Si el campo existe en el map, buscar por nombre; si no, buscar por índice directo
+      const value = field ? data?.[field] : data?.[String(i)]
+      return { type: "text" as const, text: sanitizeTemplateParam(value) }
+    })
     components.push({ type: "body", parameters })
   }
 
