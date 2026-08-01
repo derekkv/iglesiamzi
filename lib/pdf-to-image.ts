@@ -48,11 +48,11 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     fs.writeFileSync(tmpPdf, pdfBytes)
 
     try {
-      execSync(`convert -density 150 "${tmpPdf}[0]" -quality 80 -resize 1280x "${tmpPng}"`, {
+      execSync(`convert -density 150 "${tmpPdf}[0]" -colorspace sRGB -flatten -depth 8 -quality 85 -resize 1280x "${tmpPng}"`, {
         timeout: 15000,
       })
     } catch {
-      execSync(`magick -density 150 "${tmpPdf}[0]" -quality 80 -resize 1280x "${tmpPng}"`, {
+      execSync(`magick -density 150 "${tmpPdf}[0]" -colorspace sRGB -flatten -depth 8 -quality 85 -resize 1280x "${tmpPng}"`, {
         timeout: 15000,
       })
     }
@@ -65,7 +65,7 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     return {
       buffer: pngBuffer,
       type: "image/png",
-      filename: `Feliz Cumpleaños - ${nombre}.png`,
+      filename: `cumpleanos-${nombre.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "")}.png`,
     }
   } catch (err) {
     console.error("Error generando imagen de cumpleaños:", err)

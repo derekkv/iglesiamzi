@@ -45,8 +45,11 @@ export function WaInbox({
   const [sending, setSending] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [showQuickReplies, setShowQuickReplies] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const bottomRef    = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isNearBottom = useRef(true)   // ¿el usuario está cerca del fondo?
+  const isInitialLoad = useRef(false) // primera carga del hilo — siempre scroll
 
   const selected = useMemo(
     () => contacts.find((c) => c.id === selectedId) || null,
@@ -61,6 +64,8 @@ export function WaInbox({
     const q = search.trim().toLowerCase()
     return contacts
       .filter((c) => {
+        // Ocultar contactos sin ningún mensaje
+        if (!c.last_message_at && !c.last_message_preview) return false
         if (filter === "no_leidos" && (c.unread_count || 0) === 0) return false
         if (filter === "abiertos" && !isWindowOpen(c)) return false
         if (!q) return true
@@ -81,8 +86,11 @@ export function WaInbox({
   // Mensajes de la conversación abierta
   // -----------------------------------------------------------------------
 
-  const loadMessages = useCallback(async (contactId: string) => {
-    setLoadingMessages(true)
+  const loadMessages = useCallback(async (contactId: string, initial = false) => {
+    if (initial) {
+      isInitialLoad.current = true
+      setLoadingMessages(true)
+    }
     const { data, error } = await supabase
       .from("wa_messages")
       .select("*")
@@ -90,13 +98,12 @@ export function WaInbox({
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE)
 
-    setLoadingMessages(false)
+    if (initial) setLoadingMessages(false)
 
     if (error) {
       toast.error("No se pudo cargar la conversación")
       return
     }
-    // Se piden descendentes (para tomar los últimos) y se muestran ascendentes
     setMessages(((data as WaMessage[]) || []).slice().reverse())
   }, [])
 
@@ -105,27 +112,37 @@ export function WaInbox({
       setMessages([])
       return
     }
-    loadMessages(selectedId)
+    loadMessages(selectedId, true)
   }, [selectedId, loadMessages])
 
-  // Realtime del hilo abierto
+  // Realtime del hilo abierto — solo recarga si hay cambios
   useRealtime({
     table: "wa_messages",
     enabled: !!selectedId,
     onChange: () => {
-      if (selectedId) loadMessages(selectedId)
+      if (selectedId) loadMessages(selectedId, false)
     },
   })
 
+  // Scroll inteligente: al fondo siempre en carga inicial o si el usuario
+  // ya estaba cerca del fondo. Nunca interrumpe si está leyendo arriba.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages.length])
+    if (messages.length === 0) return
+    if (isInitialLoad.current) {
+      // Primera carga: scroll instantáneo sin animación para evitar el efecto "sube"
+      bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" })
+      isInitialLoad.current = false
+    } else if (isNearBottom.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    }
+  }, [messages])
 
   // Marcar como leída al abrir
   const openConversation = async (contact: WaContact) => {
     setSelectedId(contact.id)
     setDraft("")
     setFile(null)
+    isNearBottom.current = true // al abrir un chat siempre ir al fondo
 
     if ((contact.unread_count || 0) > 0) {
       const lastInbound = messages.filter((m) => m.direction === "inbound").at(-1)
@@ -135,6 +152,14 @@ export function WaInbox({
       }).catch(() => {})
       onContactsChange()
     }
+  }
+
+  // Detectar posición de scroll para saber si el usuario está cerca del fondo
+  const handleScroll = () => {
+    const el = scrollAreaRef.current
+    if (!el) return
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    isNearBottom.current = distFromBottom < 120
   }
 
   // -----------------------------------------------------------------------
@@ -191,6 +216,7 @@ export function WaInbox({
       setDraft("")
       setFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ""
+      isNearBottom.current = true  // al enviar, siempre ir al fondo
       await loadMessages(selected.id)
       onContactsChange()
     } catch (error: any) {
@@ -265,7 +291,7 @@ export function WaInbox({
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="p-6 text-center text-sm text-gray-500">
-              {contacts.length === 0
+              {contacts.filter(c => c.last_message_at).length === 0
                 ? "Aún no hay conversaciones. Aparecerán aquí cuando alguien escriba o cuando envíe un mensaje."
                 : "Ningún resultado con ese filtro."}
             </div>
@@ -277,50 +303,33 @@ export function WaInbox({
                 <button
                   key={c.id}
                   onClick={() => openConversation(c)}
-                  className={`w-full text-left px-3 py-3 border-b hover:bg-gray-50 transition-colors ${
+                  className={`w-full text-left px-3 py-2.5 border-b hover:bg-gray-50 transition-colors ${
                     active ? "bg-blue-50 border-l-4 border-l-blue-600" : ""
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-sm text-gray-900 truncate">
                           {contactName(c)}
                         </span>
                         {open && (
-                          <span
-                            className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"
-                            title="Ventana de 24 h abierta"
-                          />
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" title="Ventana abierta" />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                      <p className="text-xs text-gray-400 truncate mt-0.5">
                         {c.last_message_preview || formatPhoneDisplay(c.wa_id)}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-[10px] text-gray-400">
-                        {formatRelative(c.last_message_at)}
-                      </div>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                      <span className="text-[10px] text-gray-400">{formatRelative(c.last_message_at)}</span>
                       {(c.unread_count || 0) > 0 && (
-                        <Badge className="bg-green-600 hover:bg-green-600 text-white text-[10px] px-1.5 py-0 mt-1">
+                        <Badge className="bg-green-600 hover:bg-green-600 text-white text-[10px] px-1.5 py-0">
                           {c.unread_count}
                         </Badge>
                       )}
                     </div>
                   </div>
-                  {c.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {c.tags.slice(0, 3).map((t) => (
-                        <span
-                          key={t}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </button>
               )
             })
@@ -339,31 +348,33 @@ export function WaInbox({
           </div>
         ) : (
           <>
-            {/* Cabecera del chat */}
-            <div className="px-4 py-3 border-b flex items-center justify-between gap-3">
+            {/* Cabecera del chat — compacta */}
+            <div className="px-4 py-2.5 border-b flex items-center justify-between gap-3 bg-white">
               <div className="min-w-0">
-                <p className="font-medium text-gray-900 truncate">{contactName(selected)}</p>
-                <p className="text-xs text-gray-500">{formatPhoneDisplay(selected.wa_id)}</p>
+                <p className="font-medium text-gray-900 truncate leading-tight">{contactName(selected)}</p>
+                <p className="text-xs text-gray-400">{formatPhoneDisplay(selected.wa_id)}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {selected.blocked && <Badge variant="destructive">Bloqueado</Badge>}
-                {!selected.opt_in && <Badge variant="secondary">Opt-out</Badge>}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {selected.blocked && <Badge variant="destructive" className="text-[10px] px-1.5">Bloqueado</Badge>}
+                {!selected.opt_in  && <Badge variant="secondary"  className="text-[10px] px-1.5">Opt-out</Badge>}
                 {windowOpen ? (
-                  <Badge className="bg-green-600 hover:bg-green-600 text-white gap-1">
-                    <Clock className="w-3 h-3" />
-                    {windowRemaining(selected)}
+                  <Badge className="bg-green-600 hover:bg-green-600 text-white gap-1 text-[10px] px-2">
+                    <Clock className="w-2.5 h-2.5" />{windowRemaining(selected)}
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    <Lock className="w-3 h-3" />
-                    Ventana cerrada
+                  <Badge variant="secondary" className="gap-1 text-[10px] px-2">
+                    <Lock className="w-2.5 h-2.5" />Cerrada
                   </Badge>
                 )}
               </div>
             </div>
 
             {/* Mensajes */}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-1">
+            <div
+              ref={scrollAreaRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-3 bg-gray-50 space-y-1"
+            >
               {loadingMessages ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
@@ -397,10 +408,9 @@ export function WaInbox({
             {/* Composer */}
             <div className="border-t p-3 space-y-2 relative">
               {!windowOpen && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                  Pasaron más de 24 horas desde el último mensaje del contacto. WhatsApp solo permite
-                  enviar <strong>plantillas aprobadas</strong>. Use la sección <strong>Enviar</strong> para
-                  elegir una plantilla.
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-xs text-amber-800 flex items-center gap-2">
+                  <Lock className="w-3 h-3 shrink-0" />
+                  Ventana cerrada — usa <strong className="mx-0.5">Enviar → Plantilla</strong> para escribir.
                 </div>
               )}
 

@@ -4,8 +4,6 @@ import { createClient } from "@supabase/supabase-js"
 import { verifyApiAuth } from "@/lib/api-auth"
 import { sendSmart, sendSmartMedia } from "@/lib/mod/wa-crm-service"
 import { emailService } from "@/lib/mod/email-service"
-import * as fs from "fs"
-import * as path from "path"
 import { getBirthdayImage } from "@/lib/pdf-to-image"
 import { CHURCH, CHURCH_SIGNATURE } from "@/lib/branding"
 
@@ -13,8 +11,6 @@ const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (CHURCH.domain ? `https://${CHURCH.domain}` : "")
-
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   throw new Error("Faltan SUPABASE_URL / SUPABASE_SERVICE_KEY en el entorno del servidor")
 }
@@ -28,9 +24,6 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-// Archivos de media para WhatsApp
-const BIRTHDAY_AUDIO_PATH = path.join(process.cwd(), "public", "Cumpleaños Feliz  Happy Birthday  Queremos que Partan la Torta.mp3")
 
 function generarMensajeCumple(nombre: string, edad: number): string {
   return `🎉🎂 *¡Feliz cumpleaños, hermano/a ${nombre}!* 🎂🎉\n\n` +
@@ -110,37 +103,6 @@ async function sendWhatsAppImage(phone: string, nombre: string, caption: string,
   }
 }
 
-// Enviar WhatsApp con audio.
-// El audio no se puede enviar por plantilla, así que solo sale si el contacto
-// tiene la ventana de 24 h abierta. Fuera de ella se omite sin ruido.
-async function sendWhatsAppAudio(phone: string): Promise<boolean> {
-  try {
-    if (!fs.existsSync(BIRTHDAY_AUDIO_PATH)) {
-      console.warn("Archivo de audio de cumpleaños no encontrado:", BIRTHDAY_AUDIO_PATH)
-      return false
-    }
-
-    const fileBuffer = fs.readFileSync(BIRTHDAY_AUDIO_PATH)
-
-    const result = await sendSmartMedia({
-      to: phone,
-      buffer: fileBuffer,
-      mimeType: "audio/mpeg",
-      filename: "cumpleanos-feliz.mp3",
-      type: "audio",
-      origen: "cumpleanos",
-    })
-
-    if (!result.success) {
-      console.warn(`[cron-cumpleanos] Audio a ${phone} omitido: ${result.error}`)
-    }
-    return result.success
-  } catch (err) {
-    console.error("Error enviando audio WhatsApp:", err)
-    return false
-  }
-}
-
 // Enviar email de cumpleaños con imagen inline.
 // Usa el emailService único (plantilla "cumpleanos", editable desde el panel)
 // en lugar de un transporter nodemailer propio, y queda registrado en email_messages.
@@ -211,7 +173,6 @@ export async function POST(request: NextRequest) {
       push: false,
       email: false,
       whatsapp_imagen: false,
-      whatsapp_audio: false,
     }
 
     // 1. Buzón interno — buscar user con la misma cédula o nombre
@@ -253,15 +214,9 @@ export async function POST(request: NextRequest) {
     // 3. WhatsApp — imagen con felicitación
     if (celular) {
       resultados.whatsapp_imagen = await sendWhatsAppImage(celular, nombre, mensaje)
-
-      // Esperar un poco entre mensajes para no disparar anti-spam
-      await new Promise((r) => setTimeout(r, 2000))
-
-      // 4. WhatsApp — audio de cumpleaños feliz
-      resultados.whatsapp_audio = await sendWhatsAppAudio(celular)
     }
 
-    // 5. Registrar envío en tabla de tracking
+    // 4. Registrar envío en tabla de tracking
     try {
       await supabase.from("cumpleanos_enviados").insert({
         censo_id: censoId,
@@ -272,7 +227,6 @@ export async function POST(request: NextRequest) {
         canal_push: resultados.push,
         canal_email: resultados.email,
         canal_whatsapp_imagen: resultados.whatsapp_imagen,
-        canal_whatsapp_audio: resultados.whatsapp_audio,
         enviado_at: new Date().toISOString(),
       })
     } catch (err) {
@@ -410,7 +364,7 @@ async function notifyAdminsBirthdays(
         await sendWhatsAppText(adminUser.phone, waMessage)
         await new Promise((r) => setTimeout(r, 1500))
 
-        // Enviar cada cumpleañero: imagen + mensaje de felicitación + audio
+        // Enviar cada cumpleañero: imagen + mensaje de felicitación
         for (const c of cumpleaneros) {
           try {
             // Imagen personalizada con el nombre
@@ -434,12 +388,6 @@ async function notifyAdminsBirthdays(
             const mensajeFelicitacion = generarMensajeCumple(c.nombre, c.edad)
             await sendWhatsAppText(adminUser.phone, `📨 *Mensaje enviado a ${c.nombre}:*\n\n${mensajeFelicitacion}`)
             await new Promise((r) => setTimeout(r, 1500))
-
-            // Audio de cumpleaños feliz (solo si la ventana de 24 h está abierta)
-            if (fs.existsSync(BIRTHDAY_AUDIO_PATH)) {
-              await sendWhatsAppAudio(adminUser.phone)
-              await new Promise((r) => setTimeout(r, 2000))
-            }
           } catch {}
         }
       }
@@ -550,7 +498,7 @@ export async function GET(request: NextRequest) {
     let enviados = 0
     for (const c of pendientes) {
       const mensaje = generarMensajeCumple(c.nombre, c.edad)
-      const resultados = { buzon: false, push: false, email: false, whatsapp_imagen: false, whatsapp_audio: false }
+      const resultados = { buzon: false, push: false, email: false, whatsapp_imagen: false }
 
       // Buzón + Push
       try {
@@ -579,12 +527,9 @@ export async function GET(request: NextRequest) {
         resultados.email = await sendBirthdayEmail(c.correo, c.nombre, c.edad)
       }
 
-      // WhatsApp imagen + audio
+      // WhatsApp imagen
       if (c.celular) {
         resultados.whatsapp_imagen = await sendWhatsAppImage(c.celular, c.nombre, mensaje)
-        await new Promise((r) => setTimeout(r, 2000))
-        resultados.whatsapp_audio = await sendWhatsAppAudio(c.celular)
-        await new Promise((r) => setTimeout(r, 1500))
       }
 
       // Registrar
@@ -598,7 +543,6 @@ export async function GET(request: NextRequest) {
           canal_push: resultados.push,
           canal_email: resultados.email,
           canal_whatsapp_imagen: resultados.whatsapp_imagen,
-          canal_whatsapp_audio: resultados.whatsapp_audio,
           enviado_at: new Date().toISOString(),
         })
       } catch {}
