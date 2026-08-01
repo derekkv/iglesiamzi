@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import { Card, CardContent } from "@/components/ui/card"
@@ -63,6 +63,9 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
   const [saving, setSaving] = useState(false)
   const [asignacionesCronograma, setAsignacionesCronograma] = useState<Record<string, string[]>>({})
   const [servidorHoy, setServidorHoy] = useState<string[]>([])
+
+  // Guard para que autoCloseStaleActiveCycles solo corra una vez por montaje
+  const autoCloseRef = useRef(false)
 
   // Búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState("")
@@ -138,7 +141,14 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
     } catch { /* silencioso */ }
   }
 
-  useEffect(() => { loadData(true) }, [loadData])
+  useEffect(() => {
+    if (autoCloseRef.current) return
+    autoCloseRef.current = true
+    // Cierra automáticamente ciclos activos cuya última clase sea de un mes anterior
+    herederosCiclosService.autoCloseStaleActiveCycles()
+      .catch((e) => console.error("[herederos] auto-close error:", e))
+      .finally(() => loadData(true))
+  }, [loadData])
 
   useRealtimeMultiple(
     ["herederos_ciclos", "herederos_ciclo_participantes", "herederos_ciclo_fechas", "herederos_ciclo_asistencia", "censo_ninos"],

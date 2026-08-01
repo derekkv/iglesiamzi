@@ -26,6 +26,8 @@ interface StorageAdapter {
   }) => Promise<void>
 
   deleteMonth: (id: string) => Promise<void>;
+  upsertActiveMonth: (month: { id: string; name: string; year: number; month: number; start_date: string }) => Promise<void>;
+  closeStaleActiveMonths: (keepYear: number, keepMonth: number) => Promise<void>;
 }
 
 export interface InventoryItem {
@@ -124,6 +126,60 @@ async saveMonth(month: any) {
     if (error) throw new Error(`Supabase saveMonth error: ${error.message}`);
   }
 }
+
+  /**
+   * Crea el mes activo de forma atómica usando upsert (ON CONFLICT DO NOTHING).
+   * Evita duplicados aunque dos sesiones lo llamen simultáneamente.
+   */
+  async upsertActiveMonth(month: {
+    id: string
+    name: string
+    year: number
+    month: number
+    start_date: string
+  }): Promise<void> {
+    const { error } = await supabase.from("meses").upsert(
+      {
+        id: month.id,
+        name: month.name,
+        year: month.year,
+        month: month.month,
+        start_date: month.start_date,
+        status: "active",
+        end_date: null,
+      },
+      { onConflict: "id", ignoreDuplicates: true }
+    )
+    if (error) throw new Error(`Supabase upsertActiveMonth error: ${error.message}`)
+  }
+
+  /**
+   * Cierra todos los meses activos que NO sean del año/mes indicado.
+   * Garantiza que no quede más de un mes activo.
+   */
+  async closeStaleActiveMonths(keepYear: number, keepMonth: number): Promise<void> {
+    // Obtener todos los meses activos que no correspondan al mes/año actual
+    const { data: stale, error: fetchErr } = await supabase
+      .from("meses")
+      .select("id, year, month")
+      .eq("status", "active")
+
+    if (fetchErr) throw new Error(`closeStaleActiveMonths fetch error: ${fetchErr.message}`)
+    if (!stale || stale.length === 0) return
+
+    const staleIds = stale
+      .filter((m: any) => !(m.year === keepYear && m.month === keepMonth))
+      .map((m: any) => m.id)
+
+    if (staleIds.length === 0) return
+
+    const { error: updateErr } = await supabase
+      .from("meses")
+      .update({ status: "closed", end_date: new Date().toISOString() })
+      .in("id", staleIds)
+
+    if (updateErr) throw new Error(`closeStaleActiveMonths update error: ${updateErr.message}`)
+  }
 
 
 async addIngreso(mesId: string, ingreso: any, audit?: AuditInfo) {

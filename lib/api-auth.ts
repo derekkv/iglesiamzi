@@ -21,7 +21,7 @@ export interface AuthResult {
 export async function verifyApiAuth(request: NextRequest, options?: { bodyToken?: string }): Promise<AuthResult> {
   // 1. Check X-Internal-Secret header (server-to-server calls)
   const internalSecret = request.headers.get("x-internal-secret")
-  if (internalSecret === INTERNAL_API_SECRET) {
+  if (internalSecret && internalSecret === INTERNAL_API_SECRET) {
     return { authenticated: true, isInternal: true }
   }
 

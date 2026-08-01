@@ -13,7 +13,6 @@ import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useNotificaciones } from "@/hooks/use-notificaciones"
 import { todayEcuador } from "@/lib/timezone"
-import { CreateMonthModal } from "@/components/CreateMonthModal"
 import { ChangePasswordModal } from "@/components/ChangePasswordModal"
 import { BuzonNotificaciones } from "@/components/BuzonNotificaciones"
 
@@ -120,7 +119,6 @@ export default function DashboardPage() {
   const router = useRouter()
   const [permissions, setPermissions] = useState<ModulePermission[]>([])
   const [loading, setLoading] = useState(true)
-  const [openCreateModal, setOpenCreateModal] = useState(false)
   const { noLeidos } = useNotificaciones()
   // Vista: "cards" (tarjetas de grupo, default) o "classic" (todos los módulos)
   const [viewMode, setViewMode] = useState<"cards" | "classic">(() => {
@@ -346,24 +344,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Alerta de mes inactivo */}
-        {!currentMonth && (
-          <Alert className="mb-6 border-amber-200 bg-amber-50">
-            <AlertDescription className="flex items-center justify-between">
-              <span className="text-amber-800">
-                No hay un mes activo. Debe crear un nuevo mes para acceder a los módulos de gestión.
-              </span>
-              <Button
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-                onClick={() => setOpenCreateModal(true)}
-              >
-                Crear Mes
-              </Button>
-            </AlertDescription>
-            <CreateMonthModal open={openCreateModal} setOpen={setOpenCreateModal} />
-          </Alert>
-        )}
+        {/* Sin mes activo: el contexto lo crea automáticamente al cargar */}
 
         {availableModules.length === 0 ? (
           <Alert className="border-red-200 bg-red-50">

@@ -243,6 +243,49 @@ class HerederosCiclosService {
     return hoy > ultima
   }
 
+  /**
+   * Cierra automáticamente todos los ciclos activos (de cualquier tipo) cuya
+   * última clase pertenezca a un mes/año diferente al actual.
+   * Se llama al entrar al módulo — no inicia ciclos nuevos.
+   */
+  async autoCloseStaleActiveCycles(): Promise<void> {
+    const nowYear  = currentYearEcuador()
+    const nowMonth = currentMonthEcuador()
+
+    // Obtener todos los ciclos activos
+    const { data: activeCycles, error } = await supabase
+      .from("herederos_ciclos")
+      .select("id, tipo")
+      .eq("activo", true)
+
+    if (error || !activeCycles || activeCycles.length === 0) return
+
+    for (const ciclo of activeCycles) {
+      // Obtener la última fecha del ciclo
+      const { data: lastFecha } = await supabase
+        .from("herederos_ciclo_fechas")
+        .select("fecha")
+        .eq("ciclo_id", ciclo.id)
+        .order("numero_clase", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!lastFecha?.fecha) continue
+
+      // Comparar mes/año de la última clase con el mes/año actual
+      const lastDate = new Date(lastFecha.fecha + "T00:00:00")
+      const lastYear  = lastDate.getFullYear()
+      const lastMonth = lastDate.getMonth() + 1
+
+      if (lastYear !== nowYear || lastMonth !== nowMonth) {
+        await supabase
+          .from("herederos_ciclos")
+          .update({ activo: false, updated_at: new Date().toISOString() })
+          .eq("id", ciclo.id)
+      }
+    }
+  }
+
   // --- PARTICIPANTES ---
 
   async getParticipantes(cicloId: number): Promise<HerederosParticipante[]> {

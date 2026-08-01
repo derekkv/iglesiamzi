@@ -1,7 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react"
 import { storage } from "@/lib/storage"
+import { todayEcuador, currentMonthEcuador, currentYearEcuador, MONTH_NAMES } from "@/lib/timezone"
 
 interface MonthData {
   id: string
@@ -46,25 +47,55 @@ export function MonthProvider({ children }: { children: ReactNode }) {
   const [currentMonth, setCurrentMonth] = useState<MonthData | null>(null)
   const [monthHistory, setMonthHistory] = useState<MonthData[]>([])
 
+  const initRef = useRef(false)
+
   useEffect(() => {
-    const loadData = async () => {
+    // Guard: solo ejecutar una vez aunque el componente re-monte (StrictMode, etc.)
+    if (initRef.current) return
+    initRef.current = true
+
+    const autoManageMonth = async () => {
       try {
-        const activeMonth = await storage.getActiveMonth()
-        const closedMonths = await storage.getClosedMonths()
+        const nowYear  = currentYearEcuador()
+        const nowMonth = currentMonthEcuador()
+        const monthId  = `${nowYear}-${nowMonth}`
+        const monthName = `${MONTH_NAMES[nowMonth - 1]} ${nowYear}`
 
-        if (activeMonth) {
-          setCurrentMonth(activeMonth)
+        // 1. Cerrar cualquier mes activo que no sea el del calendario actual
+        await storage.closeStaleActiveMonths(nowYear, nowMonth)
+
+        // 2. Buscar si el mes actual ya existe como activo
+        let active = await storage.getActiveMonth()
+
+        // 3. Si no existe, crearlo de forma atómica (upsert evita duplicados)
+        if (!active) {
+          await storage.upsertActiveMonth({
+            id: monthId,
+            name: monthName,
+            year: nowYear,
+            month: nowMonth,
+            start_date: todayEcuador(),
+          })
+          // Inicializar configuraciones del nuevo mes
+          await storage.updateConfiguraciones(monthId, {
+            ministerios: ["Pastoral", "Música", "Jóvenes", "Niños", "Evangelismo"],
+            categoriasPrincipales: ["Ofrenda", "Diezmo", "Donación", "Gastos Operativos", "Mantenimiento"],
+            detalles: ["Servicio Dominical", "Servicio Miércoles", "Evento Especial", "Gastos Generales"],
+          })
+          active = await storage.getActiveMonth()
         }
 
-        if (closedMonths) {
-          setMonthHistory(closedMonths)
-        }
+        if (active) setCurrentMonth(active)
+
+        // 4. Cargar historial de meses cerrados
+        const closed = await storage.getClosedMonths()
+        if (closed) setMonthHistory(closed)
       } catch (error) {
-        console.error("Error loading data:", error)
+        console.error("Error en auto-gestión de mes:", error)
       }
     }
 
-    loadData()
+    autoManageMonth()
   }, [])
 
   const createInitialMonth = async (startDate: string, endDate: string | null) => {
