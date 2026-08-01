@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "./audit-service"
-import { authFetch } from "@/lib/auth-fetch"
+import { getInternalHeaders } from "@/lib/auth-fetch"
 import { formatPhoneForWhatsApp } from "@/lib/format-phone"
 
 export interface PagoDiarioRecord {
@@ -185,6 +185,7 @@ export const pagoDiarioService = {
   async notify(record: PagoDiarioRecord) {
     const { nombre, telefono, email, valor, metodo_pago, detalle } = record
     const metodoTexto = metodo_pago === "Transferencia" ? "Transferencia bancaria" : "Efectivo"
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 
     if (telefono) {
       const msg = [
@@ -200,9 +201,9 @@ export const pagoDiarioService = {
         `¡Dios te bendiga! 🙏`,
         `— Administración`,
       ].join("\n")
-      authFetch("/api/whatsapp/send", {
+      fetch(`${siteUrl}/api/whatsapp/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getInternalHeaders(),
         body: JSON.stringify({
           phone: formatPhoneForWhatsApp(telefono),
           message: msg,
@@ -214,9 +215,9 @@ export const pagoDiarioService = {
     }
 
     if (email) {
-      authFetch("/api/send-email", {
+      fetch(`${siteUrl}/api/send-email`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getInternalHeaders(),
         body: JSON.stringify({
           to: email,
           subject: `💸 Pago realizado — $${valor.toFixed(2)} — IRDD`,

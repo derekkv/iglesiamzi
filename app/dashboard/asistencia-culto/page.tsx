@@ -235,6 +235,8 @@ function AsistenciaCultoContent({ canEdit }: { canEdit: boolean }) {
 
   // ------ Filtrado ------
   const personasFiltradas = personas.filter((p) => {
+    // No mostrar en la tab de asistencia si ya está en seguimiento
+    if (enSeguimiento(p.id, p.fuente)) return false
     if (!search) return true
     const q = search.toLowerCase()
     return p.apellido.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q) || (p.celular || "").includes(q)

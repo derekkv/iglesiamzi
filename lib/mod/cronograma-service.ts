@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
-import { authFetch, getInternalHeaders } from "@/lib/auth-fetch"
+import { getInternalHeaders } from "@/lib/auth-fetch"
 import { formatPhoneForWhatsApp } from "@/lib/format-phone"
 import { EXCLUDED_USER_IDS } from "@/lib/excluded-users"
 
@@ -170,7 +170,7 @@ export const cronogramaService = {
       }).catch(() => {})
     } catch (e) {}
 
-    // 3. Email (si el usuario tiene correo)
+    // 3. Email y WhatsApp (si el usuario tiene correo/teléfono)
     try {
       const { data: userData } = await supabase
         .from("users")
@@ -197,17 +197,30 @@ export const cronogramaService = {
             },
           }),
         }).then(() => {
-          // Marcar flag de email enviado
           supabase.from("cronograma_servicio").update({ email_asignacion_enviado: true }).eq("id", data.id).then(() => {})
         }).catch(() => {})
       }
 
       // 4. WhatsApp (si el usuario tiene teléfono)
       if (userData?.phone) {
-        const waMessage = `📋 *Nuevo Servicio Asignado*\n\nHola ${entry.user_name}, se te ha asignado un servicio:\n\n📅 *Fecha:* ${fechaLarga}\n📍 *Asignación:* ${entry.asignacion}${entry.hora_entrada ? `\n🕐 *Hora:* ${entry.hora_entrada}` : ""}\n🏛️ *Módulo:* ${moduloLabel}${entry.ministerio ? `\n⛪ *Ministerio:* ${entry.ministerio}` : ""}${entry.evento ? `\n🎯 *Evento:* ${entry.evento}` : ""}\n\nPor favor ingresa a la app y confirma que recibiste esta notificación.`
+        const waMessage = [
+          "📋 *Nuevo Servicio Asignado*",
+          "",
+          `Hola ${entry.user_name}, se te ha asignado un servicio:`,
+          "",
+          `📅 *Fecha:* ${fechaLarga}`,
+          `📍 *Asignación:* ${entry.asignacion}`,
+          entry.hora_entrada ? `🕐 *Hora:* ${entry.hora_entrada}` : null,
+          `🏛️ *Módulo:* ${moduloLabel}`,
+          entry.ministerio ? `⛪ *Ministerio:* ${entry.ministerio}` : null,
+          entry.evento ? `🎯 *Evento:* ${entry.evento}` : null,
+          "",
+          "Por favor ingresa a la app y confirma que recibiste esta notificación.",
+        ].filter(Boolean).join("\n")
 
-        authFetch("/api/whatsapp/send", {
+        fetch("/api/whatsapp/send", {
           method: "POST",
+          headers: getInternalHeaders(),
           body: JSON.stringify({
             phone: formatPhoneForWhatsApp(userData.phone),
             message: waMessage,

@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { todayEcuador } from "../timezone"
-import { authFetch } from "../auth-fetch"
+import { getInternalHeaders } from "../auth-fetch"
 import { formatPhoneForWhatsApp } from "../format-phone"
 import { auditService } from "./audit-service"
 
@@ -178,6 +178,8 @@ export async function marcarNotificado(id: number): Promise<void> {
 /**
  * Notificar al líder del grupo sobre un atraso.
  * Envía: push notification, email y WhatsApp.
+ * Usa getInternalHeaders() porque este código corre en el servidor
+ * (no tiene acceso a localStorage).
  */
 export async function notificarLiderAtraso(params: {
   modulo: string
@@ -214,12 +216,14 @@ export async function notificarLiderAtraso(params: {
     if (!leaderUsers) return
 
     const mensaje = `Alerta de Atraso: ${params.userName} fue marcado como ATRASADO en ${params.modulo} el ${params.fecha}. Ingrese al sistema para gestionar.`
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 
     for (const leader of leaderUsers) {
       // Push notification
       try {
-        await authFetch("/api/send-notification", {
+        await fetch(`${siteUrl}/api/send-notification`, {
           method: "POST",
+          headers: getInternalHeaders(),
           body: JSON.stringify({
             user_id: leader.id,
             title: `Atraso en ${params.modulo}`,
@@ -232,8 +236,9 @@ export async function notificarLiderAtraso(params: {
       // Email
       if (leader.email) {
         try {
-          await authFetch("/api/send-email", {
+          await fetch(`${siteUrl}/api/send-email`, {
             method: "POST",
+            headers: getInternalHeaders(),
             body: JSON.stringify({
               to: leader.email,
               subject: `Alerta de Atraso - ${params.modulo}`,
@@ -247,11 +252,9 @@ export async function notificarLiderAtraso(params: {
       // WhatsApp
       if (leader.phone) {
         try {
-          // Pasa por la ruta Next (autenticada con el JWT del usuario) en lugar
-          // de golpear el proveedor directamente: así queda registrado en el CRM
-          // y no se expone ningún secreto en el bundle del navegador.
-          await authFetch("/api/whatsapp/send", {
+          await fetch(`${siteUrl}/api/whatsapp/send`, {
             method: "POST",
+            headers: getInternalHeaders(),
             body: JSON.stringify({
               phone: formatPhoneForWhatsApp(leader.phone),
               message: mensaje,

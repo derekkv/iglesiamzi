@@ -7,6 +7,7 @@
 import { db } from "@/lib/secure-db"
 import { auditService } from "./audit-service"
 import { formatPhoneForWhatsApp } from "@/lib/format-phone"
+import { getInternalHeaders } from "@/lib/auth-fetch"
 
 // ============================================================
 // TIPOS
@@ -570,12 +571,12 @@ export async function enviarNotificacionRedil(params: {
   tipoAyuda: string[]
 }): Promise<void> {
   const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
-  if (!token) return
 
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  }
+  // Usar JWT del usuario si está disponible (llamada desde el browser),
+  // o el secreto interno si no hay token (llamada desde el servidor).
+  const headers = token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+    : getInternalHeaders()
 
   const tipoAyudaTexto = params.tipoAyuda
     .map((t) => TIPOS_AYUDA.find((ta) => ta.value === t)?.label || t)

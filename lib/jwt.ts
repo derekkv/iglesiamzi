@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose"
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback-dev-secret-change-in-production"
+  process.env.JWT_SECRET || "IglesiaMZIuwuXDDDDDDDDD"
 )
 
 const TOKEN_EXPIRATION = "24h"
