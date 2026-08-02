@@ -9,7 +9,7 @@ export interface CumpleaneroRecord {
   correo: string | null
   edad_cumple: number
   dia: number
-  fuente: "protocolo" | "mdg"
+  fuente: "protocolo" | "mdg" | "jovenes"
 }
 
 export interface CumpleanoEnviado {
@@ -36,19 +36,28 @@ export async function getCumpleanerosMes(
 ): Promise<CumpleaneroRecord[]> {
   const targetMonth = mes ?? currentMonthEcuador()
   const targetYear = anio ?? currentYearEcuador()
-  const monthStr = String(targetMonth).padStart(2, "0")
 
-  // Traer todos los registros con fecha_nacimiento de ambas tablas
-  const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+  // fecha_nacimiento es tipo DATE en Postgres → no admite ilike.
+  // Filtramos trayendo todos los registros con fecha_nacimiento no nula y
+  // aplicamos el filtro de mes en JavaScript (igual que antes pero sin ilike).
+  // Para evitar el límite de 1000 filas usamos .range() o simplemente
+  // limitamos a 5000 que es más que suficiente para un censo parroquial.
+  const fetchCenso = (table: string) =>
     supabase
-      .from("censo")
+      .from(table)
       .select("id, apellidos_nombres, fecha_nacimiento, celular, correo")
-      .not("fecha_nacimiento", "is", null),
-    supabase
-      .from("censo_mdg")
-      .select("id, apellidos_nombres, fecha_nacimiento, celular, correo")
-      .not("fecha_nacimiento", "is", null),
+      .not("fecha_nacimiento", "is", null)
+      .limit(5000)
+
+  const [{ data: protocolo, error: errProtocolo }, { data: mdg, error: errMdg }, { data: jovenes, error: errJovenes }] = await Promise.all([
+    fetchCenso("censo"),
+    fetchCenso("censo_mdg"),
+    fetchCenso("censo_jovenes"),
   ])
+
+  if (errProtocolo) console.error("[cumpleanos] Error cargando censo:", errProtocolo.message)
+  if (errMdg) console.error("[cumpleanos] Error cargando censo_mdg:", errMdg.message)
+  if (errJovenes) console.error("[cumpleanos] Error cargando censo_jovenes:", errJovenes.message)
 
   const cumpleaneros: CumpleaneroRecord[] = []
 
@@ -85,6 +94,26 @@ export async function getCumpleanerosMes(
         edad_cumple: targetYear - parsed.year,
         dia: parsed.day,
         fuente: "mdg",
+      })
+    }
+  }
+
+  // Procesar censo Jóvenes (evitar duplicados)
+  const idsYaAgregados = new Set(cumpleaneros.map((c) => `${c.apellidos_nombres}-${c.fecha_nacimiento}`))
+  for (const r of jovenes || []) {
+    const key = `${r.apellidos_nombres}-${r.fecha_nacimiento}`
+    if (idsYaAgregados.has(key)) continue
+    const parsed = parseFechaNacimiento(r.fecha_nacimiento)
+    if (parsed && parsed.month === targetMonth) {
+      cumpleaneros.push({
+        id: r.id,
+        apellidos_nombres: r.apellidos_nombres,
+        fecha_nacimiento: r.fecha_nacimiento,
+        celular: r.celular || null,
+        correo: r.correo || null,
+        edad_cumple: targetYear - parsed.year,
+        dia: parsed.day,
+        fuente: "jovenes",
       })
     }
   }
@@ -166,20 +195,32 @@ export function generarMensajeCumple(nombre: string, edad: number): string {
 }
 
 /**
- * Parsea fecha_nacimiento. Soporta YYYY-MM-DD y DD/MM/YYYY.
+ * Parsea fecha_nacimiento. Soporta YYYY-MM-DD, DD/MM/YYYY y DD-MM-YYYY.
  */
 function parseFechaNacimiento(fecha: string): { year: number; month: number; day: number } | null {
   if (!fecha) return null
 
-  // Formato YYYY-MM-DD
+  // Formato YYYY-MM-DD (año de 4 dígitos primero)
   if (fecha.includes("-")) {
     const parts = fecha.split("-")
     if (parts.length === 3) {
-      const year = parseInt(parts[0], 10)
-      const month = parseInt(parts[1], 10)
-      const day = parseInt(parts[2], 10)
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        return { year, month, day }
+      // Detectar si el primer segmento es el año (YYYY-MM-DD) o el día (DD-MM-YYYY)
+      const first = parseInt(parts[0], 10)
+      const second = parseInt(parts[1], 10)
+      const third = parseInt(parts[2], 10)
+
+      if (!isNaN(first) && !isNaN(second) && !isNaN(third)) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          if (second >= 1 && second <= 12 && third >= 1 && third <= 31) {
+            return { year: first, month: second, day: third }
+          }
+        } else {
+          // DD-MM-YYYY
+          if (second >= 1 && second <= 12 && first >= 1 && first <= 31) {
+            return { year: third, month: second, day: first }
+          }
+        }
       }
     }
   }

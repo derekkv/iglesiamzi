@@ -140,8 +140,9 @@ function CumpleanosContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const filtered = cumpleaneros.filter((c) => {
-    const q = searchFilter.toLowerCase()
-    return c.apellidos_nombres.toLowerCase().includes(q)
+    if (!searchFilter) return true
+    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    return normalize(c.apellidos_nombres).includes(normalize(searchFilter))
   })
 
   const today = new Date()
@@ -296,7 +297,7 @@ function CumpleanosContent({ canEdit }: { canEdit: boolean }) {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {c.fuente === "protocolo" ? "Protocolo" : "MDG"}
+                            {c.fuente === "protocolo" ? "Protocolo" : c.fuente === "mdg" ? "MDG" : "Jóvenes"}
                           </Badge>
                         </TableCell>
                         <TableCell>

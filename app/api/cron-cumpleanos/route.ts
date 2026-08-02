@@ -424,59 +424,74 @@ export async function GET(request: NextRequest) {
     const mes = ecuadorTime.getMonth() + 1
     const dia = ecuadorTime.getDate()
     const anio = ecuadorTime.getFullYear()
-    const monthStr = String(mes).padStart(2, "0")
-    const dayStr = String(dia).padStart(2, "0")
 
-    // Buscar cumpleañeros de hoy en censo y censo_mdg
-    const [{ data: protocolo }, { data: mdg }] = await Promise.all([
+    // Buscar cumpleañeros de hoy en censo, censo_mdg y censo_jovenes
+    const fetchCenso = (table: string) =>
       supabase
-        .from("censo")
+        .from(table)
         .select("id, apellidos_nombres, fecha_nacimiento, celular, correo")
-        .not("fecha_nacimiento", "is", null),
-      supabase
-        .from("censo_mdg")
-        .select("id, apellidos_nombres, fecha_nacimiento, celular, correo")
-        .not("fecha_nacimiento", "is", null),
+        .not("fecha_nacimiento", "is", null)
+        .limit(5000)
+
+    const [{ data: protocolo }, { data: mdg }, { data: jovenes }] = await Promise.all([
+      fetchCenso("censo"),
+      fetchCenso("censo_mdg"),
+      fetchCenso("censo_jovenes"),
     ])
+
+    // Helper: parsea fecha_nacimiento (soporta YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY)
+    function parseFecha(fecha: string): { year: number; month: number; day: number } | null {
+      if (!fecha) return null
+      if (fecha.includes("-")) {
+        const parts = fecha.split("-")
+        if (parts.length === 3) {
+          const first = parseInt(parts[0], 10)
+          const second = parseInt(parts[1], 10)
+          const third = parseInt(parts[2], 10)
+          if (!isNaN(first) && !isNaN(second) && !isNaN(third)) {
+            if (parts[0].length === 4) return { year: first, month: second, day: third }
+            else if (second >= 1 && second <= 12 && first >= 1 && first <= 31) return { year: third, month: second, day: first }
+          }
+        }
+      }
+      if (fecha.includes("/")) {
+        const parts = fecha.split("/")
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10)
+          const month = parseInt(parts[1], 10)
+          const year = parseInt(parts[2], 10)
+          if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 1 && month <= 12) return { year, month, day }
+        }
+      }
+      return null
+    }
 
     // Filtrar los de hoy
     const cumpleanosHoy: Array<{ id: number; nombre: string; celular: string | null; correo: string | null; edad: number; fuente: string; fecha: string }> = []
 
-    for (const r of protocolo || []) {
-      if (!r.fecha_nacimiento) continue
-      const parts = r.fecha_nacimiento.split("-")
-      if (parts.length === 3 && parts[1] === monthStr && parts[2] === dayStr) {
-        cumpleanosHoy.push({
-          id: r.id,
-          nombre: r.apellidos_nombres,
-          celular: r.celular,
-          correo: r.correo,
-          edad: anio - parseInt(parts[0]),
-          fuente: "protocolo",
-          fecha: r.fecha_nacimiento,
-        })
-      }
-    }
-
-    for (const r of mdg || []) {
-      if (!r.fecha_nacimiento) continue
-      const parts = r.fecha_nacimiento.split("-")
-      if (parts.length === 3 && parts[1] === monthStr && parts[2] === dayStr) {
-        // Evitar duplicados
-        const isDup = cumpleanosHoy.some((c) => c.nombre === r.apellidos_nombres && c.fecha === r.fecha_nacimiento)
+    const addIfToday = (rows: any[], fuente: string) => {
+      for (const r of rows || []) {
+        if (!r.fecha_nacimiento) continue
+        const parsed = parseFecha(r.fecha_nacimiento)
+        if (!parsed || parsed.month !== mes || parsed.day !== dia) continue
+        const isDup = cumpleanosHoy.some((c) => c.nombre === r.apellidos_nombres && c.fuente !== fuente)
         if (!isDup) {
           cumpleanosHoy.push({
             id: r.id,
             nombre: r.apellidos_nombres,
             celular: r.celular,
             correo: r.correo,
-            edad: anio - parseInt(parts[0]),
-            fuente: "mdg",
+            edad: anio - parsed.year,
+            fuente,
             fecha: r.fecha_nacimiento,
           })
         }
       }
     }
+
+    addIfToday(protocolo || [], "protocolo")
+    addIfToday(mdg || [], "mdg")
+    addIfToday(jovenes || [], "jovenes")
 
     // Filtrar los que ya fueron enviados este año
     let pendientes: typeof cumpleanosHoy = []
