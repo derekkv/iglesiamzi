@@ -116,23 +116,25 @@ export async function getBirthdayVideo(nombre: string): Promise<{
     fs.writeFileSync(tmpPng, img.buffer)
 
     // 4. Construir el vídeo con FFmpeg
-    //    -loop 1          → convierte la imagen estática en un stream de vídeo infinito
-    //    -i <ogg>         → audio de cumpleaños
-    //    -shortest        → truncar al stream más corto (el audio)
-    //    -vf scale        → asegurar ancho par (requerido para yuv420p)
-    //    -c:v libx264     → H.264, compatible con WhatsApp
+    //    -loop 1             → convierte la imagen estática en un stream de vídeo infinito
+    //    -i <ogg>            → audio de cumpleaños
+    //    -shortest           → truncar al stream más corto (el audio)
+    //    -vf scale=720:-2    → 720px de ancho, alto calculado y par (requerido para yuv420p)
+    //    -preset ultrafast   → encode mínimo, mucho más rápido en VPS de pocos cores
+    //    -crf 28             → calidad razonable sin inflar el archivo
+    //    -c:v libx264        → H.264, compatible con WhatsApp
     //    -profile:v baseline -level 3.0 → máxima compatibilidad en móviles
-    //    -pix_fmt yuv420p → requerido por la Cloud API para vídeos de plantilla
-    //    -c:a aac -b:a 128k → audio AAC estándar
+    //    -pix_fmt yuv420p    → requerido por la Cloud API para vídeos de plantilla
+    //    -c:a aac -b:a 96k  → audio AAC ligero
     //    -movflags +faststart → mueve el moov atom al inicio (streaming-friendly)
     const ffmpegCmd =
       `ffmpeg -y -loop 1 -i "${tmpPng}" -i "${BIRTHDAY_OGG_PATH}" ` +
-      `-shortest -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ` +
-      `-c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p ` +
-      `-c:a aac -b:a 128k -movflags +faststart "${tmpMp4}"`
+      `-shortest -vf "scale=720:-2" ` +
+      `-c:v libx264 -preset ultrafast -crf 28 -profile:v baseline -level 3.0 -pix_fmt yuv420p ` +
+      `-c:a aac -b:a 96k -movflags +faststart "${tmpMp4}"`
 
     try {
-      execSync(ffmpegCmd, { timeout: 60_000, stdio: "pipe" })
+      execSync(ffmpegCmd, { timeout: 120_000, stdio: "pipe" })
     } catch (ffmpegErr: any) {
       console.error("FFmpeg error generando vídeo de cumpleaños:", ffmpegErr?.stderr?.toString() || ffmpegErr)
       return null
