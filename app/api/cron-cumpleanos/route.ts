@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import webpush from "web-push"
 import { createClient } from "@supabase/supabase-js"
 import { verifyApiAuth } from "@/lib/api-auth"
-import { sendSmart, sendSmartMedia } from "@/lib/mod/wa-crm-service"
+import { sendSmart, getOrCreateContact, getTemplateForUseCase, buildTemplateComponents, normalizeWaId } from "@/lib/mod/wa-crm-service"
+import { uploadMedia, sendTemplate } from "@/lib/mod/wa-cloud-service"
 import { emailService } from "@/lib/mod/email-service"
-import { getBirthdayImage } from "@/lib/pdf-to-image"
+import { getBirthdayVideo, getBirthdayImage } from "@/lib/pdf-to-image"
 import { CHURCH, CHURCH_SIGNATURE } from "@/lib/branding"
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY
@@ -69,36 +70,75 @@ async function sendPush(userId: string, title: string, body: string): Promise<bo
   }
 }
 
-// Enviar WhatsApp con imagen de cumpleaños
+// Enviar WhatsApp con vídeo de cumpleaños (imagen + audio cumpleanos-feliz.ogg)
+// Siempre usa la plantilla felicitacion_cumpleanos — el cron corre en horario fijo y la
+// ventana de 24 h rara vez está abierta para los destinatarios de cumpleaños.
 async function sendWhatsAppImage(phone: string, nombre: string, caption: string, edad?: number): Promise<boolean> {
   try {
-    const media = await getBirthdayImage(nombre)
+    const media = await getBirthdayVideo(nombre)
     if (!media) {
-      console.warn("No se pudo obtener imagen de cumpleaños")
+      console.warn("[cron-cumpleanos] No se pudo generar el vídeo de cumpleaños")
       return false
     }
 
-    // La Cloud API no acepta binarios en el mensaje: sendSmartMedia sube la
-    // imagen generada al CDN de Meta y la envía por media_id. Si la ventana de
-    // 24 h está cerrada usa la plantilla de cumpleaños (cabecera IMAGE).
-    const result = await sendSmartMedia({
-      to: phone,
-      buffer: media.buffer,
-      mimeType: media.type,
-      filename: media.filename,
-      caption,
-      type: "image",
-      useCase: "felicitacion_cumpleanos",
-      templateData: { nombre, edad: edad ?? "" },
-      origen: "cumpleanos",
-    })
+    // 1. Resolver la plantilla
+    const template = await getTemplateForUseCase("felicitacion_cumpleanos")
+    if (!template) {
+      console.warn("[cron-cumpleanos] No hay plantilla aprobada con use_case='felicitacion_cumpleanos'. Configúrela en WhatsApp → Plantillas.")
+      return false
+    }
+
+    // 2. Subir el vídeo al CDN de Meta para obtener un media_id
+    const up = await uploadMedia(media.buffer, media.type, media.filename)
+    if (!up.success || !up.mediaId) {
+      console.warn("[cron-cumpleanos] No se pudo subir el vídeo a Meta:", up.error)
+      return false
+    }
+
+    // 3. Construir componentes y enviar siempre por plantilla
+    const waId = normalizeWaId(phone)
+    const components = buildTemplateComponents(
+      template,
+      { nombre, edad: edad ?? "" },
+      { id: up.mediaId }
+    )
+    const result = await sendTemplate(waId, template.name, template.language, components)
+
+    // 4. Registrar en wa_messages a través del CRM
+    const contact = await getOrCreateContact(waId)
+    if (result.success && contact) {
+      const { supabaseServer } = await import("@/lib/supabase-server")
+      await supabaseServer.from("wa_messages").insert({
+        wamid: result.wamid || null,
+        contact_id: contact.id,
+        wa_id: waId,
+        direction: "outbound",
+        type: "template",
+        caption,
+        media_id: up.mediaId,
+        media_mime: media.type,
+        media_filename: media.filename,
+        template_name: template.name,
+        template_language: template.language,
+        template_params: { data: { nombre, edad }, components },
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        origen: "cumpleanos",
+      })
+      await supabaseServer.from("wa_contacts").update({
+        last_outbound_at: new Date().toISOString(),
+        last_message_at: new Date().toISOString(),
+        last_message_preview: caption.slice(0, 200),
+        updated_at: new Date().toISOString(),
+      }).eq("id", contact.id)
+    }
 
     if (!result.success) {
-      console.warn(`[cron-cumpleanos] Imagen a ${phone} falló: ${result.error}`)
+      console.warn(`[cron-cumpleanos] Plantilla a ${phone} falló: ${result.error}`)
     }
     return result.success
   } catch (err) {
-    console.error("Error enviando imagen WhatsApp:", err)
+    console.error("[cron-cumpleanos] Error enviando vídeo WhatsApp:", err)
     return false
   }
 }
@@ -325,11 +365,11 @@ async function notifyAdminsBirthdays(
 
   const buzonMensaje = `Hoy cumplen años:\n${lista}`
 
-  // Pre-generar las imágenes de cada cumpleañero para enviar a admins
+  // Pre-generar los vídeos de cada cumpleañero para enviar a admins
   const imagenesGeneradas: Array<{ nombre: string; media: { buffer: Buffer; type: string; filename: string } }> = []
   for (const c of cumpleaneros) {
     try {
-      const media = await getBirthdayImage(c.nombre)
+      const media = await getBirthdayVideo(c.nombre)
       if (media) {
         imagenesGeneradas.push({ nombre: c.nombre, media })
       }
@@ -364,23 +404,24 @@ async function notifyAdminsBirthdays(
         await sendWhatsAppText(adminUser.phone, waMessage)
         await new Promise((r) => setTimeout(r, 1500))
 
-        // Enviar cada cumpleañero: imagen + mensaje de felicitación
+        // Enviar cada cumpleañero: vídeo por plantilla + mensaje de felicitación
         for (const c of cumpleaneros) {
           try {
-            // Imagen personalizada con el nombre
             const img = imagenesGeneradas.find((i) => i.nombre === c.nombre)
             if (img) {
-              await sendSmartMedia({
-                to: adminUser.phone,
-                buffer: img.media.buffer,
-                mimeType: img.media.type,
-                filename: img.media.filename,
-                caption: `🎂 *${c.nombre}* — Cumple ${c.edad} años`,
-                type: "image",
-                useCase: "felicitacion_cumpleanos",
-                templateData: { nombre: c.nombre, edad: c.edad },
-                origen: "cumpleanos",
-              })
+              const template = await getTemplateForUseCase("felicitacion_cumpleanos")
+              if (template) {
+                const up = await uploadMedia(img.media.buffer, img.media.type, img.media.filename)
+                if (up.success && up.mediaId) {
+                  const adminWaId = normalizeWaId(adminUser.phone)
+                  const components = buildTemplateComponents(
+                    template,
+                    { nombre: c.nombre, edad: c.edad },
+                    { id: up.mediaId }
+                  )
+                  await sendTemplate(adminWaId, template.name, template.language, components)
+                }
+              }
               await new Promise((r) => setTimeout(r, 2000))
             }
 

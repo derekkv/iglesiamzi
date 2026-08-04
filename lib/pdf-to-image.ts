@@ -5,6 +5,7 @@ import { execSync } from "child_process"
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 
 const BIRTHDAY_PDF_PATH = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
+const BIRTHDAY_OGG_PATH = path.join(process.cwd(), "public", "cumpleanos-feliz.ogg")
 
 /**
  * Genera un PDF personalizado con el nombre y lo convierte a imagen PNG
@@ -69,6 +70,88 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     }
   } catch (err) {
     console.error("Error generando imagen de cumpleaños:", err)
+    return null
+  }
+}
+
+
+/**
+ * Genera un vídeo MP4 personalizado para el cumpleaños:
+ *   - Imagen PNG generada a partir de la plantilla PDF con el nombre de la persona.
+ *   - Audio de "Cumpleaños Feliz" tomado de public/cumpleanos-feliz.ogg.
+ *
+ * El vídeo dura exactamente lo que dure el audio (FFmpeg trunca o extiende la
+ * imagen estática para que coincida). Cumple con los requisitos de la
+ * WhatsApp Cloud API para vídeos de plantilla:
+ *   - Codec vídeo: H.264 (libx264), perfil baseline, pixel format yuv420p
+ *   - Codec audio: AAC
+ *   - Contenedor: MP4 (moov atom al inicio con -movflags +faststart)
+ *   - Ancho múltiplo de 2 (necesario para yuv420p)
+ *
+ * Retorna null si la imagen o el archivo OGG no están disponibles, o si
+ * FFmpeg no está instalado en el servidor.
+ */
+export async function getBirthdayVideo(nombre: string): Promise<{
+  buffer: Buffer
+  type: "video/mp4"
+  filename: string
+} | null> {
+  try {
+    // 1. Generar la imagen personalizada con el nombre
+    const img = await getBirthdayImage(nombre)
+    if (!img) return null
+
+    // 2. Verificar que el audio exista
+    if (!fs.existsSync(BIRTHDAY_OGG_PATH)) {
+      console.warn("Audio de cumpleaños no encontrado:", BIRTHDAY_OGG_PATH)
+      return null
+    }
+
+    const tmpDir = os.tmpdir()
+    const ts = Date.now()
+    const tmpPng = path.join(tmpDir, `cumple-vid-${ts}.png`)
+    const tmpMp4 = path.join(tmpDir, `cumple-vid-${ts}.mp4`)
+
+    // 3. Escribir la imagen al disco temporalmente
+    fs.writeFileSync(tmpPng, img.buffer)
+
+    // 4. Construir el vídeo con FFmpeg
+    //    -loop 1          → convierte la imagen estática en un stream de vídeo infinito
+    //    -i <ogg>         → audio de cumpleaños
+    //    -shortest        → truncar al stream más corto (el audio)
+    //    -vf scale        → asegurar ancho par (requerido para yuv420p)
+    //    -c:v libx264     → H.264, compatible con WhatsApp
+    //    -profile:v baseline -level 3.0 → máxima compatibilidad en móviles
+    //    -pix_fmt yuv420p → requerido por la Cloud API para vídeos de plantilla
+    //    -c:a aac -b:a 128k → audio AAC estándar
+    //    -movflags +faststart → mueve el moov atom al inicio (streaming-friendly)
+    const ffmpegCmd =
+      `ffmpeg -y -loop 1 -i "${tmpPng}" -i "${BIRTHDAY_OGG_PATH}" ` +
+      `-shortest -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ` +
+      `-c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p ` +
+      `-c:a aac -b:a 128k -movflags +faststart "${tmpMp4}"`
+
+    try {
+      execSync(ffmpegCmd, { timeout: 60_000, stdio: "pipe" })
+    } catch (ffmpegErr: any) {
+      console.error("FFmpeg error generando vídeo de cumpleaños:", ffmpegErr?.stderr?.toString() || ffmpegErr)
+      return null
+    }
+
+    const mp4Buffer = fs.readFileSync(tmpMp4)
+
+    // 5. Limpiar temporales
+    try { fs.unlinkSync(tmpPng) } catch {}
+    try { fs.unlinkSync(tmpMp4) } catch {}
+
+    const safeName = nombre.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "")
+    return {
+      buffer: mp4Buffer,
+      type: "video/mp4",
+      filename: `cumpleanos-${safeName}.mp4`,
+    }
+  } catch (err) {
+    console.error("Error generando vídeo de cumpleaños:", err)
     return null
   }
 }
