@@ -438,6 +438,17 @@ class HerederosCiclosService {
   }
 
   async cambiarFecha(cicloId: number, fechaId: number, nuevaFecha: string, audit?: AuditInfo): Promise<HerederosFecha[]> {
+    // Obtener el mes/año del ciclo para no generar fechas fuera de rango
+    const { data: ciclo } = await supabase
+      .from("herederos_ciclos")
+      .select("fecha_inicio")
+      .eq("id", cicloId)
+      .single()
+
+    const cicloDate = new Date((ciclo?.fecha_inicio || nuevaFecha) + "T12:00:00")
+    const cicloMonth = cicloDate.getMonth() // 0-based
+    const cicloYear = cicloDate.getFullYear()
+
     const fechas = await this.getFechas(cicloId)
     const indice = fechas.findIndex((f) => f.id === fechaId)
     if (indice === -1) throw new Error("Fecha no encontrada")
@@ -445,13 +456,39 @@ class HerederosCiclosService {
     const fechasStr = fechas.map((f) => f.fecha)
     const nuevasFechas = recalcularDomingosDesde(fechasStr, indice, nuevaFecha)
 
+    // Separar fechas que quedan dentro del mes vs fuera
+    const fechasParaEliminar: number[] = []
     for (let i = indice; i < fechas.length; i++) {
-      const { error } = await supabase
-        .from("herederos_ciclo_fechas")
-        .update({ fecha: nuevasFechas[i], updated_at: new Date().toISOString() })
-        .eq("id", fechas[i].id)
+      const d = new Date(nuevasFechas[i] + "T12:00:00")
+      if (d.getMonth() !== cicloMonth || d.getFullYear() !== cicloYear) {
+        fechasParaEliminar.push(fechas[i].id)
+      } else {
+        const { error } = await supabase
+          .from("herederos_ciclo_fechas")
+          .update({ fecha: nuevasFechas[i], updated_at: new Date().toISOString() })
+          .eq("id", fechas[i].id)
+        if (error) throw error
+      }
+    }
 
-      if (error) throw error
+    // Eliminar fechas que cayeron fuera del mes (y su asistencia asociada)
+    if (fechasParaEliminar.length > 0) {
+      await supabase
+        .from("herederos_ciclo_asistencia")
+        .delete()
+        .in("fecha_id", fechasParaEliminar)
+
+      await supabase
+        .from("herederos_ciclo_fechas")
+        .delete()
+        .in("id", fechasParaEliminar)
+
+      // Actualizar total_clases del ciclo
+      const totalRestante = fechas.length - fechasParaEliminar.length
+      await supabase
+        .from("herederos_ciclos")
+        .update({ total_clases: totalRestante, updated_at: new Date().toISOString() })
+        .eq("id", cicloId)
     }
 
     if (audit) {
@@ -459,8 +496,8 @@ class HerederosCiclosService {
         ...audit,
         module: "herederos",
         action: "editar",
-        description: `Fecha clase ${indice + 1} cambiada a ${nuevaFecha}`,
-        details: { ciclo_id: cicloId, clase: indice + 1, nueva_fecha: nuevaFecha },
+        description: `Fecha clase ${indice + 1} cambiada a ${nuevaFecha}${fechasParaEliminar.length > 0 ? ` (${fechasParaEliminar.length} fecha(s) fuera de mes eliminadas)` : ""}`,
+        details: { ciclo_id: cicloId, clase: indice + 1, nueva_fecha: nuevaFecha, fechas_eliminadas: fechasParaEliminar.length },
       })
     }
 
