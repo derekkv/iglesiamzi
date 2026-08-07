@@ -2,7 +2,7 @@ import { supabase } from "@/lib/secure-db"
 import { auditService, type AuditInfo } from "@/lib/mod/audit-service"
 import { getInternalHeaders } from "@/lib/auth-fetch"
 import { formatPhoneForWhatsApp } from "@/lib/format-phone"
-import { EXCLUDED_USER_IDS } from "@/lib/excluded-users"
+import { EXCLUDED_USER_IDS, EXCLUDED_FROM_ALL } from "@/lib/excluded-users"
 
 export interface CronogramaEntry {
   id?: number
@@ -350,7 +350,7 @@ export const cronogramaService = {
   },
 
   // Obtener 10 usuarios activos aleatorios (para super assigners)
-  async getRandomActiveUsers(): Promise<{ id: string; username: string; displayName: string }[]> {
+  async getRandomActiveUsers(moduloKey?: string): Promise<{ id: string; username: string; displayName: string }[]> {
     const { data, error } = await supabase
       .from("users")
       .select("id, username, displayName")
@@ -358,11 +358,12 @@ export const cronogramaService = {
       .limit(10)
 
     if (error) return []
-    return (data || []).filter((u) => !EXCLUDED_USER_IDS.includes(u.id))
+    const excludeList = moduloKey === "administracion" ? EXCLUDED_FROM_ALL : EXCLUDED_USER_IDS
+    return (data || []).filter((u) => !excludeList.includes(u.id))
   },
 
   // Buscar todos los usuarios activos sin filtro de permisos
-  async searchAllActiveUsers(query: string): Promise<{ id: string; username: string; displayName: string }[]> {
+  async searchAllActiveUsers(query: string, moduloKey?: string): Promise<{ id: string; username: string; displayName: string }[]> {
     const { data, error } = await supabase
       .from("users")
       .select("id, username, displayName")
@@ -371,11 +372,12 @@ export const cronogramaService = {
       .limit(10)
 
     if (error) return []
-    return (data || []).filter((u) => !EXCLUDED_USER_IDS.includes(u.id))
+    const excludeList = moduloKey === "administracion" ? EXCLUDED_FROM_ALL : EXCLUDED_USER_IDS
+    return (data || []).filter((u) => !excludeList.includes(u.id))
   },
 
   // Buscar usuarios que tengan permiso en el módulo dado
-  async searchUsersWithModuleAccess(query: string, moduleName: string): Promise<{ id: string; username: string; displayName: string }[]> {
+  async searchUsersWithModuleAccess(query: string, moduleName: string, moduloKey?: string): Promise<{ id: string; username: string; displayName: string }[]> {
     // Primero obtenemos los user_ids con permiso al módulo
     const { data: permissions, error: permError } = await supabase
       .from("user_permissions")
@@ -388,7 +390,8 @@ export const cronogramaService = {
 
     if (permError || !permissions) return []
 
-    const userIds = permissions.map((p: any) => p.user_id).filter((id: string) => !EXCLUDED_USER_IDS.includes(id))
+    const excludeList = moduloKey === "administracion" ? EXCLUDED_FROM_ALL : EXCLUDED_USER_IDS
+    const userIds = permissions.map((p: any) => p.user_id).filter((id: string) => !excludeList.includes(id))
     if (userIds.length === 0) return []
 
     // Buscar usuarios que coincidan con la query

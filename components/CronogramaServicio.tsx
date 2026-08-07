@@ -210,7 +210,7 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
   const loadInitialUsers = async () => {
     if (!isSuperAssigner) return
     try {
-      const results = await cronogramaService.getRandomActiveUsers()
+      const results = await cronogramaService.getRandomActiveUsers(moduloKey)
       setUserResults(results)
       setShowResults(true)
     } catch (error) {
@@ -233,9 +233,9 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
     try {
       let results
       if (isSuperAssigner) {
-        results = await cronogramaService.searchAllActiveUsers(query)
+        results = await cronogramaService.searchAllActiveUsers(query, moduloKey)
       } else {
-        results = await cronogramaService.searchUsersWithModuleAccess(query, moduleName)
+        results = await cronogramaService.searchUsersWithModuleAccess(query, moduleName, moduloKey)
       }
       setUserResults(results)
       setShowResults(true)
