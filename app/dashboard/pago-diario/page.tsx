@@ -58,7 +58,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
     categoria: "",
     detalle: "",
     valor: "",
-    metodo_pago: "Transferencia" as "Efectivo" | "Transferencia",
+    metodo_pago: "Transferencia",
   })
 
   // Ministerios (from module_groups)
@@ -313,11 +313,17 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
       </div>
       <div>
         <Label>Método de Pago *</Label>
-        <Select value={form.metodo_pago} onValueChange={(v) => setForm({ ...form, metodo_pago: v as any })}>
+        <Select value={form.metodo_pago} onValueChange={(v) => setForm({ ...form, metodo_pago: v })}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="Transferencia">Transferencia</SelectItem>
             <SelectItem value="Efectivo">Efectivo</SelectItem>
+            <SelectItem value="TC - Henry Arias">TC - Henry Arias</SelectItem>
+            <SelectItem value="TC - Valeria Escobar">TC - Valeria Escobar</SelectItem>
+            <SelectItem value="TC - Leonardo Lucas">TC - Leonardo Lucas</SelectItem>
+            <SelectItem value="TC - Yamil Machuca">TC - Yamil Machuca</SelectItem>
+            <SelectItem value="TC - Jaime Salas">TC - Jaime Salas</SelectItem>
+            <SelectItem value="TC - Miguel Machuca">TC - Miguel Machuca</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -395,7 +401,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                             <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-xs">{r.detalle}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center">
-                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
+                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : r.metodo_pago.startsWith("TC") ? "bg-blue-100 text-blue-800 border-blue-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
                             </td>
                             <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(r.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                             {canEdit && (
@@ -460,7 +466,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                             <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-xs">{r.detalle}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center">
-                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
+                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : r.metodo_pago.startsWith("TC") ? "bg-blue-100 text-blue-800 border-blue-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
                             </td>
                             <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(r.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                             {canEdit && (
@@ -545,7 +551,7 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
                             <td className="border border-gray-300 px-3 py-1.5">{r.ministerio}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-xs">{r.detalle}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center">
-                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
+                              <Badge className={`text-xs ${r.metodo_pago === "Efectivo" ? "bg-amber-100 text-amber-800 border-amber-200" : r.metodo_pago.startsWith("TC") ? "bg-blue-100 text-blue-800 border-blue-200" : "bg-green-100 text-green-800 border-green-200"}`}>{r.metodo_pago}</Badge>
                             </td>
                             <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(r.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           </tr>

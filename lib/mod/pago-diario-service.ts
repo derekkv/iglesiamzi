@@ -14,7 +14,7 @@ export interface PagoDiarioRecord {
   categoria: string
   detalle: string
   valor: number
-  metodo_pago: "Efectivo" | "Transferencia"
+  metodo_pago: string
   created_at: string
   updated_at?: string
 }
@@ -184,7 +184,7 @@ export const pagoDiarioService = {
 
   async notify(record: PagoDiarioRecord) {
     const { nombre, telefono, email, valor, metodo_pago, detalle } = record
-    const metodoTexto = metodo_pago === "Transferencia" ? "Transferencia bancaria" : "Efectivo"
+    const metodoTexto = metodo_pago === "Transferencia" ? "Transferencia bancaria" : metodo_pago === "Efectivo" ? "Efectivo" : metodo_pago
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 
     if (telefono) {
