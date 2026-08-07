@@ -554,6 +554,7 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                         <SelectItem value="Herederos Kids">Herederos Kids</SelectItem>
                         <SelectItem value="Herederos Explores">Herederos Explores</SelectItem>
                         <SelectItem value="Herederos Champions">Herederos Champions</SelectItem>
+                        <SelectItem value="Salón General">Salón General</SelectItem>
                         <SelectItem value="Recepción de Niños">Recepción de Niños</SelectItem>
                       </SelectContent>
                     </Select>
@@ -801,6 +802,7 @@ export function CronogramaServicio({ canEdit, moduloKey, moduleName, title, isAd
                     <SelectItem value="Herederos Kids">Herederos Kids</SelectItem>
                     <SelectItem value="Herederos Explores">Herederos Explores</SelectItem>
                     <SelectItem value="Herederos Champions">Herederos Champions</SelectItem>
+                    <SelectItem value="Salón General">Salón General</SelectItem>
                     <SelectItem value="Recepción de Niños">Recepción de Niños</SelectItem>
                   </SelectContent>
                 </Select>
