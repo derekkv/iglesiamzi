@@ -376,7 +376,11 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
               message: mensaje,
               origen: "herederos",
               useCase: "aviso_herederos",
-              templateData: { nino: participante.nombre, estado: statusText, salon },
+              templateData: {
+                nino: participante.nombre,
+                estado: `${statusText}${participante.alergias ? ` | ⚠️ Alergias: ${participante.alergias}` : ""}${participante.observaciones ? ` | 📝 Obs: ${participante.observaciones}` : ""}`,
+                salon,
+              },
             }),
           }).catch(() => {})
         }
