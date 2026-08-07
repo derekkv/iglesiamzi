@@ -103,6 +103,9 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
   const [gestionAsistio, setGestionAsistio] = useState<boolean | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Edición inline de asistencia (doble click)
+  const [editingInlineId, setEditingInlineId] = useState<string | null>(null)
+
   // Editar gestión
   const [editingGestion, setEditingGestion] = useState<GestionCelula | null>(null)
   const [editRespuesta, setEditRespuesta] = useState("")
@@ -453,6 +456,70 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  // Doble click para editar asistencia ya registrada
+  const handleDoubleClickAsistencia = (m: MiembroCelula, gestion: GestionCelula) => {
+    if (!canEdit) return
+    checkAndExecute(gestion.created_at, () => {
+      setEditingInlineId(`${m.fuente}-${m.id}`)
+    })
+  }
+
+  const handleInlineEditAsistencia = async (m: MiembroCelula, gestion: GestionCelula, nuevoValor: string) => {
+    if (!nuevoValor || !user) return
+    const asistio = nuevoValor === "si"
+    setIsSaving(true)
+    const result = await editarGestion(gestion.id, {
+      gestionado: asistio ? true : gestion.gestionado,
+      respuesta: asistio ? "Asistió" : (gestion.respuesta || ""),
+      asistio,
+    })
+    setIsSaving(false)
+    setEditingInlineId(null)
+    if (result.success) {
+      toast.success("Asistencia actualizada")
+
+      // Si un "posible" ahora asistió → pasarlo a activo
+      if (asistio && !m.celula_asiste) {
+        const tabla = m.fuente === "manual" ? "miembros_celulas"
+          : m.fuente === "protocolo" ? "censo" : "censo_mdg"
+        await supabase.from(tabla).update({ celula_asiste: true }).eq("id", m.id)
+        toast.success(`${m.apellidos_nombres} ahora es miembro activo`)
+        loadMiembros()
+      }
+
+      // Si ahora faltó y es activo → verificar 3+ faltas
+      if (!asistio && m.celula_asiste) {
+        const historial = await getHistorialGestiones(m.id, m.fuente)
+        const ultimasFaltas = historial.filter((g) => !g.asistio).length
+        if (ultimasFaltas >= 3) {
+          const tabla = m.fuente === "manual" ? "miembros_celulas"
+            : m.fuente === "protocolo" ? "censo" : "censo_mdg"
+          await supabase.from(tabla).update({ celula_asiste: false }).eq("id", m.id)
+          toast.info(`${m.apellidos_nombres} pasó a posibles (3+ faltas)`)
+          loadMiembros()
+        }
+      }
+
+      if (selectedCelula) loadGestionesSemana(selectedCelula)
+    } else {
+      toast.error(result.error || "Error al actualizar")
+    }
+  }
+
+  const handleDeleteInlineGestion = async (m: MiembroCelula, gestion: GestionCelula) => {
+    if (!user) return
+    setIsSaving(true)
+    const result = await eliminarGestion(gestion.id, { userId: user.id, userName: user.username })
+    setIsSaving(false)
+    setEditingInlineId(null)
+    if (result.success) {
+      toast.success("Registro eliminado")
+      if (selectedCelula) loadGestionesSemana(selectedCelula)
+    } else {
+      toast.error(result.error || "Error al eliminar")
+    }
+  }
+
   const renderMiembrosTable = (lista: MiembroCelula[], emptyMsg: string) => {
     if (lista.length === 0) {
       return <p className="text-center text-gray-500 py-6 text-sm">{emptyMsg}</p>
@@ -483,8 +550,33 @@ function SomosUnoContent({ canEdit }: { canEdit: boolean }) {
                   <TableCell className="text-xs">{m.celular || m.cedula || "-"}</TableCell>
                   <TableCell className="text-xs">{m.convencional || "-"}</TableCell>
                   <TableCell className="text-xs">
-                    {tieneRegistro ? (
-                      <Badge className={gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                    {tieneRegistro && editingInlineId === `${m.fuente}-${m.id}` ? (
+                      <select
+                        className="text-xs border rounded px-1 py-0.5 bg-white"
+                        defaultValue={gestionSemana?.asistio ? "si" : "no"}
+                        onChange={(e) => {
+                          if (gestionSemana) {
+                            if (e.target.value === "") {
+                              // Vacío = eliminar registro
+                              handleDeleteInlineGestion(m, gestionSemana)
+                            } else {
+                              handleInlineEditAsistencia(m, gestionSemana, e.target.value)
+                            }
+                          }
+                        }}
+                        onBlur={() => setEditingInlineId(null)}
+                        autoFocus
+                        disabled={isSaving}
+                      >
+                        <option value="">— Sin registro —</option>
+                        <option value="si">Asistió</option>
+                        <option value="no">Faltó</option>
+                      </select>
+                    ) : tieneRegistro ? (
+                      <Badge
+                        className={`${gestionSemana?.asistio ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"} ${canEdit ? "cursor-pointer" : ""}`}
+                        onDoubleClick={() => { if (gestionSemana) handleDoubleClickAsistencia(m, gestionSemana) }}
+                      >
                         {gestionSemana?.asistio ? "Asistió" : "Faltó"}
                       </Badge>
                     ) : canEdit ? (

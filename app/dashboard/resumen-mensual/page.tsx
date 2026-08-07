@@ -68,12 +68,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
   const { hasAccess: hasNominaAccess } = useRestrictedAccess("nomina")
 
   // Acordeones
-  const [openIngresos, setOpenIngresos] = useState(false)
-  const [openEgresos, setOpenEgresos] = useState(false)
-  const [openAsistencia, setOpenAsistencia] = useState(false)
-  const [openNomina, setOpenNomina] = useState(false)
   const [openEstadisticas, setOpenEstadisticas] = useState(true)
-  const [openProyectoMario, setOpenProyectoMario] = useState(false)
   
   // Modales de detalle
   const [modalIngresos, setModalIngresos] = useState(false)
@@ -94,18 +89,8 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
   const [modalEventos, setModalEventos] = useState(false)
   const [modalServidores, setModalServidores] = useState(false)
   const [modalAtrasados, setModalAtrasados] = useState(false)
+  const [modalAsistenciaCulto, setModalAsistenciaCulto] = useState(false)
   
-  // Acordeones de Censos (legacy - mantener por compatibilidad)
-  const [openCensoProtocolo, setOpenCensoProtocolo] = useState(false)
-  const [openCensoNinos, setOpenCensoNinos] = useState(false)
-  const [openCensoMdg, setOpenCensoMdg] = useState(false)
-  const [openCensoJovenes, setOpenCensoJovenes] = useState(false)
-  const [openDiscipulado, setOpenDiscipulado] = useState(false)
-  const [openBautizos, setOpenBautizos] = useState(false)
-  const [openMatrimonios, setOpenMatrimonios] = useState(false)
-  const [openCelulas, setOpenCelulas] = useState(false)
-  const [openAtrasados, setOpenAtrasados] = useState(false)
-
   // Estadísticas generales
   const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
   const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosHoy: 0 })
@@ -135,7 +120,6 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
   // === NUEVAS SECCIONES ===
   // Asistencia de Servidores
   const [statsServidores, setStatsServidores] = useState<Record<string, { total: number; asistieron: number; faltaron: number; justificaron: number; atrasados: number }>>({})
-  const [openServidores, setOpenServidores] = useState(false)
 
   // Redil - Ayuda Social
   const [statsRedil, setStatsRedil] = useState({
@@ -145,7 +129,6 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
     entregadosMes: 0,
     porTipo: {} as Record<string, number>,
   })
-  const [openRedil, setOpenRedil] = useState(false)
 
   // Cumpleaños
   const [statsCumpleanos, setStatsCumpleanos] = useState({
@@ -153,11 +136,9 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
     enviados: 0,
     pendientesEnvio: 0,
   })
-  const [openCumpleanos, setOpenCumpleanos] = useState(false)
 
   // Eventos / Encuentro
   const [statsEventos, setStatsEventos] = useState<Array<{ id: number; nombre: string; inscritos: number; pagadosCompleto: number; pendientesPago: number; totalRecaudado: number; totalValor: number }>>([])
-  const [openEventos, setOpenEventos] = useState(false)
 
   // Auto apertura/cierre de mes
   const autoManageRef = useRef(false)
@@ -705,7 +686,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               </Card>
 
               {/* Asistencia al Culto */}
-              <Card className="border-purple-200 bg-purple-50/50">
+              <Card className="border-purple-200 bg-purple-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalAsistenciaCulto(true)}>
                 <CardContent className="pt-5 pb-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -898,839 +879,6 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                 )}
               </Card>
 
-              {/* PROYECTO MARIO */}
-              <Card className="overflow-hidden border-orange-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenProyectoMario(!openProyectoMario)}>
-                  <div className="flex items-center gap-3">
-                    {openProyectoMario ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Palette className="w-5 h-5 text-orange-600" />
-                    <span className="font-semibold text-gray-900">Proyecto Mario (Detalle)</span>
-                    <Badge className="bg-orange-100 text-orange-800 text-xs">{Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)} inscritos</Badge>
-                  </div>
-                </button>
-                {openProyectoMario && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    {loadingStats ? (
-                      <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div></div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-                        {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => {
-                          const stats = statsProyectoMario[tipo]
-                          const config = PROYECTO_MARIO_CICLO_CONFIG[tipo]
-                          return (
-                            <div key={tipo} className="p-3 bg-orange-50 rounded-lg border border-orange-100">
-                              <p className="text-xs font-semibold text-orange-700 mb-2">{config.label}</p>
-                              {stats.inscritos > 0 ? (
-                                <div className="space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-gray-600">Inscritos</span>
-                                    <span className="text-sm font-bold text-orange-800">{stats.inscritos}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-gray-600">Última clase</span>
-                                    <span className="text-sm font-medium text-gray-700">#{stats.ultimaClase} de {config.totalClases}</span>
-                                  </div>
-                                  {stats.ultimaClase > 0 && (
-                                    <>
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-green-600">Asistieron</span>
-                                        <Badge className="bg-green-100 text-green-800 text-xs">{stats.asistieron}</Badge>
-                                      </div>
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-red-600">Faltaron</span>
-                                        <Badge className="bg-red-100 text-red-800 text-xs">{stats.faltaron}</Badge>
-                                      </div>
-                                      <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                                        <div className="bg-orange-500 h-1.5 rounded-full" style={{ width: `${(stats.ultimaClase / config.totalClases) * 100}%` }}></div>
-                                      </div>
-                                      <p className="text-[9px] text-gray-400 text-right">{Math.round((stats.ultimaClase / config.totalClases) * 100)}% completado</p>
-                                    </>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-gray-400 text-center py-3">Sin ciclo activo</p>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* ASISTENCIA SERVIDORES */}
-              <Card className="overflow-hidden border-cyan-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenServidores(!openServidores)}>
-                  <div className="flex items-center gap-3">
-                    {openServidores ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <ClipboardCheck className="w-5 h-5 text-cyan-600" />
-                    <span className="font-semibold text-gray-900">Asistencia Servidores por Ministerio</span>
-                    <Badge className="bg-cyan-100 text-cyan-800 text-xs">
-                      {Object.values(statsServidores).reduce((s, v) => s + v.total, 0)} registros
-                    </Badge>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-bold text-green-700">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)} A</span>
-                    <span className="mx-1 text-gray-400">·</span>
-                    <span className="font-bold text-red-700">{Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)} F</span>
-                  </div>
-                </button>
-                {openServidores && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    {loadingStats ? (
-                      <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div></div>
-                    ) : (
-                      <div className="mt-3 space-y-1">
-                        {/* Tabla resumen */}
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-2 px-2 text-gray-600 font-medium">Ministerio</th>
-                                <th className="text-center py-2 px-1 text-green-700 font-medium">Asistieron</th>
-                                <th className="text-center py-2 px-1 text-red-700 font-medium">Faltaron</th>
-                                <th className="text-center py-2 px-1 text-blue-700 font-medium">Justificaron</th>
-                                <th className="text-center py-2 px-1 text-amber-700 font-medium">Atrasados</th>
-                                <th className="text-center py-2 px-1 text-gray-700 font-medium">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {MINISTERIOS_SERVIDORES.map(min => {
-                                const s = statsServidores[min.key] || { total: 0, asistieron: 0, faltaron: 0, justificaron: 0, atrasados: 0 }
-                                return (
-                                  <tr key={min.key} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-1.5 px-2 text-gray-800 font-medium">{min.label}</td>
-                                    <td className="text-center py-1.5 px-1">
-                                      <Badge className="bg-green-100 text-green-800 text-[10px]">{s.asistieron}</Badge>
-                                    </td>
-                                    <td className="text-center py-1.5 px-1">
-                                      <Badge className="bg-red-100 text-red-800 text-[10px]">{s.faltaron}</Badge>
-                                    </td>
-                                    <td className="text-center py-1.5 px-1">
-                                      <Badge className="bg-blue-100 text-blue-800 text-[10px]">{s.justificaron}</Badge>
-                                    </td>
-                                    <td className="text-center py-1.5 px-1">
-                                      <Badge className="bg-amber-100 text-amber-800 text-[10px]">{s.atrasados}</Badge>
-                                    </td>
-                                    <td className="text-center py-1.5 px-1 font-semibold text-gray-700">{s.total}</td>
-                                  </tr>
-                                )
-                              })}
-                              {/* Fila totales */}
-                              <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold">
-                                <td className="py-2 px-2 text-gray-900">TOTAL</td>
-                                <td className="text-center py-2 px-1 text-green-800">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</td>
-                                <td className="text-center py-2 px-1 text-red-800">{Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)}</td>
-                                <td className="text-center py-2 px-1 text-blue-800">{Object.values(statsServidores).reduce((s, v) => s + v.justificaron, 0)}</td>
-                                <td className="text-center py-2 px-1 text-amber-800">{Object.values(statsServidores).reduce((s, v) => s + v.atrasados, 0)}</td>
-                                <td className="text-center py-2 px-1 text-gray-900">{Object.values(statsServidores).reduce((s, v) => s + v.total, 0)}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* REDIL - AYUDA SOCIAL */}
-              <Card className="overflow-hidden border-lime-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenRedil(!openRedil)}>
-                  <div className="flex items-center gap-3">
-                    {openRedil ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Heart className="w-5 h-5 text-lime-600" />
-                    <span className="font-semibold text-gray-900">Redil — Ayuda Social</span>
-                    <Badge className="bg-lime-100 text-lime-800 text-xs">{statsRedil.totalCasos} casos</Badge>
-                  </div>
-                </button>
-                {openRedil && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      <div className="text-center p-3 bg-lime-50 rounded-lg border border-lime-100">
-                        <p className="text-[10px] text-lime-600 font-medium">Entregados (semana)</p>
-                        <p className="text-2xl font-bold text-lime-800">{statsRedil.entregadosSemana}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Entregados (mes)</p>
-                        <p className="text-2xl font-bold text-green-800">{statsRedil.entregadosMes}</p>
-                      </div>
-                      <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
-                        <p className="text-[10px] text-yellow-600 font-medium">Solicitudes Pendientes</p>
-                        <p className="text-2xl font-bold text-yellow-800">{statsRedil.pendientes}</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <p className="text-[10px] text-gray-600 font-medium">Total Histórico</p>
-                        <p className="text-2xl font-bold text-gray-800">{statsRedil.totalCasos}</p>
-                      </div>
-                    </div>
-                    {/* Desglose por tipo de ayuda */}
-                    {Object.keys(statsRedil.porTipo).length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-xs font-semibold text-gray-700 mb-2">Ayudas entregadas por tipo (histórico cerrados):</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          {Object.entries(statsRedil.porTipo).sort(([, a], [, b]) => b - a).map(([tipo, cantidad]) => {
-                            const tipoInfo = [
-                              { value: "canasta", label: "Canasta/Víveres", icon: "🧺" },
-                              { value: "medicinas", label: "Medicinas", icon: "💊" },
-                              { value: "ropa", label: "Ropa", icon: "🧥" },
-                              { value: "panales", label: "Pañales", icon: "👶" },
-                              { value: "utiles_escolares", label: "Útiles", icon: "📚" },
-                              { value: "ayuda_economica", label: "Económica", icon: "💰" },
-                              { value: "otro", label: "Otro", icon: "📦" },
-                            ].find(t => t.value === tipo)
-                            return (
-                              <div key={tipo} className="flex items-center gap-2 p-2 bg-white rounded border border-gray-100">
-                                <span className="text-sm">{tipoInfo?.icon || "📦"}</span>
-                                <div>
-                                  <p className="text-[10px] text-gray-600">{tipoInfo?.label || tipo}</p>
-                                  <p className="text-sm font-bold text-gray-800">{cantidad}</p>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    <Button variant="ghost" size="sm" className="mt-3 text-lime-700" onClick={() => router.push("/dashboard/redil-ayuda-social")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Redil
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* CUMPLEAÑOS DEL MES */}
-              <Card className="overflow-hidden border-fuchsia-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCumpleanos(!openCumpleanos)}>
-                  <div className="flex items-center gap-3">
-                    {openCumpleanos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Cake className="w-5 h-5 text-fuchsia-600" />
-                    <span className="font-semibold text-gray-900">Cumpleaños del Mes</span>
-                    <Badge className="bg-fuchsia-100 text-fuchsia-800 text-xs">{statsCumpleanos.totalMes} personas</Badge>
-                  </div>
-                </button>
-                {openCumpleanos && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-3 gap-3 mt-3">
-                      <div className="text-center p-3 bg-fuchsia-50 rounded-lg border border-fuchsia-100">
-                        <p className="text-[10px] text-fuchsia-600 font-medium">Total Cumpleañeros</p>
-                        <p className="text-2xl font-bold text-fuchsia-800">{statsCumpleanos.totalMes}</p>
-                        <p className="text-[9px] text-fuchsia-500">este mes</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Felicitados</p>
-                        <p className="text-2xl font-bold text-green-800">{statsCumpleanos.enviados}</p>
-                        <p className="text-[9px] text-green-500">ya enviados</p>
-                      </div>
-                      <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-100">
-                        <p className="text-[10px] text-orange-600 font-medium">Pendientes</p>
-                        <p className="text-2xl font-bold text-orange-800">{statsCumpleanos.pendientesEnvio}</p>
-                        <p className="text-[9px] text-orange-500">sin felicitar</p>
-                      </div>
-                    </div>
-                    {/* Barra de progreso */}
-                    {statsCumpleanos.totalMes > 0 && (
-                      <div className="mt-4">
-                        <div className="flex justify-between text-[10px] text-gray-600 mb-1">
-                          <span>Progreso de felicitaciones</span>
-                          <span>{Math.round((statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100)}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-fuchsia-500 h-2 rounded-full transition-all"
-                            style={{ width: `${(statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    )}
-                    <Button variant="ghost" size="sm" className="mt-3 text-fuchsia-700" onClick={() => router.push("/dashboard/cumpleanos")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Cumpleaños
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* EVENTOS / ENCUENTRO */}
-              <Card className="overflow-hidden border-violet-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenEventos(!openEventos)}>
-                  <div className="flex items-center gap-3">
-                    {openEventos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <CalendarDays className="w-5 h-5 text-violet-600" />
-                    <span className="font-semibold text-gray-900">Eventos / Encuentro</span>
-                    <Badge className="bg-violet-100 text-violet-800 text-xs">
-                      {statsEventos.reduce((s, e) => s + e.inscritos, 0)} inscritos
-                    </Badge>
-                  </div>
-                </button>
-                {openEventos && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    {loadingStats ? (
-                      <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin"></div></div>
-                    ) : statsEventos.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-4 mt-3">No hay eventos activos</p>
-                    ) : (
-                      <div className="space-y-3 mt-3">
-                        {statsEventos.map(evento => (
-                          <div key={evento.id} className="p-3 bg-violet-50 rounded-lg border border-violet-100">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs font-semibold text-violet-700">{evento.nombre}</p>
-                              <Badge className="bg-violet-200 text-violet-900 text-[10px]">{evento.inscritos} inscritos</Badge>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-violet-800">{evento.inscritos}</p>
-                                <p className="text-[9px] text-violet-600">Inscritos</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-green-700">{evento.pagadosCompleto}</p>
-                                <p className="text-[9px] text-green-600">Pagado completo</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-orange-700">{evento.pendientesPago}</p>
-                                <p className="text-[9px] text-orange-600">Pendiente pago</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-emerald-700">${evento.totalRecaudado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                                <p className="text-[9px] text-emerald-600">Recaudado / ${evento.totalValor.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                              </div>
-                            </div>
-                            {/* Barra progreso recaudación */}
-                            {evento.totalValor > 0 && (
-                              <div className="mt-2">
-                                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                  <div
-                                    className="bg-violet-500 h-1.5 rounded-full transition-all"
-                                    style={{ width: `${Math.min((evento.totalRecaudado / evento.totalValor) * 100, 100)}%` }}
-                                  ></div>
-                                </div>
-                                <p className="text-[9px] text-gray-400 text-right mt-0.5">
-                                  {Math.round((evento.totalRecaudado / evento.totalValor) * 100)}% recaudado
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        <Button variant="ghost" size="sm" className="text-violet-700" onClick={() => router.push("/dashboard/eventos")}>
-                          <ExternalLink className="w-3 h-3 mr-1" /> Ir a Eventos
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* CENSO PROTOCOLO */}
-              <Card className="overflow-hidden border-indigo-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCensoProtocolo(!openCensoProtocolo)}>
-                  <div className="flex items-center gap-3">
-                    {openCensoProtocolo ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <img src={CHURCH.logoUrl} alt={CHURCH.initials} className="w-5 h-5 object-contain" />
-                    <span className="font-semibold text-gray-900">Censo Protocolo</span>
-                    <Badge className="bg-indigo-100 text-indigo-800 text-xs">{statsCenso.total} miembros</Badge>
-                  </div>
-                </button>
-                {openCensoProtocolo && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-3 gap-3 mt-3">
-                      <div className="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                        <p className="text-[10px] text-indigo-600 font-medium">Total Registrados</p>
-                        <p className="text-2xl font-bold text-indigo-800">{statsCenso.total}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Miembros</p>
-                        <p className="text-2xl font-bold text-green-800">{statsCenso.miembros}</p>
-                      </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-medium">Activos</p>
-                        <p className="text-2xl font-bold text-blue-800">{statsCenso.activos}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-indigo-700" onClick={() => router.push("/dashboard/censo")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Censo Protocolo
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* CENSO NIÑOS */}
-              <Card className="overflow-hidden border-amber-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCensoNinos(!openCensoNinos)}>
-                  <div className="flex items-center gap-3">
-                    {openCensoNinos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <span className="text-xl">👶</span>
-                    <span className="font-semibold text-gray-900">Censo Niños</span>
-                    <Badge className="bg-amber-100 text-amber-800 text-xs">{statsCensoNinos.total} niños</Badge>
-                  </div>
-                </button>
-                {openCensoNinos && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-100">
-                        <p className="text-[10px] text-pink-600 font-medium">Baby (0-2)</p>
-                        <p className="text-2xl font-bold text-pink-800">{statsCensoNinos.baby}</p>
-                      </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-medium">Kids (3-5)</p>
-                        <p className="text-2xl font-bold text-blue-800">{statsCensoNinos.kids}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Explores (6-8)</p>
-                        <p className="text-2xl font-bold text-green-800">{statsCensoNinos.explores}</p>
-                      </div>
-                      <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
-                        <p className="text-[10px] text-purple-600 font-medium">Champions (9-11)</p>
-                        <p className="text-2xl font-bold text-purple-800">{statsCensoNinos.champions}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-amber-700" onClick={() => router.push("/dashboard/censo-ninos")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Censo Niños
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* NUEVOS CREYENTES (MDG) */}
-              <Card className="overflow-hidden border-violet-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCensoMdg(!openCensoMdg)}>
-                  <div className="flex items-center gap-3">
-                    {openCensoMdg ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <span className="text-xl">👩</span>
-                    <span className="font-semibold text-gray-900">Nuevos Creyentes</span>
-                    <Badge className="bg-violet-100 text-violet-800 text-xs">{statsCensoMdg.total} personas</Badge>
-                  </div>
-                </button>
-                {openCensoMdg && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      <div className="text-center p-3 bg-violet-50 rounded-lg border border-violet-100">
-                        <p className="text-[10px] text-violet-600 font-medium">Total</p>
-                        <p className="text-2xl font-bold text-violet-800">{statsCensoMdg.total}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Miembros</p>
-                        <p className="text-2xl font-bold text-green-800">{statsCensoMdg.miembros}</p>
-                      </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-medium">Activos</p>
-                        <p className="text-2xl font-bold text-blue-800">{statsCensoMdg.activos}</p>
-                      </div>
-                      <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
-                        <p className="text-[10px] text-amber-600 font-medium">Nuevos este mes</p>
-                        <p className="text-2xl font-bold text-amber-800">{statsCensoMdg.nuevosMes}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-violet-700" onClick={() => router.push("/dashboard/censo-mdg")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Censo MDG
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* CENSO JÓVENES */}
-              <Card className="overflow-hidden border-pink-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCensoJovenes(!openCensoJovenes)}>
-                  <div className="flex items-center gap-3">
-                    {openCensoJovenes ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <span className="text-xl">🧑‍🤝‍🧑</span>
-                    <span className="font-semibold text-gray-900">Censo Jóvenes</span>
-                    <Badge className="bg-pink-100 text-pink-800 text-xs">{statsCensoJovenes.total} jóvenes</Badge>
-                  </div>
-                </button>
-                {openCensoJovenes && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-100">
-                        <p className="text-[10px] text-pink-600 font-medium">Total</p>
-                        <p className="text-2xl font-bold text-pink-800">{statsCensoJovenes.total}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Miembros</p>
-                        <p className="text-2xl font-bold text-green-800">{statsCensoJovenes.miembros}</p>
-                      </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-medium">Activos</p>
-                        <p className="text-2xl font-bold text-blue-800">{statsCensoJovenes.activos}</p>
-                      </div>
-                      <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
-                        <p className="text-[10px] text-amber-600 font-medium">Nuevos este mes</p>
-                        <p className="text-2xl font-bold text-amber-800">{statsCensoJovenes.nuevosMes}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-pink-700" onClick={() => router.push("/dashboard/censo-jovenes")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Censo Jóvenes
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* DISCIPULADO */}
-              <Card className="overflow-hidden border-sky-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenDiscipulado(!openDiscipulado)}>
-                  <div className="flex items-center gap-3">
-                    {openDiscipulado ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <GraduationCap className="w-5 h-5 text-sky-600" />
-                    <span className="font-semibold text-gray-900">Discipulado</span>
-                    <Badge className="bg-sky-100 text-sky-800 text-xs">{Object.values(statsDiscipulado).reduce((s, v) => s + v.inscritos, 0)} inscritos</Badge>
-                  </div>
-                </button>
-                {openDiscipulado && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                      {(Object.keys(CICLO_CONFIG) as CicloTipo[]).map(tipo => (
-                        <div key={tipo} className="p-3 bg-sky-50 rounded-lg border border-sky-100">
-                          <p className="text-xs font-semibold text-sky-700 mb-2">{CICLO_CONFIG[tipo].label}</p>
-                          {statsDiscipulado[tipo].inscritos > 0 ? (
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-sky-800">{statsDiscipulado[tipo].inscritos}</p>
-                                <p className="text-[9px] text-sky-600">Inscritos</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-green-700">{statsDiscipulado[tipo].aprobados}</p>
-                                <p className="text-[9px] text-green-600">Aprobados</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-gray-700">{statsDiscipulado[tipo].enCurso}</p>
-                                <p className="text-[9px] text-gray-500">En curso</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-bold text-red-700">{statsDiscipulado[tipo].reprobados}</p>
-                                <p className="text-[9px] text-red-600">Reprobados</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-400 text-center py-2">Sin ciclo activo</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-sky-700" onClick={() => router.push("/dashboard/discipulado-primeros-pasos")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Discipulado
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* BAUTIZOS */}
-              <Card className="overflow-hidden border-teal-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenBautizos(!openBautizos)}>
-                  <div className="flex items-center gap-3">
-                    {openBautizos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Heart className="w-5 h-5 text-teal-600" />
-                    <span className="font-semibold text-gray-900">Bautizos</span>
-                    <Badge className="bg-teal-100 text-teal-800 text-xs">{statsBautizos.censoBautizados} total</Badge>
-                  </div>
-                </button>
-                {openBautizos && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-3 gap-3 mt-3">
-                      <div className="text-center p-3 bg-teal-50 rounded-lg border border-teal-100">
-                        <p className="text-[10px] text-teal-600 font-medium">En Censos</p>
-                        <p className="text-2xl font-bold text-teal-800">{statsBautizos.censoBautizados}</p>
-                      </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-medium">Manual</p>
-                        <p className="text-2xl font-bold text-blue-800">{statsBautizos.total}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Este mes</p>
-                        <p className="text-2xl font-bold text-green-800">{statsBautizos.esteMes}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-teal-700" onClick={() => router.push("/dashboard/bautizo")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Bautizos
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* MATRIMONIOS */}
-              <Card className="overflow-hidden border-rose-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenMatrimonios(!openMatrimonios)}>
-                  <div className="flex items-center gap-3">
-                    {openMatrimonios ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Heart className="w-5 h-5 text-rose-600" />
-                    <span className="font-semibold text-gray-900">Matrimonios</span>
-                    <Badge className="bg-rose-100 text-rose-800 text-xs">{statsMatrimonios.censoMatrimonios} total</Badge>
-                  </div>
-                </button>
-                {openMatrimonios && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-3 gap-3 mt-3">
-                      <div className="text-center p-3 bg-rose-50 rounded-lg border border-rose-100">
-                        <p className="text-[10px] text-rose-600 font-medium">En Censos</p>
-                        <p className="text-2xl font-bold text-rose-800">{statsMatrimonios.censoMatrimonios}</p>
-                      </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-medium">Manual</p>
-                        <p className="text-2xl font-bold text-blue-800">{statsMatrimonios.total}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Este mes</p>
-                        <p className="text-2xl font-bold text-green-800">{statsMatrimonios.esteMes}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-rose-700" onClick={() => router.push("/dashboard/matrimonio")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Matrimonios
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* CÉLULAS */}
-              <Card className="overflow-hidden border-emerald-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenCelulas(!openCelulas)}>
-                  <div className="flex items-center gap-3">
-                    {openCelulas ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Home className="w-5 h-5 text-emerald-600" />
-                    <span className="font-semibold text-gray-900">Células</span>
-                    <Badge className="bg-emerald-100 text-emerald-800 text-xs">{statsCelulas.totalMiembros} miembros</Badge>
-                  </div>
-                </button>
-                {openCelulas && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                        <p className="text-[10px] text-emerald-600 font-medium">Miembros Activos</p>
-                        <p className="text-2xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Asistieron esta semana</p>
-                        <p className="text-2xl font-bold text-green-800">{statsCelulas.asistieronSemana}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-emerald-700" onClick={() => router.push("/dashboard/celulas")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Células
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* ATRASADOS */}
-              <Card className="overflow-hidden border-amber-200">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenAtrasados(!openAtrasados)}>
-                  <div className="flex items-center gap-3">
-                    {openAtrasados ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
-                    <span className="font-semibold text-gray-900">Atrasados</span>
-                    <Badge className="bg-amber-100 text-amber-800 text-xs">{statsAtrasados.total} personas</Badge>
-                  </div>
-                </button>
-                {openAtrasados && (
-                  <CardContent className="pt-0 pb-6 border-t">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
-                        <p className="text-[10px] text-amber-600 font-medium">Total</p>
-                        <p className="text-2xl font-bold text-amber-800">{statsAtrasados.total}</p>
-                      </div>
-                      <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
-                        <p className="text-[10px] text-red-600 font-medium">Sin Gestionar</p>
-                        <p className="text-2xl font-bold text-red-800">{statsAtrasados.sinGestionar}</p>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                        <p className="text-[10px] text-green-600 font-medium">Gestionados</p>
-                        <p className="text-2xl font-bold text-green-800">{statsAtrasados.total - statsAtrasados.sinGestionar}</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <p className="text-[10px] text-gray-600 font-medium">% Gestión</p>
-                        <p className="text-2xl font-bold text-gray-800">{statsAtrasados.total > 0 ? Math.round(((statsAtrasados.total - statsAtrasados.sinGestionar) / statsAtrasados.total) * 100) : 0}%</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* INGRESOS */}
-              <Card className="overflow-hidden">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenIngresos(!openIngresos)}>
-                  <div className="flex items-center gap-3">
-                    {openIngresos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <TrendingUp className="w-5 h-5 text-green-600" />
-                    <span className="font-semibold text-gray-900">Ingresos por Categoría</span>
-                    <Badge className="bg-green-100 text-green-800 text-xs">{ingresos.length} registros</Badge>
-                  </div>
-                  <span className="font-bold text-green-700">${totalIngresos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span>
-                </button>
-                {openIngresos && (
-                  <CardContent className="pt-0 pb-4 border-t">
-                    <div className="space-y-2 mt-3">
-                      {(Object.entries(ingresosPorCategoria) as [string, number][]).sort(([, a], [, b]) => b - a).map(([cat, monto]) => (
-                        <div key={cat} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                          <span className="text-sm text-gray-700">{cat}</span>
-                          <span className="text-sm font-semibold text-green-700">${monto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-green-700" onClick={() => router.push("/dashboard/ingresos-egresos")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Ingresos y Egresos
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* EGRESOS */}
-              <Card className="overflow-hidden">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenEgresos(!openEgresos)}>
-                  <div className="flex items-center gap-3">
-                    {openEgresos ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <TrendingDown className="w-5 h-5 text-red-600" />
-                    <span className="font-semibold text-gray-900">Egresos por Categoría</span>
-                    <Badge className="bg-red-100 text-red-800 text-xs">{egresos.length} registros</Badge>
-                  </div>
-                  <span className="font-bold text-red-700">${totalEgresos.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span>
-                </button>
-                {openEgresos && (
-                  <CardContent className="pt-0 pb-4 border-t">
-                    <div className="space-y-2 mt-3">
-                      {(Object.entries(egresosPorCategoria) as [string, number][]).sort(([, a], [, b]) => b - a).map(([cat, monto]) => (
-                        <div key={cat} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                          <span className="text-sm text-gray-700">{cat}</span>
-                          <span className="text-sm font-semibold text-red-700">${monto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <Button variant="ghost" size="sm" className="mt-3 text-red-700" onClick={() => router.push("/dashboard/ingresos-egresos")}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Ir a Ingresos y Egresos
-                    </Button>
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* ASISTENCIA */}
-              <Card className="overflow-hidden">
-                <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenAsistencia(!openAsistencia)}>
-                  <div className="flex items-center gap-3">
-                    {openAsistencia ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                    <Users className="w-5 h-5 text-purple-600" />
-                    <span className="font-semibold text-gray-900">Asistencia</span>
-                    <Badge className="bg-purple-100 text-purple-800 text-xs">{asistenciaColumns.length} días</Badge>
-                  </div>
-                  <span className="font-bold text-purple-700">{totalAsistencia} personas</span>
-                </button>
-                {openAsistencia && (
-                  <CardContent className="pt-0 pb-4 border-t">
-                    {asistenciaColumns.length > 0 ? (
-                      <>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-3">
-                          {asistenciaColumns.map((col: any) => (
-                            <div key={col.id} className="text-center p-2 bg-purple-50 rounded-lg border border-purple-100">
-                              <p className="text-[10px] text-purple-600 font-medium">{col.nombre}</p>
-                              <p className="text-lg font-bold text-purple-800">{getColumnTotal(col.id)}</p>
-                            </div>
-                          ))}
-                        </div>
-                        <Button variant="ghost" size="sm" className="mt-3 text-purple-700" onClick={() => router.push("/dashboard/asistencia")}>
-                          <ExternalLink className="w-3 h-3 mr-1" /> Ir a Asistencia
-                        </Button>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-400 text-center py-4 mt-3">Sin datos de asistencia</p>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-
-              {/* NÓMINA */}
-              {hasNominaAccess && (
-                <Card className="overflow-hidden">
-                  <button className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors" onClick={() => setOpenNomina(!openNomina)}>
-                    <div className="flex items-center gap-3">
-                      {openNomina ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                      <span className="text-xl">💰</span>
-                      <span className="font-semibold text-gray-900">Nómina</span>
-                      <Badge className="bg-amber-100 text-amber-800 text-xs">{nominaRecords.length} personas</Badge>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-amber-700">${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</span>
-                      <p className="text-[10px] text-green-600">Pagado: ${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                    </div>
-                  </button>
-                  {openNomina && (
-                    <CardContent className="pt-0 pb-4 border-t">
-                      {(() => {
-                        const pendientes1ra = nominaRecords.filter((r: any) => !r.primera_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
-                        const pendientes2da = nominaRecords.filter((r: any) => !r.segunda_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
-                        const pendientesTransporte = nominaRecords.filter((r: any) => (Number(r.movilizacion_valor || 0) > 0 || r.movilizacion_pagada) && !r.movilizacion_pagada)
-                        const totalTransportePagado = nominaRecords.reduce((s: number, r: any) => s + (r.movilizacion_pagada ? Number(r.movilizacion_valor || 0) : 0) + (r.movilizacion_segunda_pagada ? Number(r.movilizacion_segunda_valor || 0) : 0), 0)
-                        return (
-                          <>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                              <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
-                                <p className="text-xs text-amber-600">Total a Pagar</p>
-                                <p className="text-lg font-bold text-amber-800">${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                              </div>
-                              <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
-                                <p className="text-xs text-green-600">Pagado Quincenas</p>
-                                <p className="text-lg font-bold text-green-800">${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                              </div>
-                              <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                <p className="text-xs text-purple-600">Transporte Pagado</p>
-                                <p className="text-lg font-bold text-purple-800">${totalTransportePagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                              </div>
-                              <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
-                                <p className="text-xs text-red-600">Pendiente Total</p>
-                                <p className="text-lg font-bold text-red-800">${(totalNominaAPagar - totalNominaPagado).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                              </div>
-                            </div>
-
-                            {/* Pendientes por categoría */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                              {pendientes1ra.length > 0 && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                  <p className="text-xs font-semibold text-blue-700 mb-2">Falta 1ra Quincena ({pendientes1ra.length})</p>
-                                  <div className="space-y-1">
-                                    {pendientes1ra.map((r: any) => (
-                                      <div key={r.id} className="flex justify-between text-xs">
-                                        <span className="text-gray-700 truncate">{r.nombre}</span>
-                                        <span className="text-blue-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {pendientes2da.length > 0 && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                                  <p className="text-xs font-semibold text-green-700 mb-2">Falta 2da Quincena ({pendientes2da.length})</p>
-                                  <div className="space-y-1">
-                                    {pendientes2da.map((r: any) => (
-                                      <div key={r.id} className="flex justify-between text-xs">
-                                        <span className="text-gray-700 truncate">{r.nombre}</span>
-                                        <span className="text-green-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {pendientesTransporte.length > 0 && (
-                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                                  <p className="text-xs font-semibold text-purple-700 mb-2">Falta Transporte ({pendientesTransporte.length})</p>
-                                  <div className="space-y-1">
-                                    {pendientesTransporte.map((r: any) => (
-                                      <div key={r.id} className="flex justify-between text-xs">
-                                        <span className="text-gray-700 truncate">{r.nombre}</span>
-                                        <span className="text-purple-700 font-medium">${Number(r.movilizacion_valor || 0).toFixed(2)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {pendientes1ra.length === 0 && pendientes2da.length === 0 && pendientesTransporte.length === 0 && (
-                              <p className="text-sm text-green-600 text-center mt-4 font-medium">Toda la nómina está al día</p>
-                            )}
-
-                            <Button variant="ghost" size="sm" className="mt-3 text-amber-700" onClick={() => router.push("/dashboard/flujo-pago")}>
-                              <ExternalLink className="w-3 h-3 mr-1" /> Ir a Flujo de Pago
-                            </Button>
-                          </>
-                        )
-                      })()}
-                    </CardContent>
-                  )}
-                </Card>
-              )}
             </div>
 
             {/* Historial */}
@@ -1840,21 +988,84 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <DialogTitle className="flex items-center gap-2 text-amber-700">
                 <DollarSign className="w-5 h-5" /> Nómina del Mes
               </DialogTitle>
-              <DialogDescription>A pagar: ${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })} · Pagado: ${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</DialogDescription>
+              <DialogDescription>A pagar: ${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })} · Pagado: ${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })} · {nominaRecords.length} personas</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              {nominaRecords.map((nom, i) => (
-                <div key={i} className="flex justify-between items-center p-2 bg-amber-50 rounded">
-                  <p className="text-sm font-medium">{nom.nombre}</p>
-                  <div className="text-right">
-                    <p className="font-semibold text-amber-700">${Number(nom.valor_a_pagar || 0).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                    <p className="text-xs text-gray-500">{nom.pagado ? "Pagado" : "Pendiente"}</p>
+            {(() => {
+              const pendientes1ra = nominaRecords.filter((r: any) => !r.primera_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
+              const pendientes2da = nominaRecords.filter((r: any) => !r.segunda_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
+              const pendientesTransporte = nominaRecords.filter((r: any) => (Number(r.movilizacion_valor || 0) > 0 || r.movilizacion_pagada) && !r.movilizacion_pagada)
+              const totalTransportePagado = nominaRecords.reduce((s: number, r: any) => s + (r.movilizacion_pagada ? Number(r.movilizacion_valor || 0) : 0) + (r.movilizacion_segunda_pagada ? Number(r.movilizacion_segunda_valor || 0) : 0), 0)
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                      <p className="text-xs text-amber-600">Total a Pagar</p>
+                      <p className="text-lg font-bold text-amber-800">${totalNominaAPagar.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                      <p className="text-xs text-green-600">Pagado Quincenas</p>
+                      <p className="text-lg font-bold text-green-800">${totalNominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+                      <p className="text-xs text-purple-600">Transporte Pagado</p>
+                      <p className="text-lg font-bold text-purple-800">${totalTransportePagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                      <p className="text-xs text-red-600">Pendiente Total</p>
+                      <p className="text-lg font-bold text-red-800">${(totalNominaAPagar - totalNominaPagado).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {pendientes1ra.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-blue-700 mb-2">Falta 1ra Quincena ({pendientes1ra.length})</p>
+                        <div className="space-y-1">
+                          {pendientes1ra.map((r: any) => (
+                            <div key={r.id} className="flex justify-between text-xs">
+                              <span className="text-gray-700 truncate">{r.nombre}</span>
+                              <span className="text-blue-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {pendientes2da.length > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-green-700 mb-2">Falta 2da Quincena ({pendientes2da.length})</p>
+                        <div className="space-y-1">
+                          {pendientes2da.map((r: any) => (
+                            <div key={r.id} className="flex justify-between text-xs">
+                              <span className="text-gray-700 truncate">{r.nombre}</span>
+                              <span className="text-green-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {pendientesTransporte.length > 0 && (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-purple-700 mb-2">Falta Transporte ({pendientesTransporte.length})</p>
+                        <div className="space-y-1">
+                          {pendientesTransporte.map((r: any) => (
+                            <div key={r.id} className="flex justify-between text-xs">
+                              <span className="text-gray-700 truncate">{r.nombre}</span>
+                              <span className="text-purple-700 font-medium">${Number(r.movilizacion_valor || 0).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {pendientes1ra.length === 0 && pendientes2da.length === 0 && pendientesTransporte.length === 0 && (
+                    <p className="text-sm text-green-600 text-center font-medium">✓ Toda la nómina está al día</p>
+                  )}
                 </div>
-              ))}
-            </div>
-            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/nomina")}>
-              <ExternalLink className="w-4 h-4 mr-2" /> Ir a Nómina
+              )
+            })()}
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/flujo-pago")}>
+              <ExternalLink className="w-4 h-4 mr-2" /> Ir a Flujo de Pago
             </Button>
           </DialogContent>
         </Dialog>
@@ -1869,7 +1080,19 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <DialogDescription>Total: {totalAsistencia} personas · {asistenciaColumns.length} días · Promedio: {asistenciaColumns.length > 0 ? Math.round(totalAsistencia / asistenciaColumns.length) : 0}/día</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <h4 className="font-semibold text-sm text-gray-700">Desglose por fila:</h4>
+              {/* Resumen por día */}
+              {asistenciaColumns.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {asistenciaColumns.map((col: any) => (
+                    <div key={col.id} className="text-center p-2 bg-purple-50 rounded-lg border border-purple-100">
+                      <p className="text-[10px] text-purple-600 font-medium">{col.nombre}</p>
+                      <p className="text-lg font-bold text-purple-800">{getColumnTotal(col.id)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Desglose por fila */}
+              <h4 className="font-semibold text-sm text-gray-700">Desglose por categoría:</h4>
               {asistenciaDetails.map((row, i) => (
                 <div key={i} className="p-3 bg-purple-50 rounded-lg">
                   <p className="font-medium text-purple-800">{row.nombre}</p>
@@ -1886,6 +1109,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                   </div>
                 </div>
               ))}
+              {asistenciaDetails.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Sin datos de asistencia</p>}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/asistencia")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Asistencia
@@ -2105,16 +1329,41 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <DialogTitle className="flex items-center gap-2 text-emerald-700">
                 <Home className="w-5 h-5" /> Células
               </DialogTitle>
-              <DialogDescription>Miembros activos: {statsCelulas.totalMiembros}</DialogDescription>
+              <DialogDescription>Miembros activos: {statsCelulas.totalMiembros} · Asistieron esta semana: {statsCelulas.asistieronSemana}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-emerald-50 rounded">
-                <span>Total Miembros</span>
-                <span className="font-bold text-emerald-700">{statsCelulas.totalMiembros}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <p className="text-[10px] text-emerald-600 font-medium">Total Miembros</p>
+                  <p className="text-3xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p>
+                  <p className="text-[9px] text-emerald-500">registrados en células</p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Asistieron esta Semana</p>
+                  <p className="text-3xl font-bold text-green-800">{statsCelulas.asistieronSemana}</p>
+                  <p className="text-[9px] text-green-500">última semana registrada</p>
+                </div>
               </div>
-              <div className="flex justify-between p-3 bg-green-50 rounded">
-                <span>Asistieron esta semana</span>
-                <span className="font-bold text-green-700">{statsCelulas.asistieronSemana}</span>
+              {statsCelulas.totalMiembros > 0 && (
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-600 mb-1">
+                    <span>% Asistencia semanal</span>
+                    <span>{Math.round((statsCelulas.asistieronSemana / statsCelulas.totalMiembros) * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${Math.min((statsCelulas.asistieronSemana / statsCelulas.totalMiembros) * 100, 100)}%` }}></div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-center">
+                  <p className="text-[10px] text-amber-600 font-medium">No asistieron</p>
+                  <p className="text-xl font-bold text-amber-800">{Math.max(0, statsCelulas.totalMiembros - statsCelulas.asistieronSemana)}</p>
+                </div>
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-center">
+                  <p className="text-[10px] text-blue-600 font-medium">% Ausencia</p>
+                  <p className="text-xl font-bold text-blue-800">{statsCelulas.totalMiembros > 0 ? Math.round(((statsCelulas.totalMiembros - statsCelulas.asistieronSemana) / statsCelulas.totalMiembros) * 100) : 0}%</p>
+                </div>
               </div>
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/celulas")}>
@@ -2125,24 +1374,61 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
 
         {/* Modal Redil */}
         <Dialog open={modalRedil} onOpenChange={setModalRedil}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-lime-700">
                 <Heart className="w-5 h-5" /> Redil - Ayuda Social
               </DialogTitle>
-              <DialogDescription>Entregados este mes: {statsRedil.entregadosMes}</DialogDescription>
+              <DialogDescription>Total casos: {statsRedil.totalCasos} · Entregados este mes: {statsRedil.entregadosMes}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-lime-50 rounded">
-                <span>Entregados este mes</span>
-                <span className="font-bold text-lime-700">{statsRedil.entregadosMes}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-3 bg-lime-50 rounded-lg border border-lime-100">
+                  <p className="text-[10px] text-lime-600 font-medium">Entregados (semana)</p>
+                  <p className="text-2xl font-bold text-lime-800">{statsRedil.entregadosSemana}</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Entregados (mes)</p>
+                  <p className="text-2xl font-bold text-green-800">{statsRedil.entregadosMes}</p>
+                </div>
+                <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                  <p className="text-[10px] text-yellow-600 font-medium">Solicitudes Pendientes</p>
+                  <p className="text-2xl font-bold text-yellow-800">{statsRedil.pendientes}</p>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-[10px] text-gray-600 font-medium">Total Histórico</p>
+                  <p className="text-2xl font-bold text-gray-800">{statsRedil.totalCasos}</p>
+                </div>
               </div>
-              <div className="flex justify-between p-3 bg-amber-50 rounded">
-                <span>Pendientes</span>
-                <span className="font-bold text-amber-700">{statsRedil.pendientes}</span>
-              </div>
+              {Object.keys(statsRedil.porTipo).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Ayudas entregadas por tipo:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.entries(statsRedil.porTipo).sort(([, a], [, b]) => b - a).map(([tipo, cantidad]) => {
+                      const tipoInfo = [
+                        { value: "canasta", label: "Canasta/Víveres", icon: "🧺" },
+                        { value: "medicinas", label: "Medicinas", icon: "💊" },
+                        { value: "ropa", label: "Ropa", icon: "🧥" },
+                        { value: "panales", label: "Pañales", icon: "👶" },
+                        { value: "utiles_escolares", label: "Útiles", icon: "📚" },
+                        { value: "ayuda_economica", label: "Económica", icon: "💰" },
+                        { value: "otro", label: "Otro", icon: "📦" },
+                      ].find(t => t.value === tipo)
+                      return (
+                        <div key={tipo} className="flex items-center gap-2 p-2 bg-white rounded border border-gray-100">
+                          <span className="text-sm">{tipoInfo?.icon || "📦"}</span>
+                          <div>
+                            <p className="text-[10px] text-gray-600">{tipoInfo?.label || tipo}</p>
+                            <p className="text-sm font-bold text-gray-800">{cantidad}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/redil")}>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/redil-ayuda-social")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Redil
             </Button>
           </DialogContent>
@@ -2150,20 +1436,53 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
 
         {/* Modal Proyecto Mario */}
         <Dialog open={modalProyectoMario} onOpenChange={setModalProyectoMario}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-orange-700">
-                <Palette className="w-5 h-5" /> Proyecto Mario
+                <Palette className="w-5 h-5" /> Proyecto Mario (Detalle)
               </DialogTitle>
-              <DialogDescription>Total inscritos: {Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)}</DialogDescription>
+              <DialogDescription>Total inscritos: {Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)} · {Object.values(statsProyectoMario).filter(v => v.inscritos > 0).length} cursos activos</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => (
-                <div key={tipo} className="flex justify-between p-3 bg-orange-50 rounded">
-                  <span>{PROYECTO_MARIO_CICLO_CONFIG[tipo].label}</span>
-                  <span className="font-bold text-orange-700">{statsProyectoMario[tipo].inscritos}</span>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => {
+                const stats = statsProyectoMario[tipo]
+                const config = PROYECTO_MARIO_CICLO_CONFIG[tipo]
+                return (
+                  <div key={tipo} className="p-3 bg-orange-50 rounded-lg border border-orange-100">
+                    <p className="text-xs font-semibold text-orange-700 mb-2">{config.label}</p>
+                    {stats.inscritos > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-600">Inscritos</span>
+                          <span className="text-sm font-bold text-orange-800">{stats.inscritos}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-600">Última clase</span>
+                          <span className="text-sm font-medium text-gray-700">#{stats.ultimaClase} de {config.totalClases}</span>
+                        </div>
+                        {stats.ultimaClase > 0 && (
+                          <>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-green-600">Asistieron</span>
+                              <Badge className="bg-green-100 text-green-800 text-xs">{stats.asistieron}</Badge>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-red-600">Faltaron</span>
+                              <Badge className="bg-red-100 text-red-800 text-xs">{stats.faltaron}</Badge>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                              <div className="bg-orange-500 h-1.5 rounded-full" style={{ width: `${(stats.ultimaClase / config.totalClases) * 100}%` }}></div>
+                            </div>
+                            <p className="text-[9px] text-gray-400 text-right">{Math.round((stats.ultimaClase / config.totalClases) * 100)}% completado</p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 text-center py-3">Sin ciclo activo</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/proyecto-mario")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Proyecto Mario
@@ -2178,21 +1497,34 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <DialogTitle className="flex items-center gap-2 text-fuchsia-700">
                 <Cake className="w-5 h-5" /> Cumpleaños del Mes
               </DialogTitle>
-              <DialogDescription>Total: {statsCumpleanos.totalMes}</DialogDescription>
+              <DialogDescription>Total: {statsCumpleanos.totalMes} cumpleañeros</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-fuchsia-50 rounded">
-                <span>Total Cumpleaños</span>
-                <span className="font-bold text-fuchsia-700">{statsCumpleanos.totalMes}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-fuchsia-50 rounded-lg border border-fuchsia-100">
+                  <p className="text-[10px] text-fuchsia-600 font-medium">Total</p>
+                  <p className="text-2xl font-bold text-fuchsia-800">{statsCumpleanos.totalMes}</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Felicitados</p>
+                  <p className="text-2xl font-bold text-green-800">{statsCumpleanos.enviados}</p>
+                </div>
+                <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-100">
+                  <p className="text-[10px] text-orange-600 font-medium">Pendientes</p>
+                  <p className="text-2xl font-bold text-orange-800">{statsCumpleanos.pendientesEnvio}</p>
+                </div>
               </div>
-              <div className="flex justify-between p-3 bg-green-50 rounded">
-                <span>Felicitados</span>
-                <span className="font-bold text-green-700">{statsCumpleanos.enviados}</span>
-              </div>
-              <div className="flex justify-between p-3 bg-amber-50 rounded">
-                <span>Pendientes de enviar</span>
-                <span className="font-bold text-amber-700">{statsCumpleanos.pendientesEnvio}</span>
-              </div>
+              {statsCumpleanos.totalMes > 0 && (
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-600 mb-1">
+                    <span>Progreso de felicitaciones</span>
+                    <span>{Math.round((statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-fuchsia-500 h-2 rounded-full transition-all" style={{ width: `${(statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100}%` }}></div>
+                  </div>
+                </div>
+              )}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/cumpleanos")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Cumpleaños
@@ -2202,24 +1534,52 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
 
         {/* Modal Eventos */}
         <Dialog open={modalEventos} onOpenChange={setModalEventos}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-violet-700">
                 <CalendarDays className="w-5 h-5" /> Eventos / Encuentro
               </DialogTitle>
-              <DialogDescription>Eventos activos: {statsEventos.length}</DialogDescription>
+              <DialogDescription>Eventos activos: {statsEventos.length} · Total inscritos: {statsEventos.reduce((s, e) => s + e.inscritos, 0)}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              {statsEventos.length > 0 ? statsEventos.map((ev, i) => (
-                <div key={i} className="p-3 bg-violet-50 rounded">
-                  <p className="font-medium text-violet-800">{ev.nombre}</p>
-                  <p className="text-sm text-violet-600">Inscritos: {ev.inscritos}</p>
+              {statsEventos.length > 0 ? statsEventos.map((evento, i) => (
+                <div key={i} className="p-3 bg-violet-50 rounded-lg border border-violet-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-violet-700">{evento.nombre}</p>
+                    <Badge className="bg-violet-200 text-violet-900 text-[10px]">{evento.inscritos} inscritos</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-violet-800">{evento.inscritos}</p>
+                      <p className="text-[9px] text-violet-600">Inscritos</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-green-700">{evento.pagadosCompleto}</p>
+                      <p className="text-[9px] text-green-600">Pagado completo</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-orange-700">{evento.pendientesPago}</p>
+                      <p className="text-[9px] text-orange-600">Pendiente pago</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-emerald-700">${evento.totalRecaudado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[9px] text-emerald-600">Recaudado / ${evento.totalValor.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                  {evento.totalValor > 0 && (
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div className="bg-violet-500 h-1.5 rounded-full transition-all" style={{ width: `${Math.min((evento.totalRecaudado / evento.totalValor) * 100, 100)}%` }}></div>
+                      </div>
+                      <p className="text-[9px] text-gray-400 text-right mt-0.5">{Math.round((evento.totalRecaudado / evento.totalValor) * 100)}% recaudado</p>
+                    </div>
+                  )}
                 </div>
               )) : (
                 <p className="text-gray-500 text-center py-4">Sin eventos activos</p>
               )}
             </div>
-            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/encuentros")}>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/eventos")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Eventos
             </Button>
           </DialogContent>
@@ -2230,23 +1590,46 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-cyan-700">
-                <ClipboardCheck className="w-5 h-5" /> Asistencia Servidores
+                <ClipboardCheck className="w-5 h-5" /> Asistencia Servidores por Ministerio
               </DialogTitle>
-              <DialogDescription>Total asistieron: {Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</DialogDescription>
+              <DialogDescription>Total registros: {Object.values(statsServidores).reduce((s, v) => s + v.total, 0)} · Asistieron: {Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)} · Faltaron: {Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              {MINISTERIOS_SERVIDORES.map(min => {
-                const stats = statsServidores[min.key] || { asistieron: 0, faltaron: 0 }
-                return (
-                  <div key={min.key} className="flex justify-between items-center p-3 bg-cyan-50 rounded">
-                    <span>{min.label}</span>
-                    <div className="flex gap-4">
-                      <span className="text-green-600 font-semibold">✓ {stats.asistieron}</span>
-                      <span className="text-red-600 font-semibold">✗ {stats.faltaron}</span>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-2 text-gray-600 font-medium">Ministerio</th>
+                    <th className="text-center py-2 px-1 text-green-700 font-medium">Asistieron</th>
+                    <th className="text-center py-2 px-1 text-red-700 font-medium">Faltaron</th>
+                    <th className="text-center py-2 px-1 text-blue-700 font-medium">Justificaron</th>
+                    <th className="text-center py-2 px-1 text-amber-700 font-medium">Atrasados</th>
+                    <th className="text-center py-2 px-1 text-gray-700 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MINISTERIOS_SERVIDORES.map(min => {
+                    const s = statsServidores[min.key] || { total: 0, asistieron: 0, faltaron: 0, justificaron: 0, atrasados: 0 }
+                    return (
+                      <tr key={min.key} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-1.5 px-2 text-gray-800 font-medium">{min.label}</td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-green-100 text-green-800 text-[10px]">{s.asistieron}</Badge></td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-red-100 text-red-800 text-[10px]">{s.faltaron}</Badge></td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-blue-100 text-blue-800 text-[10px]">{s.justificaron}</Badge></td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-amber-100 text-amber-800 text-[10px]">{s.atrasados}</Badge></td>
+                        <td className="text-center py-1.5 px-1 font-semibold text-gray-700">{s.total}</td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold">
+                    <td className="py-2 px-2 text-gray-900">TOTAL</td>
+                    <td className="text-center py-2 px-1 text-green-800">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</td>
+                    <td className="text-center py-2 px-1 text-red-800">{Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)}</td>
+                    <td className="text-center py-2 px-1 text-blue-800">{Object.values(statsServidores).reduce((s, v) => s + v.justificaron, 0)}</td>
+                    <td className="text-center py-2 px-1 text-amber-800">{Object.values(statsServidores).reduce((s, v) => s + v.atrasados, 0)}</td>
+                    <td className="text-center py-2 px-1 text-gray-900">{Object.values(statsServidores).reduce((s, v) => s + v.total, 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </DialogContent>
         </Dialog>
@@ -2258,24 +1641,91 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <DialogTitle className="flex items-center gap-2 text-amber-700">
                 <AlertTriangle className="w-5 h-5" /> Atrasados
               </DialogTitle>
-              <DialogDescription>Total: {statsAtrasados.total}</DialogDescription>
+              <DialogDescription>Total: {statsAtrasados.total} personas</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-amber-50 rounded">
-                <span>Total Atrasados</span>
-                <span className="font-bold text-amber-700">{statsAtrasados.total}</span>
-              </div>
-              <div className="flex justify-between p-3 bg-red-50 rounded">
-                <span>Sin gestionar</span>
-                <span className="font-bold text-red-700">{statsAtrasados.sinGestionar}</span>
-              </div>
-              <div className="flex justify-between p-3 bg-green-50 rounded">
-                <span>Gestionados</span>
-                <span className="font-bold text-green-700">{statsAtrasados.total - statsAtrasados.sinGestionar}</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <p className="text-[10px] text-amber-600 font-medium">Total</p>
+                  <p className="text-2xl font-bold text-amber-800">{statsAtrasados.total}</p>
+                </div>
+                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                  <p className="text-[10px] text-red-600 font-medium">Sin Gestionar</p>
+                  <p className="text-2xl font-bold text-red-800">{statsAtrasados.sinGestionar}</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Gestionados</p>
+                  <p className="text-2xl font-bold text-green-800">{statsAtrasados.total - statsAtrasados.sinGestionar}</p>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-[10px] text-gray-600 font-medium">% Gestión</p>
+                  <p className="text-2xl font-bold text-gray-800">{statsAtrasados.total > 0 ? Math.round(((statsAtrasados.total - statsAtrasados.sinGestionar) / statsAtrasados.total) * 100) : 0}%</p>
+                </div>
               </div>
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/atrasados")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Atrasados
+            </Button>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal Asistencia al Culto */}
+        <Dialog open={modalAsistenciaCulto} onOpenChange={setModalAsistenciaCulto}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-purple-700">
+                <ClipboardCheck className="w-5 h-5" /> Asistencia al Culto
+              </DialogTitle>
+              <DialogDescription>Registro de asistencia dominical del mes</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Asistieron</p>
+                  <p className="text-2xl font-bold text-green-800">{statsAsistenciaCulto.asistieron}</p>
+                </div>
+                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                  <p className="text-[10px] text-red-600 font-medium">Faltaron</p>
+                  <p className="text-2xl font-bold text-red-800">{statsAsistenciaCulto.faltaron}</p>
+                </div>
+                <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <p className="text-[10px] text-amber-600 font-medium">En Seguimiento</p>
+                  <p className="text-2xl font-bold text-amber-800">{statsAsistenciaCulto.enSeguimiento}</p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+                  <p className="text-[10px] text-purple-600 font-medium">Sin Gestionar</p>
+                  <p className="text-2xl font-bold text-purple-800">{statsAsistenciaCulto.sinGestionar}</p>
+                </div>
+              </div>
+              {(statsAsistenciaCulto.asistieron + statsAsistenciaCulto.faltaron) > 0 && (
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-600 mb-1">
+                    <span>% Asistencia</span>
+                    <span>{Math.round((statsAsistenciaCulto.asistieron / (statsAsistenciaCulto.asistieron + statsAsistenciaCulto.faltaron)) * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-purple-500 h-2 rounded-full transition-all" style={{ width: `${(statsAsistenciaCulto.asistieron / (statsAsistenciaCulto.asistieron + statsAsistenciaCulto.faltaron)) * 100}%` }}></div>
+                  </div>
+                </div>
+              )}
+              {statsAsistenciaCulto.enSeguimiento > 0 && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-700">Seguimiento (2+ faltas en el mes)</p>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-amber-800">{statsAsistenciaCulto.enSeguimiento - statsAsistenciaCulto.sinGestionar}</p>
+                      <p className="text-[9px] text-green-600">Gestionados</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-red-700">{statsAsistenciaCulto.sinGestionar}</p>
+                      <p className="text-[9px] text-red-600">Sin gestionar</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/asistencia-culto")}>
+              <ExternalLink className="w-4 h-4 mr-2" /> Ir a Asistencia al Culto
             </Button>
           </DialogContent>
         </Dialog>

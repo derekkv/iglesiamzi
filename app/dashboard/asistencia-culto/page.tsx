@@ -34,6 +34,7 @@ import {
   getAsistenciaMes,
   getSeguimientoMes,
   registrarAsistencia,
+  eliminarAsistencia,
   gestionarSeguimiento,
   eliminarSeguimiento,
   moverASeguimientoSiCorresponde,
@@ -172,6 +173,23 @@ function AsistenciaCultoContent({ canEdit }: { canEdit: boolean }) {
         toast.info(`${persona.apellido}, ${persona.nombre} pasó a Seguimiento (2+ faltas)`)
         loadData(true) // Refrescar seguimiento
       }
+    }
+  }
+
+  const handleBorrarAsistencia = async (persona: PersonaCulto, fechaDomingo: string) => {
+    if (!canEdit) return
+    // Optimistic: quitar del state local
+    setRegistros((prev) => prev.filter((r) => !(r.persona_id === persona.id && r.fuente === persona.fuente && r.fecha_domingo === fechaDomingo)))
+
+    const result = await eliminarAsistencia({
+      persona_id: persona.id,
+      fuente: persona.fuente,
+      fecha_domingo: fechaDomingo,
+    })
+
+    if (!result.success) {
+      toast.error(result.error || "Error al borrar")
+      loadData(true) // Revertir
     }
   }
 
@@ -365,11 +383,12 @@ function AsistenciaCultoContent({ canEdit }: { canEdit: boolean }) {
                               const value = reg?.asistio === true ? "asistio" : reg?.asistio === false ? "falto" : ""
                               return (
                                 <td key={fechaDomingo} className="px-1 py-2.5 text-center">
-                                  <Select value={value} onValueChange={(v) => { if (canEdit) handleMarcar(persona, fechaDomingo, v === "asistio") }} disabled={!canEdit}>
+                                  <Select value={value} onValueChange={(v) => { if (canEdit) { if (v === "ninguno") { handleBorrarAsistencia(persona, fechaDomingo) } else { handleMarcar(persona, fechaDomingo, v === "asistio") } } }} disabled={!canEdit}>
                                     <SelectTrigger className="h-8 w-[80px] mx-auto text-xs">
                                       <SelectValue placeholder="—" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                      <SelectItem value="ninguno"><span className="flex items-center gap-1 text-gray-500">— Vacío</span></SelectItem>
                                       <SelectItem value="asistio"><span className="flex items-center gap-1 text-green-700"><CheckCircle2 className="h-3 w-3" /> Asistió</span></SelectItem>
                                       <SelectItem value="falto"><span className="flex items-center gap-1 text-red-700"><XCircle className="h-3 w-3" /> Faltó</span></SelectItem>
                                     </SelectContent>

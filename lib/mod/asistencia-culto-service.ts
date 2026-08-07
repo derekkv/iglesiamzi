@@ -195,6 +195,25 @@ export async function registrarAsistencia(params: {
 }
 
 /**
+ * Elimina un registro de asistencia de una persona en un domingo.
+ */
+export async function eliminarAsistencia(params: {
+  persona_id: number
+  fuente: string
+  fecha_domingo: string
+}): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase
+    .from("asistencia_culto")
+    .delete()
+    .eq("persona_id", params.persona_id)
+    .eq("fuente", params.fuente)
+    .eq("fecha_domingo", params.fecha_domingo)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+/**
  * Obtiene todos los registros de asistencia para un mes.
  */
 export async function getAsistenciaMes(mesId: string): Promise<RegistroAsistencia[]> {

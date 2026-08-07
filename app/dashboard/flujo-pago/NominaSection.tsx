@@ -37,6 +37,7 @@ interface NominaRecord {
   id: number; mes_id: string; cedula: string; nombre: string
   telefono: string | null; email: string | null
   valor_sueldo: number; descuento: string | null; descuento_valor: number; descuento_motivo: string | null
+  descuento_quincenas_total: number | null; descuento_quincenas_aplicadas: number | null
   valor_a_pagar: number; categoria_principal: string; detalle: string | null
   primera_quincena_pagada: boolean; primera_quincena_valor: number | null
   primera_quincena_fecha: string | null; primera_quincena_metodo: string | null
@@ -78,6 +79,7 @@ export function NominaSection() {
   const emptyForm = {
     cedula: "", nombre: "", telefono: "", email: "",
     valor_sueldo: "", descuento: "", descuento_valor: "0", descuento_motivo: "",
+    descuento_quincenas_total: "", descuento_quincenas_aplicadas: "0",
     detalle: "",
     primera_quincena_pagada: false, primera_quincena_valor: "", primera_quincena_fecha: "", primera_quincena_metodo: "Transferencia",
     segunda_quincena_pagada: false, segunda_quincena_valor: "", segunda_quincena_fecha: "", segunda_quincena_metodo: "Transferencia",
@@ -224,24 +226,45 @@ export function NominaSection() {
 
       if (previousRecords.length === 0) return
 
-      const inserts = previousRecords.map(r => ({
-        mes_id: currentMonth.id,
-        cedula: r.cedula,
-        nombre: r.nombre,
-        telefono: r.telefono,
-        email: r.email,
-        valor_sueldo: r.valor_sueldo,
-        descuento: null,
-        descuento_valor: 0,
-        descuento_motivo: null,
-        valor_a_pagar: r.valor_sueldo,
-        categoria_principal: "PAGO DE NOMINA",
-        detalle: r.detalle,
-        primera_quincena_pagada: false, primera_quincena_valor: null, primera_quincena_fecha: null, primera_quincena_metodo: null,
-        segunda_quincena_pagada: false, segunda_quincena_valor: null, segunda_quincena_fecha: null, segunda_quincena_metodo: null,
-        movilizacion_con_quincenas: false, movilizacion_pagada: false, movilizacion_valor: null, movilizacion_fecha: null, movilizacion_metodo: null,
-        movilizacion_segunda_pagada: false, movilizacion_segunda_valor: null, movilizacion_segunda_fecha: null, movilizacion_segunda_metodo: null,
-      }))
+      const inserts = previousRecords.map(r => {
+        // Determinar si el descuento tiene quincenas pendientes y debe copiarse
+        const tieneDescuentoConQuincenas = r.descuento && r.descuento !== "ninguno" &&
+          r.descuento_quincenas_total && r.descuento_quincenas_total > 0 &&
+          (r.descuento_quincenas_aplicadas || 0) < r.descuento_quincenas_total
+        
+        // Si tiene descuento con quincenas pendientes, copiar el descuento
+        const descuento = tieneDescuentoConQuincenas ? r.descuento : null
+        const descuento_valor = tieneDescuentoConQuincenas ? r.descuento_valor : 0
+        const descuento_motivo = tieneDescuentoConQuincenas ? r.descuento_motivo : null
+        const descuento_quincenas_total = tieneDescuentoConQuincenas ? r.descuento_quincenas_total : null
+        const descuento_quincenas_aplicadas = tieneDescuentoConQuincenas ? (r.descuento_quincenas_aplicadas || 0) : null
+        const valor_a_pagar = Math.max(0, r.valor_sueldo - descuento_valor)
+
+        // Preservar transporte: si la persona tenía movilizacion_valor, mantenerlo
+        const teniaTransporte = Number(r.movilizacion_valor || 0) > 0
+        const movilizacion_valor = teniaTransporte ? r.movilizacion_valor : null
+
+        return {
+          mes_id: currentMonth.id,
+          cedula: r.cedula,
+          nombre: r.nombre,
+          telefono: r.telefono,
+          email: r.email,
+          valor_sueldo: r.valor_sueldo,
+          descuento,
+          descuento_valor,
+          descuento_motivo,
+          descuento_quincenas_total,
+          descuento_quincenas_aplicadas,
+          valor_a_pagar,
+          categoria_principal: "PAGO DE NOMINA",
+          detalle: r.detalle,
+          primera_quincena_pagada: false, primera_quincena_valor: null, primera_quincena_fecha: null, primera_quincena_metodo: null,
+          segunda_quincena_pagada: false, segunda_quincena_valor: null, segunda_quincena_fecha: null, segunda_quincena_metodo: null,
+          movilizacion_con_quincenas: false, movilizacion_pagada: false, movilizacion_valor, movilizacion_fecha: null, movilizacion_metodo: null,
+          movilizacion_segunda_pagada: false, movilizacion_segunda_valor: null, movilizacion_segunda_fecha: null, movilizacion_segunda_metodo: null,
+        }
+      })
 
       const { error, data: inserted } = await supabase.from("nomina").insert(inserts).select()
       if (error) throw error
@@ -350,6 +373,8 @@ export function NominaSection() {
         telefono: formData.telefono || null, email: formData.email || null,
         valor_sueldo: parseFloat(formData.valor_sueldo), descuento: formData.descuento || null,
         descuento_valor: parseFloat(formData.descuento_valor) || 0, descuento_motivo: formData.descuento_motivo || null,
+        descuento_quincenas_total: formData.descuento_quincenas_total ? parseInt(formData.descuento_quincenas_total) : null,
+        descuento_quincenas_aplicadas: formData.descuento_quincenas_aplicadas ? parseInt(formData.descuento_quincenas_aplicadas) : 0,
         valor_a_pagar: vap, categoria_principal: "PAGO DE NOMINA", detalle: formData.detalle || null,
         primera_quincena_pagada: esTransporte ? false : formData.primera_quincena_pagada,
         primera_quincena_valor: (!esTransporte && formData.primera_quincena_pagada) ? parseFloat(formData.primera_quincena_valor) || 0 : null,
@@ -404,6 +429,8 @@ export function NominaSection() {
       cedula: record.cedula, nombre: record.nombre, telefono: record.telefono || "", email: record.email || "",
       valor_sueldo: (record.valor_sueldo || 0).toString(), descuento: record.descuento || "",
       descuento_valor: (record.descuento_valor || 0).toString(), descuento_motivo: record.descuento_motivo || "",
+      descuento_quincenas_total: record.descuento_quincenas_total?.toString() || "",
+      descuento_quincenas_aplicadas: (record.descuento_quincenas_aplicadas || 0).toString(),
       detalle: record.detalle || "",
       primera_quincena_pagada: record.primera_quincena_pagada,
       primera_quincena_valor: record.primera_quincena_valor?.toString() || "",
@@ -437,6 +464,8 @@ export function NominaSection() {
         cedula: formData.cedula, nombre: formData.nombre, telefono: formData.telefono || null, email: formData.email || null,
         valor_sueldo: parseFloat(formData.valor_sueldo), descuento: formData.descuento || null,
         descuento_valor: parseFloat(formData.descuento_valor) || 0, descuento_motivo: formData.descuento_motivo || null,
+        descuento_quincenas_total: formData.descuento_quincenas_total ? parseInt(formData.descuento_quincenas_total) : null,
+        descuento_quincenas_aplicadas: formData.descuento_quincenas_aplicadas ? parseInt(formData.descuento_quincenas_aplicadas) : 0,
         valor_a_pagar: vap, categoria_principal: "PAGO DE NOMINA", detalle: formData.detalle || null,
         primera_quincena_pagada: esTransporte ? false : formData.primera_quincena_pagada,
         primera_quincena_valor: (!esTransporte && formData.primera_quincena_pagada) ? parseFloat(formData.primera_quincena_valor) || 0 : null,
@@ -516,6 +545,27 @@ export function NominaSection() {
         await registerEgreso(formData.nombre, v, formData.movilizacion_segunda_fecha || new Date().toISOString().split("T")[0], formData.movilizacion_segunda_metodo, "2da quincena movilización", formData.detalle)
       } else if ((!formData.movilizacion_con_quincenas || !formData.movilizacion_segunda_pagada) && editingRecord.movilizacion_segunda_pagada) {
         await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena movilización de ${editingRecord.nombre}%`)
+      }
+
+      // Actualizar quincenas aplicadas del descuento cuando cambian pagos
+      if (formData.descuento && formData.descuento !== "ninguno" && formData.descuento_quincenas_total && parseInt(formData.descuento_quincenas_total) > 0) {
+        let cambio = 0
+        if (esTransporte) {
+          // Transporte: marcar/desmarcar transporte cuenta como 1 quincena aplicada
+          if (formData.movilizacion_pagada && !editingRecord.movilizacion_pagada) cambio += 1
+          if (!formData.movilizacion_pagada && editingRecord.movilizacion_pagada) cambio -= 1
+        } else {
+          // Quincenas normales
+          if (formData.primera_quincena_pagada && !editingRecord.primera_quincena_pagada) cambio++
+          if (!formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) cambio--
+          if (formData.segunda_quincena_pagada && !editingRecord.segunda_quincena_pagada) cambio++
+          if (!formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) cambio--
+        }
+        if (cambio !== 0) {
+          const actual = parseInt(formData.descuento_quincenas_aplicadas) || 0
+          const nuevasAplicadas = Math.max(0, Math.min(actual + cambio, parseInt(formData.descuento_quincenas_total)))
+          await supabase.from("nomina").update({ descuento_quincenas_aplicadas: nuevasAplicadas }).eq("id", editingRecord.id)
+        }
       }
 
       toast.success("Nómina actualizada"); setShowEditModal(false); setEditingRecord(null); resetForm(); loadNomina(true)
@@ -613,7 +663,7 @@ export function NominaSection() {
           <Select value={formData.descuento} onValueChange={(v) => {
             if (v === "ninguno") {
               updateQuincenas(formData.valor_sueldo, "0")
-              setFormData(prev => ({ ...prev, descuento: v, descuento_motivo: "" }))
+              setFormData(prev => ({ ...prev, descuento: v, descuento_motivo: "", descuento_quincenas_total: "", descuento_quincenas_aplicadas: "0" }))
             } else {
               setFormData({ ...formData, descuento: v })
             }
@@ -628,9 +678,19 @@ export function NominaSection() {
           </Select>
         </div>
         {formData.descuento && formData.descuento !== "ninguno" && (
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label className="text-xs">Valor del descuento</Label><Input type="number" value={formData.descuento_valor} onChange={(e) => updateQuincenas(formData.valor_sueldo, e.target.value)} placeholder="0.00" /></div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label className="text-xs">Valor del descuento</Label><Input type="number" value={formData.descuento_valor} onChange={(e) => updateQuincenas(formData.valor_sueldo, e.target.value)} placeholder="0.00" /></div>
+              <div><Label className="text-xs">Quincenas a aplicar</Label><Input type="number" min="1" value={formData.descuento_quincenas_total} onChange={(e) => setFormData({ ...formData, descuento_quincenas_total: e.target.value })} placeholder="Ej: 6" /></div>
+              <div><Label className="text-xs">Quincenas aplicadas</Label><Input type="number" min="0" value={formData.descuento_quincenas_aplicadas} onChange={(e) => setFormData({ ...formData, descuento_quincenas_aplicadas: e.target.value })} placeholder="0" disabled /></div>
+            </div>
             <div><Label className="text-xs">Motivo</Label><Input value={formData.descuento_motivo} onChange={(e) => setFormData({ ...formData, descuento_motivo: e.target.value })} placeholder="Razón del descuento..." /></div>
+            {formData.descuento_quincenas_total && parseInt(formData.descuento_quincenas_total) > 0 && (
+              <p className="text-xs text-red-600">
+                ⏱️ Descuento por {formData.descuento_quincenas_total} quincena{parseInt(formData.descuento_quincenas_total) > 1 ? "s" : ""} — aplicadas: {formData.descuento_quincenas_aplicadas || "0"}/{formData.descuento_quincenas_total}
+                {parseInt(formData.descuento_quincenas_aplicadas || "0") >= parseInt(formData.descuento_quincenas_total) && <span className="ml-2 text-green-600 font-medium">✓ Completado</span>}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -850,7 +910,7 @@ export function NominaSection() {
                           <tr key={r.id} className="border-b hover:bg-gray-50">
                             <td className="p-2 font-medium">
                               <div>{r.nombre}</div>
-                              {r.descuento && r.descuento !== "ninguno" && <div className="text-[10px] text-red-500">{r.descuento}{r.descuento_motivo ? `: ${r.descuento_motivo}` : ""}</div>}
+                              {r.descuento && r.descuento !== "ninguno" && <div className="text-[10px] text-red-500">{r.descuento}{r.descuento_motivo ? `: ${r.descuento_motivo}` : ""}{r.descuento_quincenas_total ? ` (${r.descuento_quincenas_aplicadas || 0}/${r.descuento_quincenas_total} quinc.)` : ""}</div>}
                             </td>
                             <td className="p-2 text-xs">{r.detalle || "-"}</td>
                             <td className="p-2 text-right">${Number(r.valor_sueldo || 0).toFixed(2)}</td>

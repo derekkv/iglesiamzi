@@ -106,6 +106,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
   const [modalEventos, setModalEventos] = useState(false)
   const [modalServidores, setModalServidores] = useState(false)
   const [modalAtrasados, setModalAtrasados] = useState(false)
+  const [modalAsistenciaCulto, setModalAsistenciaCulto] = useState(false)
 
   useEffect(() => { loadEstadisticas() }, [])
   useEffect(() => { if (currentMonth?.id) loadFinanciero() }, [currentMonth])
@@ -382,7 +383,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         <div className="grid grid-cols-2 gap-4">
           <Card className="border-cyan-200 bg-cyan-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalServidores(true)}><CardContent className="pt-5 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-cyan-700">Asistencia Servidores</p><p className="text-xl font-bold text-cyan-700">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</p><p className="text-[9px] text-cyan-600">asistieron · {Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)} faltaron</p></div><ClipboardCheck className="w-6 h-6 text-cyan-400" /></div></CardContent></Card>
           <Card className="border-amber-200 bg-amber-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalAtrasados(true)}><CardContent className="pt-5 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-amber-700">Atrasados</p><p className="text-xl font-bold text-amber-700">{statsAtrasados.total}</p><p className="text-[9px] text-red-600">{statsAtrasados.sinGestionar} sin gestionar · {statsAtrasados.total - statsAtrasados.sinGestionar} gestionados</p></div><AlertTriangle className="w-6 h-6 text-amber-400" /></div></CardContent></Card>
-          <Card className="border-purple-200 bg-purple-50/50"><CardContent className="pt-5 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-purple-700">Asistencia al Culto</p><p className="text-xl font-bold text-purple-700">{statsAsistenciaCulto.asistieron}</p><p className="text-[9px] text-purple-600">{statsAsistenciaCulto.faltaron} faltaron · {statsAsistenciaCulto.enSeguimiento} seguimiento</p>{statsAsistenciaCulto.sinGestionar > 0 && <p className="text-[9px] text-red-600">{statsAsistenciaCulto.sinGestionar} sin gestionar</p>}</div><ClipboardCheck className="w-6 h-6 text-purple-400" /></div></CardContent></Card>
+          <Card className="border-purple-200 bg-purple-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalAsistenciaCulto(true)}><CardContent className="pt-5 pb-4"><div className="flex items-center justify-between"><div><p className="text-xs text-purple-700">Asistencia al Culto</p><p className="text-xl font-bold text-purple-700">{statsAsistenciaCulto.asistieron}</p><p className="text-[9px] text-purple-600">{statsAsistenciaCulto.faltaron} faltaron · {statsAsistenciaCulto.enSeguimiento} seguimiento</p>{statsAsistenciaCulto.sinGestionar > 0 && <p className="text-[9px] text-red-600">{statsAsistenciaCulto.sinGestionar} sin gestionar</p>}</div><ClipboardCheck className="w-6 h-6 text-purple-400" /></div></CardContent></Card>
         </div>
 
 
@@ -580,28 +581,58 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
               <DialogTitle className="flex items-center gap-2 text-amber-700"><DollarSign className="w-5 h-5" /> Nómina del Mes</DialogTitle>
               <DialogDescription>A pagar: ${totalNomina.toLocaleString("es-CO", { minimumFractionDigits: 2 })} · Pagado: ${nominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })} · {nominaPersonas} personas</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              {nominaData.map((nom, i) => (
-                <div key={i} className="p-3 bg-amber-50 rounded border border-amber-100">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-amber-800">{nom.nombre || "Sin nombre"}</p>
-                      <p className="text-xs text-amber-600 mt-0.5">{nom.cargo || nom.ministerio || "Sin cargo"}</p>
+            {(() => {
+              const pendientes1ra = nominaData.filter((r: any) => !r.primera_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
+              const pendientes2da = nominaData.filter((r: any) => !r.segunda_quincena_pagada && !(Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas))
+              const pendientesTransporte = nominaData.filter((r: any) => (Number(r.movilizacion_valor || 0) > 0 || r.movilizacion_pagada) && !r.movilizacion_pagada)
+              const totalTransportePagado = nominaData.reduce((s: number, r: any) => s + (r.movilizacion_pagada ? Number(r.movilizacion_valor || 0) : 0) + (r.movilizacion_segunda_pagada ? Number(r.movilizacion_segunda_valor || 0) : 0), 0)
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                      <p className="text-xs text-amber-600">Total a Pagar</p>
+                      <p className="text-lg font-bold text-amber-800">${totalNomina.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
                     </div>
-                    <div className="text-right ml-3">
-                      <p className="font-bold text-amber-700">${Number(nom.valor_a_pagar || 0).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
-                      <p className="text-xs text-gray-500">
-                        {nom.primera_quincena_pagada && nom.segunda_quincena_pagada ? "✓ Pagado completo" : 
-                         nom.primera_quincena_pagada ? "1ra quincena pagada" : 
-                         nom.segunda_quincena_pagada ? "2da quincena pagada" : "Pendiente"}
-                      </p>
+                    <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                      <p className="text-xs text-green-600">Pagado Quincenas</p>
+                      <p className="text-lg font-bold text-green-800">${nominaPagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+                      <p className="text-xs text-purple-600">Transporte Pagado</p>
+                      <p className="text-lg font-bold text-purple-800">${totalTransportePagado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                      <p className="text-xs text-red-600">Pendiente Total</p>
+                      <p className="text-lg font-bold text-red-800">${(totalNomina - nominaPagado).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {pendientes1ra.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-blue-700 mb-2">Falta 1ra Quincena ({pendientes1ra.length})</p>
+                        <div className="space-y-1">{pendientes1ra.map((r: any, i: number) => (<div key={i} className="flex justify-between text-xs"><span className="text-gray-700 truncate">{r.nombre}</span><span className="text-blue-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span></div>))}</div>
+                      </div>
+                    )}
+                    {pendientes2da.length > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-green-700 mb-2">Falta 2da Quincena ({pendientes2da.length})</p>
+                        <div className="space-y-1">{pendientes2da.map((r: any, i: number) => (<div key={i} className="flex justify-between text-xs"><span className="text-gray-700 truncate">{r.nombre}</span><span className="text-green-700 font-medium">${(Number(r.valor_a_pagar || 0) / 2).toFixed(2)}</span></div>))}</div>
+                      </div>
+                    )}
+                    {pendientesTransporte.length > 0 && (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-purple-700 mb-2">Falta Transporte ({pendientesTransporte.length})</p>
+                        <div className="space-y-1">{pendientesTransporte.map((r: any, i: number) => (<div key={i} className="flex justify-between text-xs"><span className="text-gray-700 truncate">{r.nombre}</span><span className="text-purple-700 font-medium">${Number(r.movilizacion_valor || 0).toFixed(2)}</span></div>))}</div>
+                      </div>
+                    )}
+                  </div>
+                  {pendientes1ra.length === 0 && pendientes2da.length === 0 && pendientesTransporte.length === 0 && (
+                    <p className="text-sm text-green-600 text-center font-medium">✓ Toda la nómina está al día</p>
+                  )}
                 </div>
-              ))}
-              {nominaData.length === 0 && <p className="text-center text-gray-500 py-4">No hay registros de nómina</p>}
-            </div>
-            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/pago-diario")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Nómina</Button>
+              )
+            })()}
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/flujo-pago")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Flujo de Pago</Button>
           </DialogContent>
         </Dialog>
 
@@ -732,40 +763,128 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-emerald-700"><Home className="w-5 h-5" /> Células</DialogTitle>
-              <DialogDescription>Miembros activos: {statsCelulas.totalMiembros}</DialogDescription>
+              <DialogDescription>Miembros activos: {statsCelulas.totalMiembros} · Asistieron esta semana: {statsCelulas.asistieronSemana}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-emerald-50 rounded"><span>Total Miembros</span><span className="font-bold text-emerald-700">{statsCelulas.totalMiembros}</span></div>
-              <div className="flex justify-between p-3 bg-green-50 rounded"><span>Asistieron esta semana</span><span className="font-bold text-green-700">{statsCelulas.asistieronSemana}</span></div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <p className="text-[10px] text-emerald-600 font-medium">Total Miembros</p>
+                  <p className="text-3xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p>
+                  <p className="text-[9px] text-emerald-500">registrados en células</p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Asistieron esta Semana</p>
+                  <p className="text-3xl font-bold text-green-800">{statsCelulas.asistieronSemana}</p>
+                  <p className="text-[9px] text-green-500">última semana registrada</p>
+                </div>
+              </div>
+              {statsCelulas.totalMiembros > 0 && (
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-600 mb-1"><span>% Asistencia semanal</span><span>{Math.round((statsCelulas.asistieronSemana / statsCelulas.totalMiembros) * 100)}%</span></div>
+                  <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${Math.min((statsCelulas.asistieronSemana / statsCelulas.totalMiembros) * 100, 100)}%` }}></div></div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-center">
+                  <p className="text-[10px] text-amber-600 font-medium">No asistieron</p>
+                  <p className="text-xl font-bold text-amber-800">{Math.max(0, statsCelulas.totalMiembros - statsCelulas.asistieronSemana)}</p>
+                </div>
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-center">
+                  <p className="text-[10px] text-blue-600 font-medium">% Ausencia</p>
+                  <p className="text-xl font-bold text-blue-800">{statsCelulas.totalMiembros > 0 ? Math.round(((statsCelulas.totalMiembros - statsCelulas.asistieronSemana) / statsCelulas.totalMiembros) * 100) : 0}%</p>
+                </div>
+              </div>
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/celulas")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Células</Button>
           </DialogContent>
         </Dialog>
 
         <Dialog open={modalRedil} onOpenChange={setModalRedil}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-lime-700"><Heart className="w-5 h-5" /> Redil - Ayuda Social</DialogTitle>
-              <DialogDescription>Entregados este mes: {statsRedil.entregadosMes}</DialogDescription>
+              <DialogDescription>Total casos: {statsRedil.totalCasos} · Entregados este mes: {statsRedil.entregadosMes}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-lime-50 rounded"><span>Entregados este mes</span><span className="font-bold text-lime-700">{statsRedil.entregadosMes}</span></div>
-              <div className="flex justify-between p-3 bg-amber-50 rounded"><span>Pendientes</span><span className="font-bold text-amber-700">{statsRedil.pendientes}</span></div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-3 bg-lime-50 rounded-lg border border-lime-100">
+                  <p className="text-[10px] text-lime-600 font-medium">Entregados (semana)</p>
+                  <p className="text-2xl font-bold text-lime-800">{statsRedil.entregadosSemana}</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Entregados (mes)</p>
+                  <p className="text-2xl font-bold text-green-800">{statsRedil.entregadosMes}</p>
+                </div>
+                <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                  <p className="text-[10px] text-yellow-600 font-medium">Solicitudes Pendientes</p>
+                  <p className="text-2xl font-bold text-yellow-800">{statsRedil.pendientes}</p>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-[10px] text-gray-600 font-medium">Total Histórico</p>
+                  <p className="text-2xl font-bold text-gray-800">{statsRedil.totalCasos}</p>
+                </div>
+              </div>
+              {Object.keys(statsRedil.porTipo).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Ayudas entregadas por tipo:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.entries(statsRedil.porTipo).sort(([, a], [, b]) => b - a).map(([tipo, cantidad]) => {
+                      const tipoInfo = [
+                        { value: "canasta", label: "Canasta/Víveres", icon: "🧺" },
+                        { value: "medicinas", label: "Medicinas", icon: "💊" },
+                        { value: "ropa", label: "Ropa", icon: "🧥" },
+                        { value: "panales", label: "Pañales", icon: "👶" },
+                        { value: "utiles_escolares", label: "Útiles", icon: "📚" },
+                        { value: "ayuda_economica", label: "Económica", icon: "💰" },
+                        { value: "otro", label: "Otro", icon: "📦" },
+                      ].find(t => t.value === tipo)
+                      return (
+                        <div key={tipo} className="flex items-center gap-2 p-2 bg-white rounded border border-gray-100">
+                          <span className="text-sm">{tipoInfo?.icon || "📦"}</span>
+                          <div><p className="text-[10px] text-gray-600">{tipoInfo?.label || tipo}</p><p className="text-sm font-bold text-gray-800">{cantidad}</p></div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/redil-ayuda-social")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Redil</Button>
           </DialogContent>
         </Dialog>
 
         <Dialog open={modalProyectoMario} onOpenChange={setModalProyectoMario}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-orange-700"><Palette className="w-5 h-5" /> Proyecto Mario</DialogTitle>
-              <DialogDescription>Total inscritos: {Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)}</DialogDescription>
+              <DialogTitle className="flex items-center gap-2 text-orange-700"><Palette className="w-5 h-5" /> Proyecto Mario (Detalle)</DialogTitle>
+              <DialogDescription>Total inscritos: {Object.values(statsProyectoMario).reduce((s, v) => s + v.inscritos, 0)} · {Object.values(statsProyectoMario).filter(v => v.inscritos > 0).length} cursos activos</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => (
-                <div key={tipo} className="flex justify-between p-3 bg-orange-50 rounded"><span>{PROYECTO_MARIO_CICLO_CONFIG[tipo].label}</span><span className="font-bold text-orange-700">{statsProyectoMario[tipo].inscritos}</span></div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => {
+                const stats = statsProyectoMario[tipo]
+                const config = PROYECTO_MARIO_CICLO_CONFIG[tipo]
+                return (
+                  <div key={tipo} className="p-3 bg-orange-50 rounded-lg border border-orange-100">
+                    <p className="text-xs font-semibold text-orange-700 mb-2">{config.label}</p>
+                    {stats.inscritos > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center"><span className="text-[10px] text-gray-600">Inscritos</span><span className="text-sm font-bold text-orange-800">{stats.inscritos}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-[10px] text-gray-600">Última clase</span><span className="text-sm font-medium text-gray-700">#{stats.ultimaClase} de {config.totalClases}</span></div>
+                        {stats.ultimaClase > 0 && (
+                          <>
+                            <div className="flex justify-between items-center"><span className="text-[10px] text-green-600">Asistieron</span><Badge className="bg-green-100 text-green-800 text-xs">{stats.asistieron}</Badge></div>
+                            <div className="flex justify-between items-center"><span className="text-[10px] text-red-600">Faltaron</span><Badge className="bg-red-100 text-red-800 text-xs">{stats.faltaron}</Badge></div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1"><div className="bg-orange-500 h-1.5 rounded-full" style={{ width: `${(stats.ultimaClase / config.totalClases) * 100}%` }}></div></div>
+                            <p className="text-[9px] text-gray-400 text-right">{Math.round((stats.ultimaClase / config.totalClases) * 100)}% completado</p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 text-center py-3">Sin ciclo activo</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/proyecto-mario-belleza-integral-sabados")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Proyecto Mario</Button>
           </DialogContent>
@@ -775,26 +894,60 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-fuchsia-700"><Cake className="w-5 h-5" /> Cumpleaños del Mes</DialogTitle>
-              <DialogDescription>Total: {statsCumpleanos.totalMes}</DialogDescription>
+              <DialogDescription>Total: {statsCumpleanos.totalMes} cumpleañeros</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-fuchsia-50 rounded"><span>Total Cumpleaños</span><span className="font-bold text-fuchsia-700">{statsCumpleanos.totalMes}</span></div>
-              <div className="flex justify-between p-3 bg-green-50 rounded"><span>Felicitados</span><span className="font-bold text-green-700">{statsCumpleanos.enviados}</span></div>
-              <div className="flex justify-between p-3 bg-amber-50 rounded"><span>Pendientes de enviar</span><span className="font-bold text-amber-700">{statsCumpleanos.pendientesEnvio}</span></div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-fuchsia-50 rounded-lg border border-fuchsia-100">
+                  <p className="text-[10px] text-fuchsia-600 font-medium">Total</p>
+                  <p className="text-2xl font-bold text-fuchsia-800">{statsCumpleanos.totalMes}</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Felicitados</p>
+                  <p className="text-2xl font-bold text-green-800">{statsCumpleanos.enviados}</p>
+                </div>
+                <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-100">
+                  <p className="text-[10px] text-orange-600 font-medium">Pendientes</p>
+                  <p className="text-2xl font-bold text-orange-800">{statsCumpleanos.pendientesEnvio}</p>
+                </div>
+              </div>
+              {statsCumpleanos.totalMes > 0 && (
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-600 mb-1"><span>Progreso de felicitaciones</span><span>{Math.round((statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100)}%</span></div>
+                  <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-fuchsia-500 h-2 rounded-full transition-all" style={{ width: `${(statsCumpleanos.enviados / statsCumpleanos.totalMes) * 100}%` }}></div></div>
+                </div>
+              )}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/cumpleanos")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Cumpleaños</Button>
           </DialogContent>
         </Dialog>
 
         <Dialog open={modalEventos} onOpenChange={setModalEventos}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-violet-700"><CalendarDays className="w-5 h-5" /> Eventos / Encuentro</DialogTitle>
-              <DialogDescription>Eventos activos: {statsEventos.length}</DialogDescription>
+              <DialogDescription>Eventos activos: {statsEventos.length} · Total inscritos: {statsEventos.reduce((s, e) => s + e.inscritos, 0)}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              {statsEventos.length > 0 ? statsEventos.map((ev, i) => (
-                <div key={i} className="p-3 bg-violet-50 rounded"><p className="font-medium text-violet-800">{ev.nombre}</p><p className="text-sm text-violet-600">Inscritos: {ev.inscritos}</p></div>
+              {statsEventos.length > 0 ? statsEventos.map((evento, i) => (
+                <div key={i} className="p-3 bg-violet-50 rounded-lg border border-violet-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-violet-700">{evento.nombre}</p>
+                    <Badge className="bg-violet-200 text-violet-900 text-[10px]">{evento.inscritos} inscritos</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="text-center"><p className="text-lg font-bold text-violet-800">{evento.inscritos}</p><p className="text-[9px] text-violet-600">Inscritos</p></div>
+                    <div className="text-center"><p className="text-lg font-bold text-green-700">{evento.pagadosCompleto}</p><p className="text-[9px] text-green-600">Pagado completo</p></div>
+                    <div className="text-center"><p className="text-lg font-bold text-orange-700">{evento.pendientesPago}</p><p className="text-[9px] text-orange-600">Pendiente pago</p></div>
+                    <div className="text-center"><p className="text-lg font-bold text-emerald-700">${evento.totalRecaudado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-[9px] text-emerald-600">Recaudado / ${evento.totalValor.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p></div>
+                  </div>
+                  {evento.totalValor > 0 && (
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5"><div className="bg-violet-500 h-1.5 rounded-full transition-all" style={{ width: `${Math.min((evento.totalRecaudado / evento.totalValor) * 100, 100)}%` }}></div></div>
+                      <p className="text-[9px] text-gray-400 text-right mt-0.5">{Math.round((evento.totalRecaudado / evento.totalValor) * 100)}% recaudado</p>
+                    </div>
+                  )}
+                </div>
               )) : <p className="text-gray-500 text-center py-4">Sin eventos activos</p>}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/eventos")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Eventos</Button>
@@ -804,22 +957,45 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         <Dialog open={modalServidores} onOpenChange={setModalServidores}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-cyan-700"><ClipboardCheck className="w-5 h-5" /> Asistencia Servidores</DialogTitle>
-              <DialogDescription>Total asistieron: {Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</DialogDescription>
+              <DialogTitle className="flex items-center gap-2 text-cyan-700"><ClipboardCheck className="w-5 h-5" /> Asistencia Servidores por Ministerio</DialogTitle>
+              <DialogDescription>Total registros: {Object.values(statsServidores).reduce((s, v) => s + v.total, 0)} · Asistieron: {Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)} · Faltaron: {Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              {MINISTERIOS_SERVIDORES.map(min => {
-                const stats = statsServidores[min.key] || { asistieron: 0, faltaron: 0 }
-                return (
-                  <div key={min.key} className="flex justify-between items-center p-3 bg-cyan-50 rounded">
-                    <span>{min.label}</span>
-                    <div className="flex gap-4">
-                      <span className="text-green-600 font-semibold">✓ {stats.asistieron}</span>
-                      <span className="text-red-600 font-semibold">✗ {stats.faltaron}</span>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-2 text-gray-600 font-medium">Ministerio</th>
+                    <th className="text-center py-2 px-1 text-green-700 font-medium">Asistieron</th>
+                    <th className="text-center py-2 px-1 text-red-700 font-medium">Faltaron</th>
+                    <th className="text-center py-2 px-1 text-blue-700 font-medium">Justificaron</th>
+                    <th className="text-center py-2 px-1 text-amber-700 font-medium">Atrasados</th>
+                    <th className="text-center py-2 px-1 text-gray-700 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MINISTERIOS_SERVIDORES.map(min => {
+                    const s = statsServidores[min.key] || { total: 0, asistieron: 0, faltaron: 0, justificaron: 0, atrasados: 0 }
+                    return (
+                      <tr key={min.key} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-1.5 px-2 text-gray-800 font-medium">{min.label}</td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-green-100 text-green-800 text-[10px]">{s.asistieron}</Badge></td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-red-100 text-red-800 text-[10px]">{s.faltaron}</Badge></td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-blue-100 text-blue-800 text-[10px]">{s.justificaron}</Badge></td>
+                        <td className="text-center py-1.5 px-1"><Badge className="bg-amber-100 text-amber-800 text-[10px]">{s.atrasados}</Badge></td>
+                        <td className="text-center py-1.5 px-1 font-semibold text-gray-700">{s.total}</td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold">
+                    <td className="py-2 px-2 text-gray-900">TOTAL</td>
+                    <td className="text-center py-2 px-1 text-green-800">{Object.values(statsServidores).reduce((s, v) => s + v.asistieron, 0)}</td>
+                    <td className="text-center py-2 px-1 text-red-800">{Object.values(statsServidores).reduce((s, v) => s + v.faltaron, 0)}</td>
+                    <td className="text-center py-2 px-1 text-blue-800">{Object.values(statsServidores).reduce((s, v) => s + v.justificaron, 0)}</td>
+                    <td className="text-center py-2 px-1 text-amber-800">{Object.values(statsServidores).reduce((s, v) => s + v.atrasados, 0)}</td>
+                    <td className="text-center py-2 px-1 text-gray-900">{Object.values(statsServidores).reduce((s, v) => s + v.total, 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </DialogContent>
         </Dialog>
@@ -828,13 +1004,72 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-amber-700"><AlertTriangle className="w-5 h-5" /> Atrasados</DialogTitle>
-              <DialogDescription>Total: {statsAtrasados.total}</DialogDescription>
+              <DialogDescription>Total: {statsAtrasados.total} personas</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-amber-50 rounded"><span>Total Atrasados</span><span className="font-bold text-amber-700">{statsAtrasados.total}</span></div>
-              <div className="flex justify-between p-3 bg-red-50 rounded"><span>Sin gestionar</span><span className="font-bold text-red-700">{statsAtrasados.sinGestionar}</span></div>
-              <div className="flex justify-between p-3 bg-green-50 rounded"><span>Gestionados</span><span className="font-bold text-green-700">{statsAtrasados.total - statsAtrasados.sinGestionar}</span></div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                <p className="text-[10px] text-amber-600 font-medium">Total</p>
+                <p className="text-2xl font-bold text-amber-800">{statsAtrasados.total}</p>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                <p className="text-[10px] text-red-600 font-medium">Sin Gestionar</p>
+                <p className="text-2xl font-bold text-red-800">{statsAtrasados.sinGestionar}</p>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                <p className="text-[10px] text-green-600 font-medium">Gestionados</p>
+                <p className="text-2xl font-bold text-green-800">{statsAtrasados.total - statsAtrasados.sinGestionar}</p>
+              </div>
+              <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-[10px] text-gray-600 font-medium">% Gestión</p>
+                <p className="text-2xl font-bold text-gray-800">{statsAtrasados.total > 0 ? Math.round(((statsAtrasados.total - statsAtrasados.sinGestionar) / statsAtrasados.total) * 100) : 0}%</p>
+              </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal Asistencia al Culto */}
+        <Dialog open={modalAsistenciaCulto} onOpenChange={setModalAsistenciaCulto}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-purple-700"><ClipboardCheck className="w-5 h-5" /> Asistencia al Culto</DialogTitle>
+              <DialogDescription>Registro de asistencia dominical del mes</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-[10px] text-green-600 font-medium">Asistieron</p>
+                  <p className="text-2xl font-bold text-green-800">{statsAsistenciaCulto.asistieron}</p>
+                </div>
+                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-100">
+                  <p className="text-[10px] text-red-600 font-medium">Faltaron</p>
+                  <p className="text-2xl font-bold text-red-800">{statsAsistenciaCulto.faltaron}</p>
+                </div>
+                <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <p className="text-[10px] text-amber-600 font-medium">En Seguimiento</p>
+                  <p className="text-2xl font-bold text-amber-800">{statsAsistenciaCulto.enSeguimiento}</p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+                  <p className="text-[10px] text-purple-600 font-medium">Sin Gestionar</p>
+                  <p className="text-2xl font-bold text-purple-800">{statsAsistenciaCulto.sinGestionar}</p>
+                </div>
+              </div>
+              {(statsAsistenciaCulto.asistieron + statsAsistenciaCulto.faltaron) > 0 && (
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-600 mb-1"><span>% Asistencia</span><span>{Math.round((statsAsistenciaCulto.asistieron / (statsAsistenciaCulto.asistieron + statsAsistenciaCulto.faltaron)) * 100)}%</span></div>
+                  <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-purple-500 h-2 rounded-full transition-all" style={{ width: `${(statsAsistenciaCulto.asistieron / (statsAsistenciaCulto.asistieron + statsAsistenciaCulto.faltaron)) * 100}%` }}></div></div>
+                </div>
+              )}
+              {statsAsistenciaCulto.enSeguimiento > 0 && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-700">Seguimiento (2+ faltas en el mes)</p>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div className="text-center"><p className="text-lg font-bold text-amber-800">{statsAsistenciaCulto.enSeguimiento - statsAsistenciaCulto.sinGestionar}</p><p className="text-[9px] text-green-600">Gestionados</p></div>
+                    <div className="text-center"><p className="text-lg font-bold text-red-700">{statsAsistenciaCulto.sinGestionar}</p><p className="text-[9px] text-red-600">Sin gestionar</p></div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/asistencia-culto")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Asistencia al Culto</Button>
           </DialogContent>
         </Dialog>
 
