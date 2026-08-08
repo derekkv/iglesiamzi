@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { VAPID_PUBLIC_KEY } from "@/lib/mod/push-service"
+import { VAPID_PUBLIC_KEY } from "@/lib/mod/push-config"
 import { Button } from "@/components/ui/button"
 import { Bell, X } from "lucide-react"
 

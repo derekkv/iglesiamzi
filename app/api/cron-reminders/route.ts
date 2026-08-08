@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import webpush from "web-push"
 import { createClient } from "@supabase/supabase-js"
 import { emailService } from "@/lib/mod/email-service"
 import { sendSmart } from "@/lib/mod/wa-crm-service"
+import { sendPush as sendPushService } from "@/lib/mod/push-service"
+import { todayEcuador } from "@/lib/timezone"
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
 const CRON_SECRET = process.env.CRON_SECRET
@@ -17,14 +16,6 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 /** Mapea el tipo de alerta al caso de uso de plantilla de WhatsApp. */
 function alertTypeToUseCase(alertType: "alerta2" | "alerta1"): "recordatorio_5dias" | "recordatorio_manana" {
   return alertType === "alerta2" ? "recordatorio_5dias" : "recordatorio_manana"
-}
-
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    `mailto:${process.env.NEXT_PUBLIC_CHURCH_CONTACT_EMAIL || "admin@example.com"}`,
-    VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY
-  )
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -48,32 +39,10 @@ function addDays(date: Date, days: number): string {
   return d.toISOString().split("T")[0]
 }
 
-// Enviar push a un usuario
+// Enviar push a un usuario (delegado al servicio compartido)
 async function sendPush(userId: string, title: string, body: string): Promise<number> {
-  const { data: subscriptions } = await supabase
-    .from("push_subscriptions")
-    .select("*")
-    .eq("user_id", userId)
-
-  if (!subscriptions || subscriptions.length === 0) return 0
-
-  let sent = 0
-  const payload = JSON.stringify({ title, body, url: "/dashboard" })
-
-  for (const sub of subscriptions) {
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload
-      )
-      sent++
-    } catch (err: any) {
-      if (err.statusCode === 404 || err.statusCode === 410) {
-        await supabase.from("push_subscriptions").delete().eq("id", sub.id)
-      }
-    }
-  }
-  return sent
+  const result = await sendPushService(userId, title, body, { url: "/dashboard" })
+  return result.sent
 }
 
 // Enviar WhatsApp por la Cloud API oficial.
@@ -219,7 +188,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const today = new Date()
+    // Usar hora de Ecuador para determinar "hoy"
+    const todayStr = todayEcuador() // YYYY-MM-DD
+    const today = new Date(todayStr + "T12:00:00")
     const in5Days = addDays(today, 5)
     const tomorrow = addDays(today, 1)
 

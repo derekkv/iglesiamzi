@@ -16,7 +16,9 @@ ALTER TABLE pago_diario ADD CONSTRAINT pago_diario_metodo_pago_check
     'TC - Leonardo Lucas',
     'TC - Yamil Machuca',
     'TC - Jaime Salas',
-    'TC - Miguel Machuca'
+    'TC - Miguel Machuca',
+    'Pago posfechado - cuenta iglesia',
+    'Pago posfechado - cuenta Jaime Salas'
   ));
 
 -- 3. Verificar si egresos tiene un constraint similar y actualizarlo

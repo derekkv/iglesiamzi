@@ -438,12 +438,46 @@ async function logEmail(
 // API pública
 // ---------------------------------------------------------------------------
 
+/**
+ * Determina si un error SMTP es transitorio y se puede reintentar.
+ * Errores permanentes (dirección inválida, autenticación, etc.) no se reintentan.
+ */
+function isTransientSmtpError(error: any): boolean {
+  const code = error?.responseCode || error?.code
+  const message = String(error?.message || "").toLowerCase()
+
+  // Errores de red/conexión — siempre transitorios
+  if (["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ESOCKET", "ECONNECTION"].includes(error?.code)) {
+    return true
+  }
+
+  // Timeout genérico
+  if (message.includes("timeout") || message.includes("timed out")) {
+    return true
+  }
+
+  // Códigos SMTP 4xx son temporales (421 = service not available, 450 = mailbox busy, etc.)
+  if (typeof code === "number" && code >= 400 && code < 500) {
+    return true
+  }
+
+  // Códigos SMTP 5xx permanentes — NO reintentar
+  // 550 = mailbox not found, 553 = invalid address, 554 = transaction failed
+  if (typeof code === "number" && code >= 500) {
+    return false
+  }
+
+  // Si no podemos clasificar, asumir transitorio para no perder emails críticos
+  return true
+}
+
 export const emailService = {
-  /** Envío genérico con soporte completo (cc/bcc/adjuntos) y registro. */
-  async sendRawEmail(params: SendEmailParams): Promise<SendEmailResult> {
+  /** Envío genérico con soporte completo (cc/bcc/adjuntos), registro y reintentos. */
+  async sendRawEmail(params: SendEmailParams & { maxRetries?: number }): Promise<SendEmailResult> {
     const to = toArray(params.to)
     const cc = toArray(params.cc)
     const bcc = toArray(params.bcc)
+    const maxRetries = params.maxRetries ?? 2
 
     if (to.length === 0) {
       return { success: false, error: "Se requiere al menos un destinatario" }
@@ -460,39 +494,64 @@ export const emailService = {
       return { success: false, error: t.error, recordId: recordId || undefined }
     }
 
-    try {
-      const info = await t.transporter.sendMail({
-        from: t.from,
-        to,
-        cc: cc.length ? cc : undefined,
-        bcc: bcc.length ? bcc : undefined,
-        replyTo: params.replyTo || t.replyTo,
-        subject: params.subject,
-        html: params.html,
-        text: params.text,
-        inReplyTo: params.inReplyTo,
-        references: params.references,
-        attachments: params.attachments as any,
-      })
+    let lastError: string = ""
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const info = await t.transporter.sendMail({
+          from: t.from,
+          to,
+          cc: cc.length ? cc : undefined,
+          bcc: bcc.length ? bcc : undefined,
+          replyTo: params.replyTo || t.replyTo,
+          subject: params.subject,
+          html: params.html,
+          text: params.text,
+          inReplyTo: params.inReplyTo,
+          references: params.references,
+          attachments: params.attachments as any,
+        })
 
-      const recordId = await logEmail(
-        params,
-        { success: true, messageId: info.messageId, response: info.response },
-        { from: t.from, to, cc, bcc }
-      )
+        const recordId = await logEmail(
+          params,
+          { success: true, messageId: info.messageId, response: info.response },
+          { from: t.from, to, cc, bcc }
+        )
 
-      return { success: true, messageId: info.messageId, recordId: recordId || undefined }
-    } catch (error: any) {
-      const message = error?.message || "Error enviando el correo"
-      console.error("[email] Error enviando correo:", message)
-      const recordId = await logEmail(params, { success: false, error: message }, {
-        from: t.from,
-        to,
-        cc,
-        bcc,
-      })
-      return { success: false, error: message, recordId: recordId || undefined }
+        if (attempt > 0) {
+          console.info(`[email] Éxito en intento ${attempt + 1}/${maxRetries + 1} para ${to.join(", ")}`)
+        }
+
+        return { success: true, messageId: info.messageId, recordId: recordId || undefined }
+      } catch (error: any) {
+        lastError = error?.message || "Error enviando el correo"
+
+        // Solo reintentar en errores transitorios (timeout, conexión, SMTP temporales)
+        const isTransient = isTransientSmtpError(error)
+        if (!isTransient || attempt >= maxRetries) {
+          console.error(`[email] Error enviando correo (intento ${attempt + 1}/${maxRetries + 1}):`, lastError)
+          const recordId = await logEmail(params, { success: false, error: lastError }, {
+            from: t.from,
+            to,
+            cc,
+            bcc,
+          })
+          return { success: false, error: lastError, recordId: recordId || undefined }
+        }
+
+        // Esperar antes de reintentar (backoff exponencial: 1s, 2s)
+        console.warn(`[email] Intento ${attempt + 1}/${maxRetries + 1} falló (transitorio), reintentando...`)
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
+      }
     }
+
+    // Nunca debería llegar aquí, pero por seguridad
+    const recordId = await logEmail(params, { success: false, error: lastError }, {
+      from: t.from,
+      to,
+      cc,
+      bcc,
+    })
+    return { success: false, error: lastError, recordId: recordId || undefined }
   },
 
   /** Envío por plantilla (BD o por defecto). */

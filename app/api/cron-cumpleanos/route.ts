@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import webpush from "web-push"
 import { createClient } from "@supabase/supabase-js"
 import { verifyApiAuth } from "@/lib/api-auth"
 import { sendSmart, getOrCreateContact, getTemplateForUseCase, buildTemplateComponents, normalizeWaId } from "@/lib/mod/wa-crm-service"
 import { uploadMedia, sendTemplate } from "@/lib/mod/wa-cloud-service"
 import { emailService } from "@/lib/mod/email-service"
 import { getBirthdayVideo, getBirthdayImage } from "@/lib/pdf-to-image"
+import { sendPush } from "@/lib/mod/push-service"
+import { notifyError } from "@/lib/error-notifier"
 import { CHURCH, CHURCH_SIGNATURE } from "@/lib/branding"
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   throw new Error("Faltan SUPABASE_URL / SUPABASE_SERVICE_KEY en el entorno del servidor")
-}
-
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    `mailto:${CHURCH.contactEmail || "admin@example.com"}`,
-    VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY
-  )
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -38,61 +29,44 @@ function generarMensajeCumple(nombre: string, edad: number): string {
     `*${CHURCH_SIGNATURE}*`
 }
 
-// Enviar push notification
-async function sendPush(userId: string, title: string, body: string): Promise<boolean> {
-  try {
-    const { data: subscriptions } = await supabase
-      .from("push_subscriptions")
-      .select("*")
-      .eq("user_id", userId)
-
-    if (!subscriptions || subscriptions.length === 0) return false
-
-    const payload = JSON.stringify({ title, body, url: "/dashboard/cumpleanos" })
-    let sent = false
-
-    for (const sub of subscriptions) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
-        )
-        sent = true
-      } catch (err: any) {
-        if (err.statusCode === 404 || err.statusCode === 410) {
-          await supabase.from("push_subscriptions").delete().eq("id", sub.id)
-        }
-      }
-    }
-    return sent
-  } catch {
-    return false
-  }
-}
+// sendPush ahora se importa de @/lib/mod/push-service
 
 // Enviar WhatsApp con vídeo de cumpleaños (imagen + audio cumpleanos-feliz.ogg)
 // Siempre usa la plantilla felicitacion_cumpleanos — el cron corre en horario fijo y la
 // ventana de 24 h rara vez está abierta para los destinatarios de cumpleaños.
-async function sendWhatsAppImage(phone: string, nombre: string, caption: string, edad?: number): Promise<boolean> {
+async function sendWhatsAppImage(phone: string, nombre: string, caption: string, edad?: number): Promise<{ success: boolean; videoError?: string }> {
   try {
     const media = await getBirthdayVideo(nombre)
     if (!media) {
-      console.warn("[cron-cumpleanos] No se pudo generar el vídeo de cumpleaños")
-      return false
+      const errorMsg = `No se pudo generar el vídeo de cumpleaños para "${nombre}" después de 3 intentos`
+      console.error(`[cron-cumpleanos] ${errorMsg}`)
+      // Notificar error del sistema vía alerta_sistema (WhatsApp al admin técnico)
+      await notifyError({
+        context: "Cron Cumpleaños — Generación de Video",
+        error: `Falló la generación de video para "${nombre}"`,
+        details: `Persona: ${nombre}\nTeléfono: ${phone}\nEl video no se pudo generar después de 3 intentos con FFmpeg. Verificar que FFmpeg e ImageMagick estén instalados y que existan los archivos: plantilla PDF y audio OGG en /public.`,
+      })
+      return { success: false, videoError: errorMsg }
     }
 
     // 1. Resolver la plantilla
     const template = await getTemplateForUseCase("felicitacion_cumpleanos")
     if (!template) {
       console.warn("[cron-cumpleanos] No hay plantilla aprobada con use_case='felicitacion_cumpleanos'. Configúrela en WhatsApp → Plantillas.")
-      return false
+      return { success: false, videoError: "Sin plantilla aprobada 'felicitacion_cumpleanos'" }
     }
 
     // 2. Subir el vídeo al CDN de Meta para obtener un media_id
     const up = await uploadMedia(media.buffer, media.type, media.filename)
     if (!up.success || !up.mediaId) {
-      console.warn("[cron-cumpleanos] No se pudo subir el vídeo a Meta:", up.error)
-      return false
+      const errorMsg = `No se pudo subir el vídeo a Meta: ${up.error}`
+      console.warn(`[cron-cumpleanos] ${errorMsg}`)
+      await notifyError({
+        context: "Cron Cumpleaños — Upload a Meta CDN",
+        error: `Falló subida de video para "${nombre}"`,
+        details: `Persona: ${nombre}\nTeléfono: ${phone}\nError Meta: ${up.error || "desconocido"}`,
+      })
+      return { success: false, videoError: errorMsg }
     }
 
     // 3. Construir componentes y enviar siempre por plantilla
@@ -136,10 +110,10 @@ async function sendWhatsAppImage(phone: string, nombre: string, caption: string,
     if (!result.success) {
       console.warn(`[cron-cumpleanos] Plantilla a ${phone} falló: ${result.error}`)
     }
-    return result.success
+    return { success: result.success }
   } catch (err) {
     console.error("[cron-cumpleanos] Error enviando vídeo WhatsApp:", err)
-    return false
+    return { success: false, videoError: String(err) }
   }
 }
 
@@ -236,11 +210,13 @@ export async function POST(request: NextRequest) {
         resultados.buzon = true
 
         // Push al usuario del sistema
-        resultados.push = await sendPush(
+        const pushRes = await sendPush(
           userData.id,
           "🎂 ¡Feliz Cumpleaños!",
-          `La ${CHURCH.name} te desea un bendecido cumpleaños #${edad}`
+          `La ${CHURCH.name} te desea un bendecido cumpleaños #${edad}`,
+          { url: "/dashboard/cumpleanos" }
         )
+        resultados.push = pushRes.success
       }
     } catch (err) {
       console.warn("Error buzón/push cumpleaños:", err)
@@ -253,7 +229,8 @@ export async function POST(request: NextRequest) {
 
     // 3. WhatsApp — imagen con felicitación
     if (celular) {
-      resultados.whatsapp_imagen = await sendWhatsAppImage(celular, nombre, mensaje)
+      const waResult = await sendWhatsAppImage(celular, nombre, mensaje)
+      resultados.whatsapp_imagen = waResult.success
     }
 
     // 4. Registrar envío en tabla de tracking
@@ -284,11 +261,40 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// IDs de admins que reciben notificación de cumpleaños
-const ADMIN_BIRTHDAY_NOTIFY_IDS = [
+// IDs de admins que reciben notificación de cumpleaños.
+// Prioridad: 1) tabla admin_notification_config, 2) variable de entorno, 3) hardcoded fallback
+const FALLBACK_ADMIN_IDS = [
   "bb4dce93-0345-4203-8e8a-76b6d58490e8",
   "5047fe7d-0e7b-4752-b25a-ae3b9bbac009",
 ]
+
+async function getAdminBirthdayNotifyIds(): Promise<string[]> {
+  // 1. Intentar desde la tabla de configuración
+  try {
+    const { data } = await supabase
+      .from("admin_notification_config")
+      .select("user_ids")
+      .eq("config_key", "birthday_notify")
+      .eq("is_active", true)
+      .maybeSingle()
+
+    if (data?.user_ids && data.user_ids.length > 0) {
+      return data.user_ids
+    }
+  } catch {
+    // tabla puede no existir aún — continuar con fallback
+  }
+
+  // 2. Variable de entorno (lista separada por comas)
+  const envIds = process.env.ADMIN_BIRTHDAY_NOTIFY_IDS
+  if (envIds) {
+    const ids = envIds.split(",").map((s) => s.trim()).filter(Boolean)
+    if (ids.length > 0) return ids
+  }
+
+  // 3. Fallback hardcoded
+  return FALLBACK_ADMIN_IDS
+}
 
 // Enviar WhatsApp texto simple (resumen a administradores)
 async function sendWhatsAppText(phone: string, message: string): Promise<boolean> {
@@ -327,18 +333,22 @@ async function sendSimpleEmail(to: string, subject: string, html: string): Promi
 /**
  * Notifica a los admins configurados sobre los cumpleañeros del día.
  * Canales: WhatsApp (texto + imágenes), Email, Push, Buzón (modal in-app)
+ * Si hay fallos de envío, lo incluye en la notificación.
  */
 async function notifyAdminsBirthdays(
   cumpleaneros: Array<{ id: number; nombre: string; edad: number; celular: string | null; fuente: string }>,
   dia: number,
   mes: number,
-  anio: number
+  anio: number,
+  fallidos: number = 0
 ) {
   const fechaHoy = `${dia}/${String(mes).padStart(2, "0")}/${anio}`
   const lista = cumpleaneros.map((c) => `• ${c.nombre} (${c.edad} años)`).join("\n")
   const listaHtml = cumpleaneros.map((c) => `<li><strong>${c.nombre}</strong> — ${c.edad} años</li>`).join("")
 
-  const waMessage = `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n_Total: ${cumpleaneros.length} persona(s)_`
+  const waMessage = fallidos > 0
+    ? `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n⚠️ *${fallidos} envío(s) fallaron y se reintentarán en la próxima ejecución.*\n\n_Total: ${cumpleaneros.length} persona(s)_`
+    : `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n_Total: ${cumpleaneros.length} persona(s)_`
 
   const emailSubject = `🎂 Cumpleaños de hoy (${fechaHoy}) — ${cumpleaneros.length} persona(s)`
   const emailHtml = `
@@ -376,6 +386,8 @@ async function notifyAdminsBirthdays(
     } catch {}
   }
 
+  const ADMIN_BIRTHDAY_NOTIFY_IDS = await getAdminBirthdayNotifyIds()
+
   for (const adminId of ADMIN_BIRTHDAY_NOTIFY_IDS) {
     try {
       // Obtener datos del admin
@@ -397,7 +409,7 @@ async function notifyAdminsBirthdays(
       })
 
       // 2. Push
-      await sendPush(adminId, pushTitle, pushBody)
+      await sendPush(adminId, pushTitle, pushBody, { url: "/dashboard/cumpleanos" })
 
       // 3. WhatsApp — primero el resumen en texto
       if (adminUser.phone) {
@@ -552,6 +564,7 @@ export async function GET(request: NextRequest) {
 
     // Enviar a cada pendiente
     let enviados = 0
+    let fallidos = 0
     for (const c of pendientes) {
       const mensaje = generarMensajeCumple(c.nombre, c.edad)
       const resultados = { buzon: false, push: false, email: false, whatsapp_imagen: false }
@@ -574,7 +587,8 @@ export async function GET(request: NextRequest) {
             referencia_tipo: "cumpleanos",
           })
           resultados.buzon = true
-          resultados.push = await sendPush(userData.id, "🎂 ¡Feliz Cumpleaños!", `La Iglesia te desea un bendecido cumpleaños #${c.edad}`)
+          const pushRes = await sendPush(userData.id, "🎂 ¡Feliz Cumpleaños!", `La Iglesia te desea un bendecido cumpleaños #${c.edad}`, { url: "/dashboard/cumpleanos" })
+          resultados.push = pushRes.success
         }
       } catch {}
 
@@ -584,39 +598,55 @@ export async function GET(request: NextRequest) {
       }
 
       // WhatsApp imagen
+      let videoError: string | undefined
       if (c.celular) {
-        resultados.whatsapp_imagen = await sendWhatsAppImage(c.celular, c.nombre, mensaje)
+        const waResult = await sendWhatsAppImage(c.celular, c.nombre, mensaje)
+        resultados.whatsapp_imagen = waResult.success
+        videoError = waResult.videoError
       }
 
-      // Registrar
-      try {
-        await supabase.from("cumpleanos_enviados").insert({
-          censo_id: c.id,
-          fuente: c.fuente,
-          fecha_cumple: c.fecha,
-          anio,
-          canal_buzon: resultados.buzon,
-          canal_push: resultados.push,
-          canal_email: resultados.email,
-          canal_whatsapp_imagen: resultados.whatsapp_imagen,
-          enviado_at: new Date().toISOString(),
-        })
-      } catch {}
-
-      enviados++
+      // Solo registrar si al menos un canal tuvo éxito.
+      // Si TODOS los canales fallan, NO registramos — así el próximo cron
+      // lo reintentará automáticamente.
+      const algunExito = resultados.buzon || resultados.push || resultados.email || resultados.whatsapp_imagen
+      if (algunExito) {
+        try {
+          await supabase.from("cumpleanos_enviados").insert({
+            censo_id: c.id,
+            fuente: c.fuente,
+            fecha_cumple: c.fecha,
+            anio,
+            canal_buzon: resultados.buzon,
+            canal_push: resultados.push,
+            canal_email: resultados.email,
+            canal_whatsapp_imagen: resultados.whatsapp_imagen,
+            enviado_at: new Date().toISOString(),
+            video_error: videoError || null,
+          })
+        } catch {}
+        enviados++
+      } else {
+        // Todos los canales fallaron: no marcar como enviado para reintentar
+        console.error(`[cron-cumpleanos] TODOS los canales fallaron para ${c.nombre} (censo_id=${c.id}, fuente=${c.fuente}). Se reintentará.`)
+        if (videoError) {
+          console.error(`[cron-cumpleanos] Detalle video: ${videoError}`)
+        }
+        fallidos++
+      }
     }
 
     // === NOTIFICAR A ADMINS sobre los cumpleañeros de hoy ===
     if (cumpleanosHoy.length > 0) {
-      await notifyAdminsBirthdays(cumpleanosHoy, dia, mes, anio)
+      await notifyAdminsBirthdays(cumpleanosHoy, dia, mes, anio, fallidos)
     }
 
     return NextResponse.json({
       success: true,
-      message: `Cron cumpleaños: ${enviados}/${pendientes.length} enviados. Total hoy: ${cumpleanosHoy.length}.`,
+      message: `Cron cumpleaños: ${enviados}/${pendientes.length} enviados, ${fallidos} fallidos (se reintentarán). Total hoy: ${cumpleanosHoy.length}.`,
       total_hoy: cumpleanosHoy.length,
       ya_enviados: cumpleanosHoy.length - pendientes.length,
       enviados_ahora: enviados,
+      fallidos,
     })
   } catch (error: any) {
     console.error("Error en /api/cron-cumpleanos GET:", error)

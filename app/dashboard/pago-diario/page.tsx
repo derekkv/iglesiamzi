@@ -324,6 +324,8 @@ function PagoDiarioContent({ canEdit }: { canEdit: boolean }) {
             <SelectItem value="TC - Yamil Machuca">TC - Yamil Machuca</SelectItem>
             <SelectItem value="TC - Jaime Salas">TC - Jaime Salas</SelectItem>
             <SelectItem value="TC - Miguel Machuca">TC - Miguel Machuca</SelectItem>
+            <SelectItem value="Pago posfechado - cuenta iglesia">Pago posfechado - cuenta iglesia</SelectItem>
+            <SelectItem value="Pago posfechado - cuenta Jaime Salas">Pago posfechado - cuenta Jaime Salas</SelectItem>
           </SelectContent>
         </Select>
       </div>

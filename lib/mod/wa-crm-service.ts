@@ -199,12 +199,34 @@ export async function getOrCreateContact(
 /** Registra actividad entrante: abre la ventana de 24 h y suma no leídos. */
 async function touchInbound(contactId: string, preview: string, at: string) {
   const windowExpires = new Date(new Date(at).getTime() + WINDOW_MS).toISOString()
-  const { data: current } = await supabaseServer
-    .from("wa_contacts")
-    .select("unread_count")
-    .eq("id", contactId)
-    .maybeSingle()
 
+  // Usar incremento atómico via RPC para evitar race condition.
+  // Si no existe la función RPC, fallback al patrón anterior.
+  try {
+    await supabaseServer.rpc("increment_unread_count", { contact_id_param: contactId })
+  } catch {
+    // Fallback: incremento no atómico (mejor que nada si no existe la RPC)
+    const { data: current } = await supabaseServer
+      .from("wa_contacts")
+      .select("unread_count")
+      .eq("id", contactId)
+      .maybeSingle()
+
+    await supabaseServer
+      .from("wa_contacts")
+      .update({
+        last_inbound_at: at,
+        window_expires_at: windowExpires,
+        last_message_at: at,
+        last_message_preview: preview.slice(0, 200),
+        unread_count: (current?.unread_count || 0) + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", contactId)
+    return
+  }
+
+  // Si la RPC tuvo éxito, actualizar el resto de campos sin tocar unread_count
   await supabaseServer
     .from("wa_contacts")
     .update({
@@ -212,7 +234,6 @@ async function touchInbound(contactId: string, preview: string, at: string) {
       window_expires_at: windowExpires,
       last_message_at: at,
       last_message_preview: preview.slice(0, 200),
-      unread_count: (current?.unread_count || 0) + 1,
       updated_at: new Date().toISOString(),
     })
     .eq("id", contactId)
@@ -325,6 +346,7 @@ export function buildTemplateComponents(
 export async function syncTemplates(): Promise<{
   success: boolean
   synced?: number
+  removed?: number
   error?: string
 }> {
   const result = await listTemplates()
@@ -333,6 +355,8 @@ export async function syncTemplates(): Promise<{
   }
 
   let synced = 0
+  const syncedNames = new Set<string>()
+
   for (const t of result.templates) {
     const components = Array.isArray(t.components) ? t.components : []
     const bodyComponent = components.find((c: any) => c?.type === "BODY")
@@ -364,10 +388,33 @@ export async function syncTemplates(): Promise<{
       console.error(`[wa-crm] Error sincronizando plantilla ${t.name}:`, error.message)
       continue
     }
+    syncedNames.add(`${t.name}__${t.language}`)
     synced++
   }
 
-  return { success: true, synced }
+  // Eliminar plantillas que ya no existen en Meta (soft-delete: marcar como "DELETED")
+  let removed = 0
+  if (syncedNames.size > 0) {
+    const { data: dbTemplates } = await supabaseServer
+      .from("wa_templates")
+      .select("id, name, language, status")
+      .neq("status", "DELETED")
+
+    if (dbTemplates) {
+      for (const row of dbTemplates) {
+        const key = `${row.name}__${row.language}`
+        if (!syncedNames.has(key)) {
+          await supabaseServer
+            .from("wa_templates")
+            .update({ status: "DELETED", synced_at: new Date().toISOString() })
+            .eq("id", row.id)
+          removed++
+        }
+      }
+    }
+  }
+
+  return { success: true, synced, removed }
 }
 
 // ---------------------------------------------------------------------------
@@ -929,17 +976,36 @@ export interface BulkSendResult {
   mode?: string
 }
 
+/** Opciones de configuración para envío masivo. */
+export interface BulkSendOptions {
+  /** Máximo de fallos consecutivos antes de abortar (circuit breaker). Default: 10 */
+  maxConsecutiveFailures?: number
+  /** Porcentaje máximo de fallos sobre total enviados antes de abortar. Default: 0.7 (70%) */
+  maxFailureRate?: number
+  /** Mínimo de envíos antes de evaluar la tasa de fallos. Default: 5 */
+  minSampleSize?: number
+}
+
 /**
  * Envío masivo secuencial con pausa configurable entre mensajes.
- * Mantiene la forma de respuesta que ya consumía la UI anterior.
+ * Incluye circuit breaker: aborta si hay demasiados fallos consecutivos
+ * o si la tasa de error supera el umbral configurado.
  */
 export async function sendBulkSmart(
   phones: string[],
-  base: Omit<SmartSendParams, "to">
+  base: Omit<SmartSendParams, "to">,
+  options?: BulkSendOptions
 ): Promise<BulkSendResult[]> {
   const cfg = await getWaConfig()
   const delay = cfg?.bulk_delay_ms ?? 250
   const results: BulkSendResult[] = []
+
+  const maxConsecutiveFailures = options?.maxConsecutiveFailures ?? 10
+  const maxFailureRate = options?.maxFailureRate ?? 0.7
+  const minSampleSize = options?.minSampleSize ?? 5
+
+  let consecutiveFailures = 0
+  let totalFailures = 0
 
   for (const phone of phones) {
     const res = await sendSmart({ ...base, to: phone })
@@ -950,6 +1016,57 @@ export async function sendBulkSmart(
       messageId: res.wamid,
       mode: res.mode,
     })
+
+    // Circuit breaker: evaluar si debemos abortar
+    if (res.success) {
+      consecutiveFailures = 0
+    } else {
+      consecutiveFailures++
+      totalFailures++
+
+      // Abortar por fallos consecutivos
+      if (consecutiveFailures >= maxConsecutiveFailures) {
+        const remaining = phones.length - results.length
+        console.error(
+          `[wa-crm] Bulk send abortado: ${maxConsecutiveFailures} fallos consecutivos. ` +
+          `${results.length}/${phones.length} procesados, ${remaining} omitidos.`
+        )
+        // Marcar los restantes como no enviados
+        const remainingPhones = phones.slice(results.length)
+        for (const p of remainingPhones) {
+          results.push({
+            phone: p,
+            success: false,
+            error: `Envío abortado: ${maxConsecutiveFailures} fallos consecutivos previos`,
+            mode: "skipped",
+          })
+        }
+        break
+      }
+
+      // Abortar por tasa de error alta (solo si tenemos suficiente muestra)
+      if (results.length >= minSampleSize) {
+        const failureRate = totalFailures / results.length
+        if (failureRate >= maxFailureRate) {
+          const remaining = phones.length - results.length
+          console.error(
+            `[wa-crm] Bulk send abortado: tasa de error ${(failureRate * 100).toFixed(0)}% ` +
+            `(>${(maxFailureRate * 100).toFixed(0)}%). ${results.length}/${phones.length} procesados, ${remaining} omitidos.`
+          )
+          const remainingPhones = phones.slice(results.length)
+          for (const p of remainingPhones) {
+            results.push({
+              phone: p,
+              success: false,
+              error: `Envío abortado: tasa de error demasiado alta (${(failureRate * 100).toFixed(0)}%)`,
+              mode: "skipped",
+            })
+          }
+          break
+        }
+      }
+    }
+
     if (delay > 0) await new Promise((r) => setTimeout(r, delay))
   }
 
