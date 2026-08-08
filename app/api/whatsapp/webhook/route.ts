@@ -3,6 +3,7 @@ import crypto from "crypto"
 import { supabaseServer } from "@/lib/supabase-server"
 import { getWaConfig } from "@/lib/mod/wa-cloud-service"
 import { logInbound, updateMessageStatus } from "@/lib/mod/wa-crm-service"
+import { handleKeyword } from "@/lib/wa-keyword-handler"
 
 /**
  * Webhook de WhatsApp Cloud API.
@@ -157,6 +158,13 @@ async function processPayload(payload: any, signatureValid: boolean) {
               : new Date().toISOString(),
             raw: msg,
           })
+
+          // Procesar keywords (ej: "ver" para cumpleaños)
+          if (type === "text" && body) {
+            handleKeyword(waId, body).catch((err) => {
+              console.error("[wa-webhook] Error en handleKeyword:", err?.message)
+            })
+          }
         }
 
         console.log(`[wa-webhook] ✅ ${value.messages.length} mensaje(s) entrante(s) procesado(s)`)

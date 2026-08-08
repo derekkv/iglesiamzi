@@ -266,6 +266,7 @@ export async function POST(request: NextRequest) {
 const FALLBACK_ADMIN_IDS = [
   "bb4dce93-0345-4203-8e8a-76b6d58490e8",
   "5047fe7d-0e7b-4752-b25a-ae3b9bbac009",
+  "8a799e01-11bb-4ea4-8a95-9f7033e90fb1",
 ]
 
 async function getAdminBirthdayNotifyIds(): Promise<string[]> {
@@ -332,8 +333,10 @@ async function sendSimpleEmail(to: string, subject: string, html: string): Promi
 
 /**
  * Notifica a los admins configurados sobre los cumpleañeros del día.
- * Canales: WhatsApp (texto + imágenes), Email, Push, Buzón (modal in-app)
- * Si hay fallos de envío, lo incluye en la notificación.
+ * Canales: WhatsApp (1 solo resumen con opción "VER"), Email, Push, Buzón.
+ *
+ * Ya NO envía videos ni mensajes individuales por cada cumpleañero.
+ * Los videos se envían GRATIS cuando el admin responde "VER" (abre ventana 24h).
  */
 async function notifyAdminsBirthdays(
   cumpleaneros: Array<{ id: number; nombre: string; edad: number; celular: string | null; fuente: string }>,
@@ -346,9 +349,11 @@ async function notifyAdminsBirthdays(
   const lista = cumpleaneros.map((c) => `• ${c.nombre} (${c.edad} años)`).join("\n")
   const listaHtml = cumpleaneros.map((c) => `<li><strong>${c.nombre}</strong> — ${c.edad} años</li>`).join("")
 
-  const waMessage = fallidos > 0
-    ? `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n⚠️ *${fallidos} envío(s) fallaron y se reintentarán en la próxima ejecución.*\n\n_Total: ${cumpleaneros.length} persona(s)_`
-    : `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n_Total: ${cumpleaneros.length} persona(s)_`
+  let waMessage = `📋🎂 *Cumpleaños de hoy — ${fechaHoy}*\n\n${lista}\n\n_Total: ${cumpleaneros.length} persona(s)_`
+  if (fallidos > 0) {
+    waMessage += `\n\n⚠️ *${fallidos} envío(s) fallaron y se reintentarán en la próxima ejecución.*`
+  }
+  waMessage += `\n\n👉 Responde *VER* para recibir los videos de felicitación.`
 
   const emailSubject = `🎂 Cumpleaños de hoy (${fechaHoy}) — ${cumpleaneros.length} persona(s)`
   const emailHtml = `
@@ -375,18 +380,25 @@ async function notifyAdminsBirthdays(
 
   const buzonMensaje = `Hoy cumplen años:\n${lista}`
 
-  // Pre-generar los vídeos de cada cumpleañero para enviar a admins
-  const imagenesGeneradas: Array<{ nombre: string; media: { buffer: Buffer; type: string; filename: string } }> = []
-  for (const c of cumpleaneros) {
-    try {
-      const media = await getBirthdayVideo(c.nombre)
-      if (media) {
-        imagenesGeneradas.push({ nombre: c.nombre, media })
-      }
-    } catch {}
-  }
-
   const ADMIN_BIRTHDAY_NOTIFY_IDS = await getAdminBirthdayNotifyIds()
+
+  // Guardar los cumpleañeros del día para el handler "VER" del webhook
+  try {
+    // Borrar los pendientes anteriores (de otro día) y guardar los de hoy
+    await supabase.from("cumpleanos_pendientes_ver").delete().neq("fecha", `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`)
+    for (const c of cumpleaneros) {
+      await supabase.from("cumpleanos_pendientes_ver").upsert({
+        censo_id: c.id,
+        fuente: c.fuente,
+        nombre: c.nombre,
+        edad: c.edad,
+        celular: c.celular,
+        fecha: `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`,
+      }, { onConflict: "censo_id,fuente,fecha" })
+    }
+  } catch (err) {
+    console.warn("[cron-cumpleanos] Error guardando pendientes para VER:", err)
+  }
 
   for (const adminId of ADMIN_BIRTHDAY_NOTIFY_IDS) {
     try {
@@ -411,38 +423,9 @@ async function notifyAdminsBirthdays(
       // 2. Push
       await sendPush(adminId, pushTitle, pushBody, { url: "/dashboard/cumpleanos" })
 
-      // 3. WhatsApp — primero el resumen en texto
+      // 3. WhatsApp — UN SOLO mensaje resumen con opción "VER"
       if (adminUser.phone) {
         await sendWhatsAppText(adminUser.phone, waMessage)
-        await new Promise((r) => setTimeout(r, 1500))
-
-        // Enviar cada cumpleañero: vídeo por plantilla + mensaje de felicitación
-        for (const c of cumpleaneros) {
-          try {
-            const img = imagenesGeneradas.find((i) => i.nombre === c.nombre)
-            if (img) {
-              const template = await getTemplateForUseCase("felicitacion_cumpleanos")
-              if (template) {
-                const up = await uploadMedia(img.media.buffer, img.media.type, img.media.filename)
-                if (up.success && up.mediaId) {
-                  const adminWaId = normalizeWaId(adminUser.phone)
-                  const components = buildTemplateComponents(
-                    template,
-                    { nombre: c.nombre, edad: c.edad },
-                    { id: up.mediaId }
-                  )
-                  await sendTemplate(adminWaId, template.name, template.language, components)
-                }
-              }
-              await new Promise((r) => setTimeout(r, 2000))
-            }
-
-            // Mensaje de felicitación completo (el mismo que recibe la persona)
-            const mensajeFelicitacion = generarMensajeCumple(c.nombre, c.edad)
-            await sendWhatsAppText(adminUser.phone, `📨 *Mensaje enviado a ${c.nombre}:*\n\n${mensajeFelicitacion}`)
-            await new Promise((r) => setTimeout(r, 1500))
-          } catch {}
-        }
       }
 
       // 4. Email
@@ -546,20 +529,19 @@ export async function GET(request: NextRequest) {
     addIfToday(mdg || [], "mdg")
     addIfToday(jovenes || [], "jovenes")
 
-    // Filtrar los que ya fueron enviados este año
+    // Filtrar los que ya fueron enviados este año (una sola query en vez de N)
     let pendientes: typeof cumpleanosHoy = []
-    for (const c of cumpleanosHoy) {
-      const { data: yaEnv } = await supabase
+    if (cumpleanosHoy.length > 0) {
+      const { data: yaEnviados } = await supabase
         .from("cumpleanos_enviados")
-        .select("id")
-        .eq("censo_id", c.id)
-        .eq("fuente", c.fuente)
+        .select("censo_id, fuente")
         .eq("anio", anio)
-        .maybeSingle()
+        .in("censo_id", cumpleanosHoy.map((c) => c.id))
 
-      if (!yaEnv) {
-        pendientes.push(c)
-      }
+      const enviadosSet = new Set(
+        (yaEnviados || []).map((e) => `${e.censo_id}|${e.fuente}`)
+      )
+      pendientes = cumpleanosHoy.filter((c) => !enviadosSet.has(`${c.id}|${c.fuente}`))
     }
 
     // Enviar a cada pendiente
