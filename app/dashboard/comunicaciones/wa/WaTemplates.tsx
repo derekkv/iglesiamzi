@@ -36,6 +36,7 @@ const USE_CASE_FIELDS: Record<string, string[]> = {
   aviso_requerimiento: ["destinatario", "solicitante", "detalle"],
   aviso_ayuda_social: ["destinatario", "detalle"],
   aviso_herederos: ["nino", "estado", "salon"],
+  aviso_herederos_c: ["nino", "estado", "alergias", "observaciones", "salon"],
 }
 
 const STATUS_STYLES: Record<string, string> = {

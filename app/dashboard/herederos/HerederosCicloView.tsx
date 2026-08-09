@@ -362,9 +362,9 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
         if (!userData) continue
 
         const statusText = status === "A" ? "ha llegado" : "ha llegado atrasado"
-        const alergias = participante.alergias ? `\n⚠️ ALERGIAS: ${participante.alergias}` : ""
-        const observaciones = participante.observaciones ? `\n📝 Observaciones: ${participante.observaciones}` : ""
-        const mensaje = `👶 *${participante.nombre}* ${statusText} a *${salon}*${alergias}${observaciones}\n\n¡Tener cuidado y atención!`
+        const alergias = participante.alergias || "Ninguna"
+        const observaciones = participante.observaciones || "Ninguna"
+        const mensaje = `👶 *Herederos del Reino*\n\nLe informamos sobre ${participante.nombre}.\n\n📍 Estado: ${statusText}\n📍 Alergias: ${alergias}\n📍 Observaciones: ${observaciones}\n🏫 Salón: ${salon}\n\nIngresa a la aplicación para más detalles.`
 
         // Enviar por WhatsApp si tiene teléfono
         if (userData.phone) {
@@ -375,10 +375,12 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
               phone: formatPhoneForWhatsApp(userData.phone),
               message: mensaje,
               origen: "herederos",
-              useCase: "aviso_herederos",
+              useCase: "aviso_herederos_c",
               templateData: {
                 nino: participante.nombre,
-                estado: `${statusText}${participante.alergias ? ` | ⚠️ Alergias: ${participante.alergias}` : ""}${participante.observaciones ? ` | 📝 Obs: ${participante.observaciones}` : ""}`,
+                estado: statusText,
+                alergias,
+                observaciones,
                 salon,
               },
             }),
@@ -392,8 +394,8 @@ export function HerederosCicloView({ tipo, canEdit }: HerederosCicloViewProps) {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               to: userData.email,
-              subject: `${participante.nombre} ${statusText} a ${salon}`,
-              html: `<p><strong>${participante.nombre}</strong> ${statusText} a <strong>${salon}</strong></p>${alergias ? `<p style="color:red">⚠️ ALERGIAS: ${participante.alergias}</p>` : ""}${observaciones ? `<p>📝 Observaciones: ${participante.observaciones}</p>` : ""}<p><em>¡Tener cuidado y atención!</em></p>`,
+              subject: `👶 ${participante.nombre} ${statusText} — Herederos del Reino`,
+              html: `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:500px;margin:0 auto;"><h3>👶 Herederos del Reino</h3><p>Le informamos sobre <strong>${participante.nombre}</strong>.</p><table style="border-collapse:collapse;width:100%;margin:12px 0;"><tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;">📍 Estado</td><td style="padding:8px;border:1px solid #e5e7eb;">${statusText}</td></tr><tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;">📍 Alergias</td><td style="padding:8px;border:1px solid #e5e7eb;">${alergias}</td></tr><tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;">📝 Observaciones</td><td style="padding:8px;border:1px solid #e5e7eb;">${observaciones}</td></tr><tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;">🏫 Salón</td><td style="padding:8px;border:1px solid #e5e7eb;">${salon}</td></tr></table><p><em>Ingresa a la aplicación para más detalles.</em></p></div>`,
             }),
           }).catch(() => {})
         }

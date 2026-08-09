@@ -43,6 +43,7 @@ export const WA_USE_CASES = [
   "aviso_requerimiento",
   "aviso_ayuda_social",
   "aviso_herederos",
+  "aviso_herederos_c",
 ] as const
 
 export type WaUseCase = (typeof WA_USE_CASES)[number]
@@ -60,6 +61,7 @@ export const WA_USE_CASE_LABELS: Record<string, string> = {
   aviso_requerimiento: "Requerimientos de bienes y servicios",
   aviso_ayuda_social: "Redil / ayuda social",
   aviso_herederos: "Herederos del Reino (ciclos)",
+  aviso_herederos_c: "Herederos del Reino — llegada de niño",
 }
 
 const WINDOW_MS = 24 * 60 * 60 * 1000
