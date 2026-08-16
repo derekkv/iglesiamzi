@@ -15,6 +15,7 @@ import { useNotificaciones } from "@/hooks/use-notificaciones"
 import { todayEcuador } from "@/lib/timezone"
 import { ChangePasswordModal } from "@/components/ChangePasswordModal"
 import { BuzonNotificaciones } from "@/components/BuzonNotificaciones"
+import { GlobalSearch } from "@/components/GlobalSearch"
 
 
 interface ModulePermission {
@@ -281,6 +282,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
+              <GlobalSearch />
               <BuzonNotificaciones />
               <Badge variant="outline" className="text-blue-600 border-blue-200 text-xs hidden sm:inline-flex">
                 {new Date(todayEcuador() + "T12:00:00").toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}
