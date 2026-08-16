@@ -372,6 +372,20 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: true,
   },
 
+  // === REDIL - EXISTENCIA DE AYUDA (inventario de ayuda social) ===
+  existencia_ayuda_categorias: {
+    modules: ["existencia_ayuda", "redil_ayuda_social", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  existencia_ayuda_items: {
+    modules: ["existencia_ayuda", "redil_ayuda_social", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  existencia_ayuda_movimientos: {
+    modules: ["existencia_ayuda", "redil_ayuda_social", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+
   // === WHATSAPP (legacy — deprecado, el historial nuevo vive en wa_messages) ===
   whatsapp_messages: {
     modules: ["administracion", "comunicaciones"],

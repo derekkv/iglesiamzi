@@ -32,6 +32,7 @@ const MODULES = [
   { value: "administracion", label: "Administración" },
   { value: "caja_chica", label: "Caja Chica" },
   { value: "redil_ayuda_social", label: "Redil - Ayuda Social" },
+  { value: "existencia_ayuda", label: "Redil - Existencia de Ayuda" },
   { value: "gestion-atrasados", label: "Gestión Atrasados" },
   { value: "eventos_encuentro", label: "Eventos / Encuentro" },
   { value: "ofrenda-celulas", label: "Ofrenda Células" },
