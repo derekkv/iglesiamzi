@@ -134,7 +134,38 @@ export interface EntregaRedil {
   observaciones: string | null
   entregado_por: string
   entregado_por_nombre: string
+  articulos_entregados: ArticulosEntregados | null  // JSONB con lo entregado
   created_at: string
+}
+
+// Un artículo entregado (descontado del inventario de existencia-ayuda)
+export interface ArticuloEntregado {
+  item_id: number
+  item_nombre: string
+  categoria: string | null
+  cantidad: number
+}
+
+// Estructura persistida en entregas_redil.articulos_entregados (JSONB)
+export interface ArticulosEntregados {
+  incluye_canasta: boolean
+  articulos: ArticuloEntregado[]
+}
+
+/** Parsear los artículos entregados desde la columna JSONB (tolerante a texto o objeto). */
+export function parseArticulosEntregados(entrega: EntregaRedil): ArticulosEntregados {
+  const vacio: ArticulosEntregados = { incluye_canasta: false, articulos: [] }
+  const raw = entrega.articulos_entregados as any
+  if (!raw) return vacio
+  try {
+    const obj = typeof raw === "string" ? JSON.parse(raw) : raw
+    return {
+      incluye_canasta: !!obj?.incluye_canasta,
+      articulos: Array.isArray(obj?.articulos) ? obj.articulos : [],
+    }
+  } catch {
+    return vacio
+  }
 }
 
 // Archivo subido a Supabase Storage
@@ -218,6 +249,10 @@ export interface EntregaInput {
   fecha_entrega: string
   archivos: ArchivoSubido[]
   observaciones?: string
+  /** Si la entrega incluye la canasta (todos los alimentos de existencia-ayuda) */
+  incluye_canasta?: boolean
+  /** Artículos a entregar; se descuentan del inventario y se registran como egresos */
+  articulos?: ArticuloEntregado[]
 }
 
 // ============================================================
@@ -442,48 +477,32 @@ class RedilAyudaSocialService {
     input: EntregaInput,
     usuario: { id: string; nombre: string }
   ): Promise<void> {
-    // 1. Crear registro de entrega
-    const { error: entregaError } = await db
-      .from("entregas_redil")
-      .insert({
-        caso_id: casoId,
-        fecha_entrega: input.fecha_entrega,
-        foto1: input.archivos.length > 0 ? JSON.stringify(input.archivos) : null,
-        observaciones: input.observaciones || null,
-        entregado_por: usuario.id,
-        entregado_por_nombre: usuario.nombre,
-      })
-      .select("*")
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+    if (!token) throw new Error("No hay sesión activa")
 
-    if (entregaError) throw new Error(entregaError.message)
+    const arts = (input.articulos || []).filter((a) => a.item_id && Number(a.cantidad) > 0)
 
-    // 2. Cerrar el caso
-    const { error: updateError } = await db
-      .from("casos_redil")
-      .update({
-        estado: "cerrado",
-        fecha_cierre: new Date().toISOString(),
-      })
-      .eq("id", casoId)
-
-    if (updateError) throw new Error(updateError.message)
-
-    // Audit log
-    auditService.log({
-      user_id: usuario.id,
-      user_name: usuario.nombre,
-      module: "redil_ayuda_social",
-      action: "editar",
-      description: `Entrega registrada - Caso #${casoId}`,
-      details: {
-        caso_id: casoId,
-        fecha_entrega: input.fecha_entrega,
-        observaciones: input.observaciones,
-        archivos_count: input.archivos.length,
-        antes: { estado: "pendiente_entrega" },
-        despues: { estado: "cerrado" },
+    const res = await fetch("/api/redil/registrar-entrega", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
+      body: JSON.stringify({
+        caso_id: casoId,
+        fecha_entrega: input.fecha_entrega,
+        observaciones: input.observaciones || null,
+        foto1: input.archivos.length > 0 ? JSON.stringify(input.archivos) : null,
+        incluye_canasta: !!input.incluye_canasta,
+        articulos: arts,
+        usuario_nombre: usuario.nombre,
+      }),
     })
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error || `Error ${res.status} registrando entrega`)
+    }
   }
 
   /** Eliminar caso completo (solo admin) */

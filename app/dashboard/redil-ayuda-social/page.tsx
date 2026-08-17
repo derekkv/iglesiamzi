@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   ArrowLeft, Plus, Search, Lock, Loader2, Eye, Trash2, Send, CheckCircle, XCircle,
-  Package, History, ClipboardList, Upload, X, FileText, Film, ImageIcon,
+  Package, History, ClipboardList, Upload, X, FileText, Film, ImageIcon, ShoppingBasket,
 } from "lucide-react"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
@@ -27,9 +27,12 @@ import { useRealtime } from "@/hooks/use-realtime"
 import { toast } from "sonner"
 import {
   redilService, enviarNotificacionRedil,
-  ESTADOS_LABELS, ESTADOS_COLORS, TIPOS_AYUDA, parseArchivos,
-  type CasoRedil, type CasoCompleto, type SolicitudInput, type VisitaTecnicaInput, type EntregaInput, type EstadoCaso, type ArchivoSubido,
+  ESTADOS_LABELS, ESTADOS_COLORS, TIPOS_AYUDA, parseArchivos, parseArticulosEntregados,
+  type CasoRedil, type CasoCompleto, type SolicitudInput, type VisitaTecnicaInput, type EntregaInput, type EstadoCaso, type ArchivoSubido, type ArticuloEntregado,
 } from "@/lib/mod/redil-ayuda-social-service"
+import { existenciaAyudaService, type ExistenciaItem } from "@/lib/mod/existencia-ayuda-service"
+
+const CATEGORIA_ALIMENTOS = "Alimentos"
 
 
 // ============================================================
@@ -343,6 +346,12 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
+  // Inventario de existencia-ayuda para seleccionar qué se entrega
+  const [existenciaItems, setExistenciaItems] = useState<ExistenciaItem[]>([])
+  const [incluyeCanasta, setIncluyeCanasta] = useState(false)
+  // Cantidades seleccionadas por item_id (source of truth de lo que se entrega)
+  const [articulosCantidad, setArticulosCantidad] = useState<Record<number, number>>({})
+
   const loadCaso = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true)
@@ -362,6 +371,46 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   useRealtime({ table: "casos_redil", filter: `id=eq.${casoId}`, onChange: () => loadCaso(true) })
   useRealtime({ table: "visitas_tecnicas", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
   useRealtime({ table: "entregas_redil", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
+
+  const loadExistencia = useCallback(async () => {
+    try {
+      const items = await existenciaAyudaService.getItems()
+      setExistenciaItems(items)
+    } catch (error: any) {
+      toast.error("Error cargando existencia de ayuda: " + error.message)
+    }
+  }, [])
+
+  useEffect(() => { loadExistencia() }, [loadExistencia])
+  useRealtime({ table: "existencia_ayuda_items", onChange: loadExistencia })
+
+  // Helpers de selección de artículos
+  const setCantidadArticulo = (itemId: number, cantidad: number) => {
+    setArticulosCantidad((prev) => {
+      const next = { ...prev }
+      if (!cantidad || cantidad <= 0) delete next[itemId]
+      else next[itemId] = cantidad
+      return next
+    })
+  }
+
+  const toggleCanasta = (checked: boolean) => {
+    setIncluyeCanasta(checked)
+    setArticulosCantidad((prev) => {
+      const next = { ...prev }
+      const alimentos = existenciaItems.filter((i) => i.categoria === CATEGORIA_ALIMENTOS)
+      if (checked) {
+        // Agregar todos los alimentos con existencia; cantidad por defecto 1 (o la ya puesta)
+        for (const item of alimentos) {
+          if (Number(item.cantidad_actual) > 0 && !next[item.id]) next[item.id] = 1
+        }
+      } else {
+        // Quitar los alimentos de la selección
+        for (const item of alimentos) delete next[item.id]
+      }
+      return next
+    })
+  }
 
   const handleGuardarVisita = async () => {
     if (!visitaForm.ficha_recomendacion) { toast.error("Seleccione una recomendación técnica"); return }
@@ -407,6 +456,24 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   const handleGuardarEntrega = async () => {
     if (!entregaForm.fecha_entrega) { toast.error("La fecha de entrega es requerida"); return }
 
+    // Construir lista de artículos seleccionados y validar existencia
+    const articulos: ArticuloEntregado[] = []
+    for (const [idStr, cantidad] of Object.entries(articulosCantidad)) {
+      const itemId = Number(idStr)
+      const item = existenciaItems.find((i) => i.id === itemId)
+      if (!item || cantidad <= 0) continue
+      if (cantidad > Number(item.cantidad_actual)) {
+        toast.error(`No hay suficiente "${item.nombre}" (disponible: ${item.cantidad_actual})`)
+        return
+      }
+      articulos.push({
+        item_id: item.id,
+        item_nombre: item.nombre,
+        categoria: item.categoria,
+        cantidad,
+      })
+    }
+
     setSavingEntrega(true)
     setUploadingFiles(true)
     try {
@@ -418,13 +485,19 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
       }
       setUploadingFiles(false)
 
-      // Guardar entrega con URLs de archivos
+      // Guardar entrega con URLs de archivos + artículos entregados
       await redilService.registrarEntrega(casoId, {
         ...entregaForm,
         archivos: archivosSubidos,
+        incluye_canasta: incluyeCanasta,
+        articulos,
       }, { id: userId, nombre: userName })
 
-      toast.success("Entrega registrada. Caso cerrado.")
+      toast.success(
+        articulos.length > 0
+          ? `Entrega registrada. ${articulos.length} artículo(s) descontado(s) del inventario. Caso cerrado.`
+          : "Entrega registrada. Caso cerrado."
+      )
       await loadCaso(true)
     } catch (error: any) {
       toast.error("Error registrando entrega: " + error.message)
@@ -901,6 +974,27 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                   <p><span className="font-medium text-gray-500">Fecha:</span> {new Date(entrega.fecha_entrega).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</p>
                   <p><span className="font-medium text-gray-500">Entregado por:</span> {entrega.entregado_por_nombre}</p>
                 </div>
+                {/* Artículos entregados */}
+                {(() => {
+                  const ae = parseArticulosEntregados(entrega)
+                  if (!ae.articulos.length && !ae.incluye_canasta) return null
+                  return (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                      <p className="font-medium text-emerald-800 mb-2 flex items-center gap-2">
+                        <ShoppingBasket className="w-4 h-4" />Artículos entregados
+                        {ae.incluye_canasta && <Badge className="bg-emerald-600 text-white text-xs ml-1">🧺 Canasta incluida</Badge>}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {ae.articulos.map((art, idx) => (
+                          <Badge key={idx} className="bg-white border border-emerald-300 text-emerald-800 px-2 py-1 text-xs">
+                            {art.item_nombre} <span className="font-bold ml-1">× {art.cantidad}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {entrega.observaciones && (
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="font-medium text-gray-700 mb-1">Observaciones:</p>
@@ -972,6 +1066,89 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                       <Input id="fecha_entrega" type="date" value={entregaForm.fecha_entrega} onChange={(e) => setEntregaForm({ ...entregaForm, fecha_entrega: e.target.value })} className="mt-1 max-w-xs" />
                     </div>
 
+                    {/* ¿Qué se va a entregar? */}
+                    <div className="space-y-3">
+                      <Label className="font-semibold flex items-center gap-2">
+                        <ShoppingBasket className="w-4 h-4 text-emerald-600" />¿Qué se va a entregar?
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Selecciona los artículos a entregar. Se descontarán automáticamente del inventario de
+                        Existencia de Ayuda y se registrarán como egresos.
+                      </p>
+
+                      {/* Opción Canasta (todos los alimentos) */}
+                      <div
+                        onClick={() => toggleCanasta(!incluyeCanasta)}
+                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${incluyeCanasta ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-gray-200 hover:border-emerald-200 hover:bg-emerald-50/40"}`}
+                      >
+                        <Checkbox checked={incluyeCanasta} onCheckedChange={(c) => toggleCanasta(!!c)} onClick={(e) => e.stopPropagation()} />
+                        <span className="text-2xl">🧺</span>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">Canasta de alimentos</p>
+                          <p className="text-xs text-gray-500">Incluye todos los alimentos con existencia disponible</p>
+                        </div>
+                        {incluyeCanasta && <CheckCircle className="w-5 h-5 text-emerald-600" />}
+                      </div>
+
+                      {/* Lista de artículos agrupados por categoría */}
+                      {existenciaItems.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic px-1">No hay artículos registrados en Existencia de Ayuda.</p>
+                      ) : (
+                        <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-3 bg-gray-50/50">
+                          {Array.from(new Set(existenciaItems.map((i) => i.categoria))).map((cat) => {
+                            const items = existenciaItems.filter((i) => i.categoria === cat)
+                            return (
+                              <div key={cat} className="space-y-2">
+                                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                  {cat} {cat === CATEGORIA_ALIMENTOS && "🍚"}
+                                </p>
+                                <div className="space-y-1.5">
+                                  {items.map((item) => {
+                                    const cantidad = articulosCantidad[item.id] || 0
+                                    const sinStock = Number(item.cantidad_actual) <= 0
+                                    const excede = cantidad > Number(item.cantidad_actual)
+                                    return (
+                                      <div key={item.id} className={`flex items-center gap-3 p-2 rounded-lg border bg-white ${cantidad > 0 ? "border-emerald-300 ring-1 ring-emerald-200" : "border-gray-100"}`}>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium truncate">{item.nombre}</p>
+                                          <p className={`text-xs ${sinStock ? "text-red-500 font-medium" : "text-gray-400"}`}>
+                                            Disponible: {item.cantidad_actual}
+                                          </p>
+                                        </div>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          max={Number(item.cantidad_actual)}
+                                          value={cantidad || ""}
+                                          disabled={sinStock}
+                                          onChange={(e) => setCantidadArticulo(item.id, parseInt(e.target.value) || 0)}
+                                          placeholder="0"
+                                          className={`w-24 h-9 ${excede ? "border-red-400 text-red-600" : ""}`}
+                                        />
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Resumen de lo seleccionado */}
+                      {Object.keys(articulosCantidad).length > 0 && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm">
+                          <p className="font-medium text-emerald-800 mb-2">Se entregará:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(articulosCantidad).map(([id, cant]) => {
+                              const item = existenciaItems.find((i) => i.id === Number(id))
+                              if (!item) return null
+                              return <Badge key={id} className="bg-emerald-100 text-emerald-800 border-emerald-200">{item.nombre} × {cant}</Badge>
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Upload de archivos múltiples */}
                     <div className="space-y-3">
