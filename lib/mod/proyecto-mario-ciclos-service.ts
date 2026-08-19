@@ -107,6 +107,39 @@ function recalcularFechasDesde(fechas: string[], indiceModificado: number, nueva
   return resultado
 }
 
+/**
+ * Devuelve el domingo en/o-después de la fecha dada (YYYY-MM-DD).
+ * Si la fecha ya es domingo, la retorna igual; si no, avanza al próximo domingo.
+ * Ej: miércoles 19 → domingo 23 (el domingo de esa misma semana).
+ */
+export function proximoDomingo(fechaBase: string): string {
+  const fecha = new Date(fechaBase + "T12:00:00")
+  const dia = fecha.getDay() // 0 = domingo
+  if (dia !== 0) fecha.setDate(fecha.getDate() + (7 - dia))
+  const y = fecha.getFullYear()
+  const m = String(fecha.getMonth() + 1).padStart(2, "0")
+  const d = String(fecha.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Genera `cantidad` domingos consecutivos (uno por semana) a partir del primer
+ * domingo en/o-después de `fechaBase`.
+ */
+export function generarDomingos(fechaBase: string, cantidad: number): string[] {
+  const fechas: string[] = []
+  if (cantidad <= 0) return fechas
+  const fecha = new Date(proximoDomingo(fechaBase) + "T12:00:00")
+  for (let i = 0; i < cantidad; i++) {
+    const y = fecha.getFullYear()
+    const m = String(fecha.getMonth() + 1).padStart(2, "0")
+    const d = String(fecha.getDate()).padStart(2, "0")
+    fechas.push(`${y}-${m}-${d}`)
+    fecha.setDate(fecha.getDate() + 7)
+  }
+  return fechas
+}
+
 // === SERVICIO ===
 
 class ProyectoMarioCiclosService {
@@ -344,8 +377,7 @@ class ProyectoMarioCiclosService {
   }
 
   /** Eliminar todas las fechas (y asistencia asociada) de un ciclo */
-  async deleteAllFechas(cicloId: number, audit?: AuditInfo): Promise<void> {
-    // Eliminar asistencia asociada a las fechas del ciclo
+  async deleteAllFechas(cicloId: number, audit?: AuditInfo): Promise<void> {    // Eliminar asistencia asociada a las fechas del ciclo
     const { error: asistError } = await supabase
       .from("proyecto_mario_ciclo_asistencia")
       .delete()
@@ -373,8 +405,61 @@ class ProyectoMarioCiclosService {
   }
 
   /**
+   * Quitar todas las fechas que caen en DOMINGO (y su asistencia asociada).
+   * Es la acción inversa de "generar serie de domingos". Renumera las clases
+   * restantes de forma consecutiva (1..N).
+   */
+  async quitarFechasDomingo(cicloId: number, audit?: AuditInfo): Promise<ProyectoMarioCicloFecha[]> {
+    const fechas = await this.getFechas(cicloId)
+    const domingos = fechas.filter((f) => new Date(f.fecha + "T12:00:00").getDay() === 0)
+    if (domingos.length === 0) return fechas
+
+    const ids = domingos.map((f) => f.id)
+
+    // 1. Borrar la asistencia registrada en esas fechas
+    const { error: asistError } = await supabase
+      .from("proyecto_mario_ciclo_asistencia")
+      .delete()
+      .in("fecha_id", ids)
+    if (asistError) throw asistError
+
+    // 2. Borrar las fechas de domingo
+    const { error: fechasError } = await supabase
+      .from("proyecto_mario_ciclo_fechas")
+      .delete()
+      .in("id", ids)
+    if (fechasError) throw fechasError
+
+    // 3. Renumerar las clases restantes (1..N), en orden ascendente
+    const restantes = fechas.filter((f) => !ids.includes(f.id))
+    for (let i = 0; i < restantes.length; i++) {
+      if (restantes[i].numero_clase !== i + 1) {
+        const { error } = await supabase
+          .from("proyecto_mario_ciclo_fechas")
+          .update({ numero_clase: i + 1, updated_at: new Date().toISOString() })
+          .eq("id", restantes[i].id)
+        if (error) throw error
+      }
+    }
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "proyecto_mario",
+        action: "eliminar",
+        description: `Quitadas ${domingos.length} fecha(s) de domingo del ciclo #${cicloId}`,
+        details: { ciclo_id: cicloId, fechas_eliminadas: domingos.length, fechas: domingos.map((f) => f.fecha) },
+      })
+    }
+
+    return this.getFechas(cicloId)
+  }
+
+  /**
    * Cambiar una fecha y recalcular las siguientes.
-   * Solo las fechas posteriores al índice cambiado se recalculan como semanales consecutivas.
+   * Las fechas posteriores al índice cambiado se recalculan como semanales
+   * consecutivas. Además, si el ciclo tiene MENOS fechas que su `total_clases`,
+   * se CREAN las clases faltantes al final, continuando la cadencia semanal.
    */
   async cambiarFecha(cicloId: number, fechaId: number, nuevaFecha: string, audit?: AuditInfo): Promise<ProyectoMarioCicloFecha[]> {
     // Obtener todas las fechas del ciclo
@@ -395,20 +480,183 @@ class ProyectoMarioCiclosService {
       if (error) throw error
     }
 
+    // Si faltan clases para completar el total del ciclo, crearlas al final
+    // continuando la cadencia semanal desde la última fecha.
+    const { data: cicloRow } = await supabase
+      .from("proyecto_mario_ciclos")
+      .select("total_clases")
+      .eq("id", cicloId)
+      .single()
+
+    const totalClases = cicloRow?.total_clases ?? fechas.length
+    const faltan = totalClases - fechas.length
+    let creadas = 0
+
+    if (faltan > 0 && fechas.length > 0) {
+      const maxNumero = fechas.reduce((m, f) => Math.max(m, f.numero_clase), 0)
+      const base = new Date(nuevasFechas[fechas.length - 1] + "T12:00:00")
+      const nuevas: { ciclo_id: number; numero_clase: number; fecha: string }[] = []
+      for (let k = 0; k < faltan; k++) {
+        base.setDate(base.getDate() + 7)
+        const y = base.getFullYear()
+        const m = String(base.getMonth() + 1).padStart(2, "0")
+        const d = String(base.getDate()).padStart(2, "0")
+        nuevas.push({ ciclo_id: cicloId, numero_clase: maxNumero + 1 + k, fecha: `${y}-${m}-${d}` })
+      }
+      const { error } = await supabase.from("proyecto_mario_ciclo_fechas").insert(nuevas)
+      if (error) throw error
+      creadas = nuevas.length
+    }
+
     if (audit) {
       auditService.log({
         ...audit,
         module: "proyecto_mario",
         action: "editar",
-        description: `Fecha clase ${indice + 1} cambiada a ${nuevaFecha}, recalculando siguientes`,
-        details: { ciclo_id: cicloId, clase: indice + 1, nueva_fecha: nuevaFecha },
+        description: `Fecha clase ${indice + 1} cambiada a ${nuevaFecha}, recalculando siguientes${creadas > 0 ? ` y creando ${creadas} clase(s) faltante(s)` : ""}`,
+        details: { ciclo_id: cicloId, clase: indice + 1, nueva_fecha: nuevaFecha, fechas_creadas: creadas },
       })
     }
 
     return this.getFechas(cicloId)
   }
 
-  // --- ASISTENCIA ---
+  /**
+   * Reordena TODAS las fechas del ciclo por fecha ascendente y renumera
+   * `numero_clase` 1..N. Renumerado en dos pasadas (temporales altos → finales)
+   * para no chocar con un posible índice único (ciclo_id, numero_clase).
+   * No toca la asistencia (referencia por fecha_id, no por numero_clase).
+   */
+  private async reordenarPorFecha(cicloId: number): Promise<void> {
+    const fechas = await this.getFechas(cicloId)
+    const ordenadas = [...fechas].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0))
+
+    // Si ya está ordenado y contiguo (1..N), no hacer nada
+    const yaOrdenado = ordenadas.every((f, i) => f.numero_clase === i + 1)
+    if (yaOrdenado) return
+
+    // Pasada 1: números temporales altos
+    for (let i = 0; i < ordenadas.length; i++) {
+      const { error } = await supabase
+        .from("proyecto_mario_ciclo_fechas")
+        .update({ numero_clase: 10000 + i + 1 })
+        .eq("id", ordenadas[i].id)
+      if (error) throw error
+    }
+    // Pasada 2: números finales 1..N
+    for (let i = 0; i < ordenadas.length; i++) {
+      const { error } = await supabase
+        .from("proyecto_mario_ciclo_fechas")
+        .update({ numero_clase: i + 1, updated_at: new Date().toISOString() })
+        .eq("id", ordenadas[i].id)
+      if (error) throw error
+    }
+  }
+
+  /**
+   * Agrega UNA fecha (clase) suelta al ciclo y reordena todas las columnas por
+   * fecha (numero_clase 1..N). Útil para reponer una fecha que faltaba (p.ej.
+   * un 15/8 borrado) en su posición cronológica correcta. No toca la asistencia
+   * de las demás fechas. La asistencia de la fecha nueva queda en blanco.
+   */
+  async agregarFecha(cicloId: number, fecha: string, audit?: AuditInfo): Promise<ProyectoMarioCicloFecha[]> {
+    if (!fecha) throw new Error("Fecha requerida")
+
+    const fechas = await this.getFechas(cicloId)
+    if (fechas.some((f) => f.fecha === fecha)) throw new Error("Ya existe una clase con esa fecha")
+
+    const maxNumero = fechas.reduce((m, f) => Math.max(m, f.numero_clase), 0)
+
+    // Insertar la nueva fecha al final (evita choques de numero_clase)
+    const { error } = await supabase
+      .from("proyecto_mario_ciclo_fechas")
+      .insert({ ciclo_id: cicloId, numero_clase: maxNumero + 1, fecha })
+      .select()
+      .single()
+    if (error) throw error
+
+    // Reordenar todas las columnas por fecha (numero_clase 1..N)
+    await this.reordenarPorFecha(cicloId)
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "proyecto_mario",
+        action: "crear",
+        description: `Fecha agregada al ciclo #${cicloId}: ${fecha}`,
+        details: { ciclo_id: cicloId, fecha },
+      })
+    }
+
+    return this.getFechas(cicloId)
+  }
+
+  /**
+   * Agrega `cantidad` fechas de DOMINGO como columnas NUEVAS, al lado de las que
+   * ya existen (sin modificar ni eliminar ninguna). Empieza por el domingo en/o
+   * -después de `fechaBase` y avanza semana a semana, OMITIENDO los domingos que
+   * ya existan como columna (para no duplicar). Las nuevas clases se numeran
+   * continuando desde la última (max numero_clase + 1).
+   */
+  async agregarSerieDomingos(
+    cicloId: number,
+    fechaBase: string,
+    cantidad: number,
+    audit?: AuditInfo
+  ): Promise<ProyectoMarioCicloFecha[]> {
+    if (!cantidad || cantidad <= 0) throw new Error("La cantidad de domingos debe ser mayor a 0")
+
+    const fechas = await this.getFechas(cicloId)
+    const maxNumero = fechas.reduce((m, f) => Math.max(m, f.numero_clase), 0)
+    const existentes = new Set(fechas.map((f) => f.fecha))
+
+    // Generar domingos consecutivos, saltando los que ya existen, hasta juntar `cantidad`
+    const nuevasFechas: string[] = []
+    const cursor = new Date(proximoDomingo(fechaBase) + "T12:00:00")
+    let guard = 0
+    const maxIteraciones = cantidad + existentes.size + 520 // ~10 años de tope de seguridad
+    while (nuevasFechas.length < cantidad && guard < maxIteraciones) {
+      const y = cursor.getFullYear()
+      const m = String(cursor.getMonth() + 1).padStart(2, "0")
+      const d = String(cursor.getDate()).padStart(2, "0")
+      const fechaStr = `${y}-${m}-${d}`
+      if (!existentes.has(fechaStr)) nuevasFechas.push(fechaStr)
+      cursor.setDate(cursor.getDate() + 7)
+      guard++
+    }
+
+    if (nuevasFechas.length === 0) return fechas
+
+    const nuevas = nuevasFechas.map((fecha, i) => ({
+      ciclo_id: cicloId,
+      numero_clase: maxNumero + 1 + i,
+      fecha,
+    }))
+
+    const { error } = await supabase.from("proyecto_mario_ciclo_fechas").insert(nuevas)
+    if (error) throw error
+
+    // Reordenar todas las columnas por fecha para que los domingos queden en su
+    // posición cronológica (no al final)
+    await this.reordenarPorFecha(cicloId)
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "proyecto_mario",
+        action: "crear",
+        description: `Agregados ${nuevasFechas.length} domingos al ciclo #${cicloId} (${nuevasFechas[0]} → ${nuevasFechas[nuevasFechas.length - 1]})`,
+        details: {
+          ciclo_id: cicloId,
+          cantidad: nuevasFechas.length,
+          primer_domingo: nuevasFechas[0],
+          ultimo_domingo: nuevasFechas[nuevasFechas.length - 1],
+        },
+      })
+    }
+
+    return this.getFechas(cicloId)
+  }
 
   async getAsistencia(cicloId: number): Promise<ProyectoMarioCicloAsistencia[]> {
     const { data, error } = await supabase

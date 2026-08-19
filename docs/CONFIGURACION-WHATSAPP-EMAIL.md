@@ -535,11 +535,17 @@ Conéctate por SSH y ejecuta `crontab -e`. Añade:
 ```cron
 # Sincronizar correo entrante cada 5 minutos
 */5 * * * * curl -s -X POST https://panel.iglesiaregalodedios.com/api/email/sync -H "X-Internal-Secret: TU_SECRETO" > /dev/null 2>&1
+
+# Registrar automáticamente la fecha del domingo en el módulo de Asistencia.
+# Corre cada domingo a las 06:00 (hora del servidor). Crea la columna del día
+# en el mes activo aunque nadie entre al módulo. Es idempotente: no duplica.
+0 6 * * 0 curl -s https://panel.iglesiaregalodedios.com/api/cron-asistencia -H "Authorization: Bearer TU_CRON_SECRET" > /dev/null 2>&1
 ```
 
 Sustituye `TU_SECRETO` por el valor de `INTERNAL_API_SECRET`. Si esa variable no
 existe en el `.env`, el sistema usa `CRON_SECRET`, y si tampoco existe, un valor
-por defecto que **deberías cambiar**:
+por defecto que **deberías cambiar**. El cron de asistencia usa `CRON_SECRET`
+(el mismo header `Authorization: Bearer` que `cron-reminders` y `cron-cumpleanos`):
 
 ```bash
 # En el .env del servidor

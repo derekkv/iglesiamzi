@@ -34,6 +34,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useMonth } from "@/contexts/month-context"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
+import { todayEcuador } from "@/lib/timezone"
 
 interface CellData {
   cantidad: number
@@ -102,9 +103,14 @@ function AsistenciaContent({ canEdit }: { canEdit: boolean }) {
       })
       setAttendanceData(dataMap)
 
-      // Auto-registrar la fecha de hoy SOLO si es domingo
+      // Auto-registrar la fecha de hoy SOLO si es domingo.
+      // Nota: el registro principal lo garantiza el cron /api/cron-asistencia
+      // (corre en el servidor cada domingo aunque nadie entre al módulo). Esto
+      // es solo un respaldo inmediato para cuando un editor sí abre el módulo.
+      // Se usa la hora de Ecuador para que el "domingo" y la fecha guardada
+      // coincidan con el resto del sistema.
       if (!silent && canEdit) {
-        const today = new Date().toISOString().split("T")[0]
+        const today = todayEcuador()
         const date = new Date(today + "T12:00:00")
         const isSunday = date.getDay() === 0
         if (isSunday) {

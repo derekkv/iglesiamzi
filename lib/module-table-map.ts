@@ -80,7 +80,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["ingresos_egresos", "diezmos", "caja_chica", "control_mensual", "eventos_encuentro", "presupuesto_anual", "resumen-pastoral"],
   },
   egresos: {
-    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica", "control_mensual", "presupuesto_anual", "resumen-pastoral"],
+    modules: ["ingresos_egresos", "flujo_pago", "pago_diario", "caja_chica", "control_mensual", "presupuesto_anual", "resumen-pastoral", "pasivos"],
   },
 
   // === CAJA CHICA ===
@@ -341,6 +341,16 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   },
   asistencia_culto_seguimiento: {
     modules: ["asistencia_culto", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+
+  // === PASIVOS (deudas de la iglesia) ===
+  pasivos: {
+    modules: ["pasivos", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  pasivos_abonos: {
+    modules: ["pasivos", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
 

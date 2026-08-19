@@ -4,8 +4,24 @@ import { useEffect } from "react"
 
 export function ErrorReporter() {
   useEffect(() => {
+    // Anti-flood: evita que un mismo error en bucle sature /api/report-error.
+    // - Deduplica por firma (contexto+mensaje) durante una ventana de tiempo.
+    // - Cap global de envíos por sesión de página.
+    const recent = new Map<string, number>()
+    const DEDUPE_MS = 60_000 // no repetir el mismo error más de 1 vez/minuto
+    const MAX_REPORTS = 50 // tope duro por carga de página
+    let sent = 0
+
     function reportError(context: string, error: string, details?: string) {
       try {
+        const key = `${context}:${(error || "").slice(0, 120)}`
+        const now = Date.now()
+        const last = recent.get(key)
+        if (last && now - last < DEDUPE_MS) return
+        if (sent >= MAX_REPORTS) return
+        recent.set(key, now)
+        sent++
+
         fetch("/api/report-error", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

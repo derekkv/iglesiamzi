@@ -79,6 +79,8 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
   const [showEditFecha, setShowEditFecha] = useState(false)
   const [editingFecha, setEditingFecha] = useState<ProyectoMarioCicloFecha | null>(null)
   const [nuevaFechaEdit, setNuevaFechaEdit] = useState("")
+  const [showAddFecha, setShowAddFecha] = useState(false)
+  const [nuevaFechaAdd, setNuevaFechaAdd] = useState("")
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const audit = user ? { user_id: user.id, user_name: user.username } : undefined
@@ -183,11 +185,66 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
     if (!editingFecha || !nuevaFechaEdit || !data) return
     setSaving(true)
     try {
-      await proyectoMarioCiclosService.cambiarFecha(data.ciclo.id, editingFecha.id, nuevaFechaEdit, audit)
-      toast.success("Fecha actualizada y siguientes recalculadas")
+      const antes = data.fechas.length
+      const result = await proyectoMarioCiclosService.cambiarFecha(data.ciclo.id, editingFecha.id, nuevaFechaEdit, audit)
+      const creadas = result.length - antes
+      toast.success(creadas > 0 ? `Fecha actualizada; se crearon ${creadas} clase(s) faltante(s)` : "Fecha actualizada y siguientes recalculadas")
       setShowEditFecha(false)
       setEditingFecha(null)
       setNuevaFechaEdit("")
+      await loadData()
+    } catch (error: any) {
+      toast.error("Error: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleGenerarDomingos = async () => {
+    if (!nuevaFechaEdit || !data) return
+    const domingosExistentes = data.fechas.filter((f) => new Date(f.fecha + "T12:00:00").getDay() === 0).length
+    const cantidad = data.ciclo.total_clases - domingosExistentes
+    if (cantidad <= 0) {
+      toast.error("Este ciclo ya tiene sus domingos completos")
+      return
+    }
+    setSaving(true)
+    try {
+      const result = await proyectoMarioCiclosService.agregarSerieDomingos(data.ciclo.id, nuevaFechaEdit, cantidad, audit)
+      const creados = result.length - data.fechas.length
+      toast.success(`${creados} domingo(s) agregado(s) junto a las fechas existentes`)
+      setShowEditFecha(false)
+      setEditingFecha(null)
+      setNuevaFechaEdit("")
+      await loadData()
+    } catch (error: any) {
+      toast.error("Error: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAddFecha = async () => {
+    if (!nuevaFechaAdd || !data) return
+    setSaving(true)
+    try {
+      await proyectoMarioCiclosService.agregarFecha(data.ciclo.id, nuevaFechaAdd, audit)
+      toast.success("Fecha agregada (columnas reordenadas por fecha)")
+      setShowAddFecha(false)
+      setNuevaFechaAdd("")
+      await loadData()
+    } catch (error: any) {
+      toast.error("Error: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleQuitarDomingos = async () => {    if (!data) return
+    setSaving(true)
+    try {
+      await proyectoMarioCiclosService.quitarFechasDomingo(data.ciclo.id, audit)
+      toast.success("Fechas de domingo eliminadas")
       await loadData()
     } catch (error: any) {
       toast.error("Error: " + error.message)
@@ -323,6 +380,11 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
             </Dialog>
           )}
           {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => { setNuevaFechaAdd(""); setShowAddFecha(true) }}>
+              <Plus className="w-4 h-4 mr-2" /> Agregar fecha
+            </Button>
+          )}
+          {canEdit && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50">
@@ -417,6 +479,30 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
               </AlertDialogContent>
             </AlertDialog>
           )}
+          {/* Botón quitar fechas de domingo (inverso de "generar domingos") */}
+          {canEdit && data.fechas.some((f) => new Date(f.fecha + "T12:00:00").getDay() === 0) && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50">
+                  <CalendarDays className="w-4 h-4 mr-2" /> Quitar domingos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Quitar las fechas de domingo?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se eliminarán las {data.fechas.filter((f) => new Date(f.fecha + "T12:00:00").getDay() === 0).length} fecha(s) que caen en domingo y la asistencia registrada en ellas. Las demás clases se renumeran. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleQuitarDomingos}>
+                    Quitar domingos
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         {/* Leyenda */}
@@ -440,11 +526,14 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
                   <tr className="bg-gray-50">
                     <th className="border border-gray-200 px-3 py-2 text-left text-sm font-medium">#</th>
                     <th className="border border-gray-200 px-3 py-2 text-left text-sm font-medium min-w-[180px]">Participante</th>
-                    {data.fechas.map((f) => (
-                      <th key={f.id} className="border border-gray-200 px-2 py-2 text-center text-xs font-medium min-w-[85px]">
+                    {data.fechas.map((f) => {
+                      const esDomingo = new Date(f.fecha + "T12:00:00").getDay() === 0
+                      return (
+                      <th key={f.id} className={`border border-gray-200 px-2 py-2 text-center text-xs font-medium min-w-[85px] ${esDomingo ? "bg-blue-100 text-blue-800" : ""}`}>
                         <div className="flex flex-col items-center gap-1">
                           <span className="font-semibold">C{f.numero_clase}</span>
                           <span>{new Date(f.fecha + "T00:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit" })}</span>
+                          {esDomingo && <span className="text-[10px] font-semibold text-blue-700 leading-none">DOM</span>}
                           {canEdit && (
                             <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-purple-500 hover:text-purple-700" onClick={() => { setEditingFecha(f); setNuevaFechaEdit(f.fecha); setShowEditFecha(true) }}>
                               <Edit className="w-3 h-3" />
@@ -452,7 +541,8 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
                           )}
                         </div>
                       </th>
-                    ))}
+                      )
+                    })}
                     <th className="border border-gray-200 px-3 py-2 text-center text-sm font-medium min-w-[110px]">Estatus</th>
                   </tr>
                 </thead>
@@ -491,8 +581,9 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
 
                       {data.fechas.map((f) => {
                         const status = getAttendanceStatus(p.id, f.id)
+                        const esDomingo = new Date(f.fecha + "T12:00:00").getDay() === 0
                         return (
-                          <td key={f.id} className="border border-gray-200 px-1 py-1 text-center">
+                          <td key={f.id} className={`border border-gray-200 px-1 py-1 text-center ${esDomingo ? "bg-blue-50" : ""}`}>
                             <Select value={status} onValueChange={(value) => handleAttendanceChange(p.id, f.id, value)} disabled={!canEdit}>
                               <SelectTrigger className={`w-full h-7 text-xs ${getAttendanceColor(status)}`}>
                                 <SelectValue placeholder="-" />
@@ -532,6 +623,26 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
         )}
 
 
+        {/* Modal agregar fecha suelta */}
+        {canEdit && (
+          <Dialog open={showAddFecha} onOpenChange={setShowAddFecha}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Agregar fecha</DialogTitle>
+                <DialogDescription>Agrega una clase con esta fecha (por ejemplo, para reponer una que faltaba). Las columnas se reordenan por fecha. La asistencia de esta nueva fecha queda en blanco.</DialogDescription>
+              </DialogHeader>
+              <div>
+                <Label>Fecha</Label>
+                <Input type="date" value={nuevaFechaAdd} onChange={(e) => setNuevaFechaAdd(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddFecha(false)}>Cancelar</Button>
+                <Button onClick={handleAddFecha} disabled={saving || !nuevaFechaAdd}>{saving ? "Guardando..." : "Agregar"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
         {/* Modal editar participante */}
         {canEdit && (
           <Dialog open={showEditParticipant} onOpenChange={setShowEditParticipant}>
@@ -558,11 +669,68 @@ export function ProyectoMarioCicloView({ tipo, canEdit }: ProyectoMarioCicloView
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Cambiar fecha - Clase {editingFecha?.numero_clase}</DialogTitle>
-                <DialogDescription>Al cambiar esta fecha, las clases posteriores se recalcularán como sesiones semanales consecutivas.</DialogDescription>
+                <DialogDescription>Al cambiar esta fecha, las clases posteriores se recalcularán como sesiones semanales consecutivas. Si faltan clases para completar el total del ciclo, se crearán al final.</DialogDescription>
               </DialogHeader>
-              <div>
-                <Label>Nueva fecha</Label>
-                <Input type="date" value={nuevaFechaEdit} onChange={(e) => setNuevaFechaEdit(e.target.value)} />
+              <div className="space-y-4">
+                <div>
+                  <Label>Nueva fecha</Label>
+                  <Input type="date" value={nuevaFechaEdit} onChange={(e) => setNuevaFechaEdit(e.target.value)} />
+                </div>
+
+                {/* Agregar domingos (columnas nuevas, al lado de las existentes) */}
+                {(() => {
+                  if (!nuevaFechaEdit || !data) return null
+                  const esDom = (s: string) => new Date(s + "T12:00:00").getDay() === 0
+                  const domingosExistentes = data.fechas.filter((f) => esDom(f.fecha)).length
+                  const cantidad = data.ciclo.total_clases - domingosExistentes
+                  const fmt = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" })
+                  if (cantidad <= 0) {
+                    return (
+                      <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+                        <p className="text-xs text-purple-800">
+                          Este ciclo ya tiene sus {data.ciclo.total_clases} domingos registrados.
+                        </p>
+                      </div>
+                    )
+                  }
+                  // Vista previa: domingos que se agregarán, saltando los que ya existan
+                  const existentes = new Set(data.fechas.map((f) => f.fecha))
+                  const preview: string[] = []
+                  const cursor = new Date(nuevaFechaEdit + "T12:00:00")
+                  if (cursor.getDay() !== 0) cursor.setDate(cursor.getDate() + (7 - cursor.getDay()))
+                  let guard = 0
+                  while (preview.length < cantidad && guard < cantidad + existentes.size + 520) {
+                    const y = cursor.getFullYear()
+                    const m = String(cursor.getMonth() + 1).padStart(2, "0")
+                    const d = String(cursor.getDate()).padStart(2, "0")
+                    const s = `${y}-${m}-${d}`
+                    if (!existentes.has(s)) preview.push(s)
+                    cursor.setDate(cursor.getDate() + 7)
+                    guard++
+                  }
+                  return (
+                    <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 space-y-2">
+                      <p className="text-sm font-medium text-purple-900">Agregar domingos</p>
+                      <p className="text-xs text-purple-800">
+                        Desde el día seleccionado se agregan <strong>{cantidad}</strong> domingo(s) (hasta completar las {data.ciclo.total_clases} clases del ciclo en domingo), al lado de las fechas existentes y sin modificarlas.
+                      </p>
+                      <p className="text-xs text-purple-700">
+                        {preview.slice(0, 6).map(fmt).join(" · ")}{preview.length > 6 ? ` … ${fmt(preview[preview.length - 1])}` : ""}
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-purple-300 text-purple-700 hover:bg-purple-100"
+                        onClick={handleGenerarDomingos}
+                        disabled={saving}
+                      >
+                        <CalendarDays className="w-4 h-4 mr-2" />
+                        {saving ? "Agregando..." : "Agregar domingos"}
+                      </Button>
+                    </div>
+                  )
+                })()}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowEditFecha(false)}>Cancelar</Button>
