@@ -8,7 +8,10 @@ export interface Pasivo {
   acreedor: string
   detalle: string | null
   monto_total: number
+  /** Fecha de pago acordada/estimada (ingresada manualmente) */
   fecha: string
+  /** Fecha y hora de ingreso al sistema — automática, hora Ecuador (UTC-5) */
+  fecha_ingreso: string
   estado: "pendiente" | "pagado"
   observacion: string | null
   created_at: string
@@ -51,7 +54,7 @@ class PasivosService {
     const { data, error } = await supabase
       .from("pasivos")
       .select("*")
-      .order("created_at", { ascending: false })
+      .order("fecha", { ascending: false })
     if (error) throw error
     return data || []
   }

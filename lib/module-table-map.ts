@@ -396,6 +396,34 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     requireEditForWrite: true,
   },
 
+  // === ADMINISTRACIÓN - EXISTENCIA (inventario de recursos administrativos) ===
+  existencia_adm_categorias: {
+    modules: ["existencia_administracion", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  existencia_adm_items: {
+    modules: ["existencia_administracion", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  existencia_adm_movimientos: {
+    modules: ["existencia_administracion", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+
+  // === MUJERES DE GRACIA - EXISTENCIA (inventario de recursos MDG) ===
+  existencia_mdg_categorias: {
+    modules: ["existencia_mdg", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  existencia_mdg_items: {
+    modules: ["existencia_mdg", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  existencia_mdg_movimientos: {
+    modules: ["existencia_mdg", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+
   // === WHATSAPP (legacy — deprecado, el historial nuevo vive en wa_messages) ===
   whatsapp_messages: {
     modules: ["administracion", "comunicaciones"],

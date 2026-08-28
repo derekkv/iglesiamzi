@@ -19,7 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Plus, Trash2, Pencil, Lock, Wallet, HandCoins } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Pencil, Lock, Wallet, HandCoins, ArrowUp, ArrowDown } from "lucide-react"
 import { pasivosService, type Pasivo, type PasivoAbono } from "@/lib/mod/pasivos-service"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useMonth } from "@/contexts/month-context"
@@ -31,6 +31,15 @@ const METODOS_PAGO = ["Efectivo", "Transferencia", "Cheque", "Tarjeta", "Otro"]
 const fmtMoney = (n: number) =>
   `$${(Number(n) || 0).toLocaleString("es-EC", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtDate = (s: string) => (s ? new Date(s + "T00:00:00").toLocaleDateString("es-EC") : "-")
+const fmtDateTime = (s: string) => {
+  if (!s) return "-"
+  return new Date(s).toLocaleDateString("es-EC", {
+    timeZone: "America/Guayaquil",
+    day: "2-digit", month: "2-digit", year: "numeric",
+  })
+}
+
+type SortDir = "asc" | "desc"
 
 function PasivosContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
@@ -43,6 +52,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "pendiente" | "pagado">("todos")
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
 
   // Crear/editar pasivo
   const [showPasivo, setShowPasivo] = useState(false)
@@ -81,7 +91,13 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
   const totalAbonado = abonos.reduce((s, a) => s + Number(a.monto), 0)
   const totalSaldo = totalDeuda - totalAbonado
 
-  const pasivosFiltrados = pasivos.filter((p) => filtroEstado === "todos" || p.estado === filtroEstado)
+  const pasivosFiltrados = pasivos
+    .filter((p) => filtroEstado === "todos" || p.estado === filtroEstado)
+    .sort((a, b) => {
+      const da = new Date(a.fecha + "T00:00:00").getTime()
+      const db = new Date(b.fecha + "T00:00:00").getTime()
+      return sortDir === "desc" ? db - da : da - db
+    })
 
   // --- Handlers pasivo ---
   const openNuevo = () => {
@@ -228,7 +244,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Label className="text-sm text-gray-600">Estado:</Label>
             <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as any)}>
               <SelectTrigger className="w-40 h-9"><SelectValue /></SelectTrigger>
@@ -238,6 +254,19 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                 <SelectItem value="pagado">Pagados</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+              title={sortDir === "desc" ? "Mostrando más recientes primero" : "Mostrando más antiguos primero"}
+            >
+              {sortDir === "desc" ? (
+                <><ArrowDown className="w-4 h-4" /> Más recientes</>
+              ) : (
+                <><ArrowUp className="w-4 h-4" /> Más antiguos</>
+              )}
+            </Button>
           </div>
           {canEdit && (
             <Button size="sm" onClick={openNuevo}><Plus className="w-4 h-4 mr-2" /> Nuevo pasivo</Button>
@@ -255,7 +284,8 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                   <TableRow>
                     <TableHead>Acreedor</TableHead>
                     <TableHead>Detalle</TableHead>
-                    <TableHead>Fecha</TableHead>
+                    <TableHead>Fecha de pago</TableHead>
+                    <TableHead>Fecha de ingreso</TableHead>
                     <TableHead className="text-right">Monto total</TableHead>
                     <TableHead className="text-right">Abonado</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
@@ -272,6 +302,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                         <TableCell className="font-medium">{p.acreedor}</TableCell>
                         <TableCell className="text-sm text-gray-600">{p.detalle || "-"}</TableCell>
                         <TableCell className="text-sm">{fmtDate(p.fecha)}</TableCell>
+                        <TableCell className="text-sm text-gray-500">{fmtDateTime(p.fecha_ingreso)}</TableCell>
                         <TableCell className="text-right">{fmtMoney(p.monto_total)}</TableCell>
                         <TableCell className="text-right text-green-700">{fmtMoney(abonado)}</TableCell>
                         <TableCell className="text-right font-semibold text-red-700">{fmtMoney(saldo)}</TableCell>
@@ -319,7 +350,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                   })}
                   {pasivosFiltrados.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">No hay pasivos registrados.</TableCell>
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">No hay pasivos registrados.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -356,7 +387,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                   <Input type="number" min="0" step="0.01" value={form.monto_total} onChange={(e) => setForm({ ...form, monto_total: e.target.value })} placeholder="0.00" />
                 </div>
                 <div>
-                  <Label>Fecha</Label>
+                  <Label>Fecha de pago</Label>
                   <Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
                 </div>
               </div>
