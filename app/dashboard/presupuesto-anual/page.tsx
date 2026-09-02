@@ -11,7 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, BarChart3, PieChart } from "lucide-react"
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, BarChart3, PieChart, Wallet, AlertTriangle } from "lucide-react"
+import { pasivosService, type Pasivo, type PasivoAbono, calcAbonado, calcSaldo, esVencido, anioDePasivo } from "@/lib/mod/pasivos-service"
+import { todayEcuador } from "@/lib/timezone"
 
 const MESES_NOMBRES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
@@ -59,6 +61,8 @@ function PresupuestoAnualContent({ canEdit }: { canEdit: boolean }) {
   const [resumenMensual, setResumenMensual] = useState<MesData[]>([])
   const [detalleEgresos, setDetalleEgresos] = useState<DetalleEgreso[]>([])
   const [detalleIngresos, setDetalleIngresos] = useState<DetalleIngreso[]>([])
+  const [pasivos, setPasivos] = useState<Pasivo[]>([])
+  const [abonos, setAbonos] = useState<PasivoAbono[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -71,14 +75,23 @@ function PresupuestoAnualContent({ canEdit }: { canEdit: boolean }) {
 
   const loadAniosDisponibles = async () => {
     try {
-      const { data } = await supabase.from("meses").select("year").order("year", { ascending: false })
-      if (data) {
-        const yearsSet = Array.from(new Set(data.map((m: any) => Number(m.year)))) as number[]
-        const years = yearsSet.sort((a, b) => b - a)
-        setAniosDisponibles(years)
-        if (years.length > 0 && !years.includes(anioSeleccionado)) {
-          setAnioSeleccionado(years[0])
-        }
+      // Cargar pasivos/abonos (globales) y años de meses en paralelo
+      const [mesesRes, pasivosData, abonosData] = await Promise.all([
+        supabase.from("meses").select("year").order("year", { ascending: false }),
+        pasivosService.getPasivos().catch(() => [] as Pasivo[]),
+        pasivosService.getAbonos().catch(() => [] as PasivoAbono[]),
+      ])
+      setPasivos(pasivosData)
+      setAbonos(abonosData)
+
+      const yearsFromMeses = (mesesRes.data || []).map((m: any) => Number(m.year))
+      // Incluir también los años de las FECHAS DE PAGO de los pasivos (p. ej. 2027)
+      const yearsFromPasivos = pasivosData.map((p) => anioDePasivo(p)).filter((y) => y > 0)
+      const yearsSet = Array.from(new Set([...yearsFromMeses, ...yearsFromPasivos])) as number[]
+      const years = yearsSet.sort((a, b) => b - a)
+      setAniosDisponibles(years)
+      if (years.length > 0 && !years.includes(anioSeleccionado)) {
+        setAnioSeleccionado(years[0])
       }
     } catch (error) {
       console.error("Error cargando años:", error)
@@ -257,6 +270,43 @@ function PresupuestoAnualContent({ canEdit }: { canEdit: boolean }) {
 
   const formatMoney = (val: number) => `$${val.toLocaleString("es-EC", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+  // === PASIVOS DEL AÑO SELECCIONADO ===
+  // Pasivos cuya FECHA DE PAGO cae en el año seleccionado (p. ej. 2027 -> presupuesto 2027)
+  const hoy = todayEcuador()
+  const pasivosDelAnio = useMemo(
+    () =>
+      pasivos
+        .filter((p) => anioDePasivo(p) === anioSeleccionado)
+        .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0)),
+    [pasivos, anioSeleccionado],
+  )
+
+  const pasivosTotales = useMemo(() => {
+    let total = 0, abonado = 0, saldo = 0, vencidoMonto = 0, vencidoCount = 0
+    for (const p of pasivosDelAnio) {
+      const ab = calcAbonado(abonos, p.id)
+      const sal = calcSaldo(p, abonos)
+      total += Number(p.monto_total)
+      abonado += ab
+      saldo += sal
+      if (esVencido(p, sal, hoy)) { vencidoMonto += sal; vencidoCount++ }
+    }
+    return { total, abonado, saldo, vencidoMonto, vencidoCount }
+  }, [pasivosDelAnio, abonos, hoy])
+
+  // Pasivos del año agrupados por mes de su fecha de pago
+  const pasivosPorMes = useMemo(() => {
+    const porMes: Record<number, { mes: number; nombre: string; total: number; saldo: number; items: Pasivo[] }> = {}
+    for (const p of pasivosDelAnio) {
+      const mes = Number(p.fecha.slice(5, 7))
+      if (!porMes[mes]) porMes[mes] = { mes, nombre: MESES_NOMBRES[mes - 1], total: 0, saldo: 0, items: [] }
+      porMes[mes].total += Number(p.monto_total)
+      porMes[mes].saldo += calcSaldo(p, abonos)
+      porMes[mes].items.push(p)
+    }
+    return Object.values(porMes).sort((a, b) => a.mes - b.mes)
+  }, [pasivosDelAnio, abonos])
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -370,9 +420,17 @@ function PresupuestoAnualContent({ canEdit }: { canEdit: boolean }) {
 
 
         <Tabs defaultValue="resumen" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
             <TabsTrigger value="detalle">Detalle</TabsTrigger>
+            <TabsTrigger value="pasivos" className="relative">
+              Pasivos
+              {pasivosTotales.vencidoCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">
+                  {pasivosTotales.vencidoCount}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="estadisticas">Estadísticas</TabsTrigger>
           </TabsList>
 
@@ -519,6 +577,140 @@ function PresupuestoAnualContent({ canEdit }: { canEdit: boolean }) {
             </Tabs>
           </TabsContent>
 
+
+          {/* TAB PASIVOS */}
+          <TabsContent value="pasivos" className="space-y-4">
+            {/* Tarjetas resumen de pasivos del año */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border-blue-200 bg-blue-50/30">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-blue-700">Deuda {anioSeleccionado}</p>
+                      <p className="text-xl font-bold text-blue-800">{formatMoney(pasivosTotales.total)}</p>
+                    </div>
+                    <Wallet className="w-7 h-7 text-blue-400" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-green-200 bg-green-50/30">
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-green-700">Abonado</p>
+                  <p className="text-xl font-bold text-green-800">{formatMoney(pasivosTotales.abonado)}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-amber-200 bg-amber-50/30">
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-amber-700">Saldo pendiente</p>
+                  <p className="text-xl font-bold text-amber-800">{formatMoney(pasivosTotales.saldo)}</p>
+                </CardContent>
+              </Card>
+              <Card className={pasivosTotales.vencidoCount > 0 ? "border-red-300 bg-red-50/60" : "border-gray-200"}>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600 flex items-center gap-1">
+                        <AlertTriangle className={`w-3.5 h-3.5 ${pasivosTotales.vencidoCount > 0 ? "text-red-500" : "text-gray-400"}`} />
+                        Vencidos
+                      </p>
+                      <p className={`text-xl font-bold ${pasivosTotales.vencidoCount > 0 ? "text-red-700" : "text-gray-800"}`}>{formatMoney(pasivosTotales.vencidoMonto)}</p>
+                    </div>
+                    <Badge className={pasivosTotales.vencidoCount > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}>
+                      {pasivosTotales.vencidoCount}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">Debieron pagarse antes de hoy</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-blue-600" />
+                  Pasivos con vencimiento en {anioSeleccionado}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-8 text-gray-500">Cargando datos...</div>
+                ) : pasivosDelAnio.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">No hay pasivos con fecha de pago en {anioSeleccionado}</div>
+                ) : (
+                  <div className="space-y-4">
+                    {pasivosPorMes.map((mesData) => (
+                      <div key={mesData.mes} className="rounded-md border border-blue-200">
+                        <div className="bg-blue-50 px-4 py-2.5 flex items-center justify-between border-b border-blue-200">
+                          <span className="font-semibold text-sm text-gray-900">{mesData.nombre}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-gray-500">Saldo</span>
+                            <Badge className="font-bold bg-amber-100 text-amber-800 hover:bg-amber-100">{formatMoney(mesData.saldo)}</Badge>
+                            <Badge className="font-bold bg-blue-100 text-blue-800 hover:bg-blue-100">{formatMoney(mesData.total)}</Badge>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Acreedor</TableHead>
+                                <TableHead>Detalle</TableHead>
+                                <TableHead>Fecha de pago</TableHead>
+                                <TableHead className="text-right">Monto</TableHead>
+                                <TableHead className="text-right">Abonado</TableHead>
+                                <TableHead className="text-right">Saldo</TableHead>
+                                <TableHead>Estado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {mesData.items.map((p) => {
+                                const ab = calcAbonado(abonos, p.id)
+                                const sal = calcSaldo(p, abonos)
+                                const vencido = esVencido(p, sal, hoy)
+                                return (
+                                  <TableRow key={p.id} className={vencido ? "bg-red-50/60" : undefined}>
+                                    <TableCell className="font-medium">{p.acreedor}</TableCell>
+                                    <TableCell className="text-sm text-gray-600">{p.detalle || "-"}</TableCell>
+                                    <TableCell className={`text-sm ${vencido ? "text-red-700 font-semibold" : ""}`}>
+                                      <span className="inline-flex items-center gap-1">
+                                        {vencido && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
+                                        {p.fecha ? new Date(p.fecha + "T00:00:00").toLocaleDateString("es-EC") : "-"}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-right">{formatMoney(Number(p.monto_total))}</TableCell>
+                                    <TableCell className="text-right text-green-700">{formatMoney(ab)}</TableCell>
+                                    <TableCell className="text-right font-semibold text-red-700">{formatMoney(sal)}</TableCell>
+                                    <TableCell>
+                                      {vencido ? (
+                                        <Badge className="bg-red-100 text-red-800">Vencido</Badge>
+                                      ) : (
+                                        <Badge className={p.estado === "pagado" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
+                                          {p.estado === "pagado" ? "Pagado" : "Pendiente"}
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="rounded-md border-2 border-blue-300 bg-blue-50 px-4 py-3 flex items-center justify-between">
+                      <span className="font-bold text-gray-900">TOTAL PASIVOS {anioSeleccionado}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600">Saldo: <span className="font-bold text-amber-800">{formatMoney(pasivosTotales.saldo)}</span></span>
+                        <span className="font-bold text-blue-800 text-lg">{formatMoney(pasivosTotales.total)}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Nota: al registrar un abono a un pasivo se genera automáticamente un egreso en el mes activo (categoría &quot;{"PAGO DE PASIVOS"}&quot;), que se refleja en Ingresos/Egresos y en este informe anual.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* TAB ESTADÍSTICAS */}
           <TabsContent value="estadisticas" className="space-y-4">

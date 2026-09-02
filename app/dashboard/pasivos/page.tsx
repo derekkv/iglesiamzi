@@ -19,11 +19,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Plus, Trash2, Pencil, Lock, Wallet, HandCoins, ArrowUp, ArrowDown } from "lucide-react"
-import { pasivosService, type Pasivo, type PasivoAbono } from "@/lib/mod/pasivos-service"
+import { ArrowLeft, Plus, Trash2, Pencil, Lock, Wallet, HandCoins, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react"
+import { pasivosService, type Pasivo, type PasivoAbono, calcAbonado, calcSaldo, esVencido } from "@/lib/mod/pasivos-service"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
+import { todayEcuador } from "@/lib/timezone"
 import { toast } from "sonner"
 
 const METODOS_PAGO = ["Efectivo", "Transferencia", "Cheque", "Tarjeta", "Otro"]
@@ -51,7 +52,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
   const [abonos, setAbonos] = useState<PasivoAbono[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "pendiente" | "pagado">("todos")
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "pendiente" | "pagado" | "vencido">("todos")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
 
   // Crear/editar pasivo
@@ -83,16 +84,43 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
   useEffect(() => { loadData() }, [loadData])
   useRealtimeMultiple(["pasivos", "pasivos_abonos"], () => loadData())
 
-  const abonadoDe = (pasivoId: number) =>
-    abonos.filter((a) => a.pasivo_id === pasivoId).reduce((s, a) => s + Number(a.monto), 0)
-  const saldoDe = (p: Pasivo) => Number(p.monto_total) - abonadoDe(p.id)
+  const abonadoDe = (pasivoId: number) => calcAbonado(abonos, pasivoId)
+  const saldoDe = (p: Pasivo) => calcSaldo(p, abonos)
+
+  const hoy = todayEcuador()
+  const esVencidoP = (p: Pasivo) => esVencido(p, saldoDe(p), hoy)
 
   const totalDeuda = pasivos.reduce((s, p) => s + Number(p.monto_total), 0)
   const totalAbonado = abonos.reduce((s, a) => s + Number(a.monto), 0)
   const totalSaldo = totalDeuda - totalAbonado
 
+  // Pasivos vencidos: pendientes cuya fecha de pago ya pasó
+  const pasivosVencidos = pasivos.filter((p) => esVencidoP(p))
+  const totalVencido = pasivosVencidos.reduce((s, p) => s + saldoDe(p), 0)
+
+  // Resumen por acreedor (persona): cuánto se le debe, cuánto se le ha pagado y saldo
+  const resumenPorAcreedor = (() => {
+    const map = new Map<string, { acreedor: string; total: number; abonado: number; saldo: number; vencido: boolean; count: number }>()
+    for (const p of pasivos) {
+      const key = p.acreedor
+      const entry = map.get(key) || { acreedor: key, total: 0, abonado: 0, saldo: 0, vencido: false, count: 0 }
+      const ab = abonadoDe(p.id)
+      entry.total += Number(p.monto_total)
+      entry.abonado += ab
+      entry.saldo += Number(p.monto_total) - ab
+      entry.count += 1
+      if (esVencidoP(p)) entry.vencido = true
+      map.set(key, entry)
+    }
+    return Array.from(map.values()).sort((a, b) => b.saldo - a.saldo || b.total - a.total)
+  })()
+
   const pasivosFiltrados = pasivos
-    .filter((p) => filtroEstado === "todos" || p.estado === filtroEstado)
+    .filter((p) => {
+      if (filtroEstado === "todos") return true
+      if (filtroEstado === "vencido") return esVencidoP(p)
+      return p.estado === filtroEstado
+    })
     .sort((a, b) => {
       const da = new Date(a.fecha + "T00:00:00").getTime()
       const db = new Date(b.fecha + "T00:00:00").getTime()
@@ -228,7 +256,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
         {/* Resumen */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card><CardContent className="py-4">
             <p className="text-sm text-gray-500">Deuda total</p>
             <p className="text-2xl font-bold text-gray-900">{fmtMoney(totalDeuda)}</p>
@@ -241,7 +269,83 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
             <p className="text-sm text-gray-500">Saldo pendiente</p>
             <p className="text-2xl font-bold text-red-600">{fmtMoney(totalSaldo)}</p>
           </CardContent></Card>
+          <Card
+            className={pasivosVencidos.length > 0 ? "border-red-300 bg-red-50/60 cursor-pointer hover:shadow-md transition-shadow" : "cursor-pointer hover:shadow-md transition-shadow"}
+            onClick={() => setFiltroEstado("vencido")}
+            title="Ver solo pasivos vencidos"
+          >
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <AlertTriangle className={`w-3.5 h-3.5 ${pasivosVencidos.length > 0 ? "text-red-500" : "text-gray-400"}`} />
+                    Vencidos
+                  </p>
+                  <p className={`text-2xl font-bold ${pasivosVencidos.length > 0 ? "text-red-700" : "text-gray-900"}`}>{fmtMoney(totalVencido)}</p>
+                </div>
+                <Badge className={pasivosVencidos.length > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}>
+                  {pasivosVencidos.length}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">Debieron pagarse antes de hoy</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {pasivosVencidos.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              Hay <strong>{pasivosVencidos.length}</strong> pasivo(s) vencido(s) por un total de{" "}
+              <strong>{fmtMoney(totalVencido)}</strong> que ya debieron ser pagados.
+            </span>
+          </div>
+        )}
+
+        {/* Resumen por acreedor (persona): total debido y total pagado */}
+        {resumenPorAcreedor.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Resumen por acreedor ({resumenPorAcreedor.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {resumenPorAcreedor.map((r) => (
+                  <div
+                    key={r.acreedor}
+                    className={`rounded-lg border p-3 ${r.vencido ? "border-red-300 bg-red-50/60" : r.saldo <= 0.0001 ? "border-green-200 bg-green-50/40" : "border-gray-200 bg-gray-50/50"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-gray-900 truncate" title={r.acreedor}>{r.acreedor}</p>
+                      {r.vencido ? (
+                        <Badge className="bg-red-100 text-red-800 shrink-0">Vencido</Badge>
+                      ) : r.saldo <= 0.0001 ? (
+                        <Badge className="bg-green-100 text-green-800 shrink-0">Pagado</Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-800 shrink-0">Pendiente</Badge>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{r.count} pasivo(s)</p>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Se le debe (total)</span>
+                        <span className="font-semibold text-gray-900">{fmtMoney(r.total)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Pagado</span>
+                        <span className="font-semibold text-green-700">{fmtMoney(r.abonado)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm border-t pt-1">
+                        <span className="text-gray-500">Saldo</span>
+                        <span className="font-bold text-red-700">{fmtMoney(r.saldo)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -252,6 +356,7 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                 <SelectItem value="todos">Todos</SelectItem>
                 <SelectItem value="pendiente">Pendientes</SelectItem>
                 <SelectItem value="pagado">Pagados</SelectItem>
+                <SelectItem value="vencido">Vencidos</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -297,19 +402,29 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                   {pasivosFiltrados.map((p) => {
                     const abonado = abonadoDe(p.id)
                     const saldo = Number(p.monto_total) - abonado
+                    const vencido = esVencidoP(p)
                     return (
-                      <TableRow key={p.id}>
+                      <TableRow key={p.id} className={vencido ? "bg-red-50/60" : undefined}>
                         <TableCell className="font-medium">{p.acreedor}</TableCell>
                         <TableCell className="text-sm text-gray-600">{p.detalle || "-"}</TableCell>
-                        <TableCell className="text-sm">{fmtDate(p.fecha)}</TableCell>
+                        <TableCell className={`text-sm ${vencido ? "text-red-700 font-semibold" : ""}`}>
+                          <span className="inline-flex items-center gap-1">
+                            {vencido && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
+                            {fmtDate(p.fecha)}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-sm text-gray-500">{fmtDateTime(p.fecha_ingreso)}</TableCell>
                         <TableCell className="text-right">{fmtMoney(p.monto_total)}</TableCell>
                         <TableCell className="text-right text-green-700">{fmtMoney(abonado)}</TableCell>
                         <TableCell className="text-right font-semibold text-red-700">{fmtMoney(saldo)}</TableCell>
                         <TableCell>
-                          <Badge className={p.estado === "pagado" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
-                            {p.estado === "pagado" ? "Pagado" : "Pendiente"}
-                          </Badge>
+                          {vencido ? (
+                            <Badge className="bg-red-100 text-red-800">Vencido</Badge>
+                          ) : (
+                            <Badge className={p.estado === "pagado" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
+                              {p.estado === "pagado" ? "Pagado" : "Pendiente"}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">

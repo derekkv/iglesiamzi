@@ -47,6 +47,41 @@ export interface AbonoInput {
 /** Categoría con la que se registran los egresos generados por abonos a pasivos. */
 export const CATEGORIA_PASIVOS = "PAGO DE PASIVOS"
 
+// === HELPERS REUTILIZABLES ===
+// Funciones puras para calcular saldos y clasificar pasivos. Se usan en la lista
+// de pasivos, el presupuesto anual y el resumen/control mensual para mantener una
+// única fuente de verdad sobre "abonado", "saldo" y "vencido".
+
+/** Suma de abonos de un pasivo. */
+export function calcAbonado(abonos: PasivoAbono[], pasivoId: number): number {
+  return abonos
+    .filter((a) => a.pasivo_id === pasivoId)
+    .reduce((s, a) => s + Number(a.monto), 0)
+}
+
+/** Saldo pendiente de un pasivo (monto total - abonado). */
+export function calcSaldo(pasivo: Pasivo, abonos: PasivoAbono[]): number {
+  return Number(pasivo.monto_total) - calcAbonado(abonos, pasivo.id)
+}
+
+/**
+ * ¿El pasivo está vencido? = tiene saldo pendiente y su fecha de pago ya pasó.
+ * `hoy` debe ser un string ISO (YYYY-MM-DD), típicamente `todayEcuador()`.
+ */
+export function esVencido(pasivo: Pasivo, saldo: number, hoy: string): boolean {
+  return saldo > 0.0001 && !!pasivo.fecha && pasivo.fecha < hoy
+}
+
+/** Año (número) de la fecha de pago del pasivo. */
+export function anioDePasivo(pasivo: Pasivo): number {
+  return pasivo.fecha ? Number(pasivo.fecha.slice(0, 4)) : 0
+}
+
+/** Mes (1-12) de la fecha de pago del pasivo. */
+export function mesDePasivo(pasivo: Pasivo): number {
+  return pasivo.fecha ? Number(pasivo.fecha.slice(5, 7)) : 0
+}
+
 class PasivosService {
   // --- LECTURA ---
 

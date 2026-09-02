@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,7 +73,10 @@ export function NominaSection() {
   const [loadingHistorial, setLoadingHistorial] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteRecordId, setDeleteRecordId] = useState<number | null>(null)
-  const hasSyncedRef = { current: false }
+  // Mes seleccionado para trabajar (permite pagar meses anteriores). Vacío = mes activo.
+  const [selectedMesId, setSelectedMesId] = useState<string>("")
+  // Guarda el mes_id ya sincronizado para no re-sincronizar egresos en cada render/cambio de mes.
+  const hasSyncedRef = useRef<string | null>(null)
   const { ascending: sortAsc, toggle: toggleSort } = useSortOrder(true)
 
   const emptyForm = {
@@ -90,6 +93,15 @@ export function NominaSection() {
   }
 
   const [formData, setFormData] = useState(emptyForm)
+
+  // Meses disponibles para trabajar: el mes activo + los meses cerrados (históricos), orden desc.
+  const mesesDisponibles = [
+    ...(currentMonth ? [currentMonth] : []),
+    ...monthHistory.filter((m) => m.id !== currentMonth?.id),
+  ].sort((a, b) => (a.year !== b.year ? b.year - a.year : b.month - a.month))
+  // Mes sobre el que se registran/pagan los datos. Permite pagar meses anteriores.
+  const activeMes = mesesDisponibles.find((m) => m.id === selectedMesId) || currentMonth
+  const esMesActivo = !!activeMes && !!currentMonth && activeMes.id === currentMonth.id
 
 
   // Valor a pagar calculado
@@ -117,24 +129,34 @@ export function NominaSection() {
     })
   }
 
-  useEffect(() => { if (currentMonth && hasAccess) { loadNomina(); loadDetalles() } }, [currentMonth, hasAccess])
+  useEffect(() => { if (currentMonth && !selectedMesId) setSelectedMesId(currentMonth.id) }, [currentMonth])
+  useEffect(() => { if (activeMes && hasAccess) { loadNomina(); loadDetalles() } }, [activeMes?.id, hasAccess])
+
+  // Historial: al abrir la pestaña, seleccionar el mes más reciente por defecto
+  useEffect(() => {
+    if (activeTab === "historial" && !historialMesId && monthHistory.length > 0) {
+      const reciente = [...monthHistory].sort((a, b) => (a.year !== b.year ? b.year - a.year : b.month - a.month))[0]
+      if (reciente) { setHistorialMesId(reciente.id); loadHistorial(reciente.id) }
+    }
+  }, [activeTab, monthHistory])
 
   const loadNomina = async (silent = false) => {
-    if (!currentMonth) return
+    if (!activeMes) return
     try {
       if (!silent) setLoading(true)
-      const { data, error } = await supabase.from("nomina").select("*").eq("mes_id", currentMonth.id).order("nombre", { ascending: true })
+      const { data, error } = await supabase.from("nomina").select("*").eq("mes_id", activeMes.id).order("nombre", { ascending: true })
       if (error) throw error
       if (data && data.length > 0) {
         setRecords(data)
-        // Sincronizar egresos faltantes (solo una vez al montar)
-        if (!silent && !hasSyncedRef.current) {
-          hasSyncedRef.current = true
+        // Sincronizar egresos faltantes (una sola vez por mes)
+        if (!silent && hasSyncedRef.current !== activeMes.id) {
+          hasSyncedRef.current = activeMes.id
           syncEgresosFromNomina(data)
         }
       } else {
         setRecords([])
-        if (!silent) await autoCopyFromPreviousMonth()
+        // Solo auto-copiar personas del mes anterior cuando se trabaja sobre el MES ACTIVO
+        if (!silent && esMesActivo) await autoCopyFromPreviousMonth()
       }
     } catch (error) { console.error("Error cargando nómina:", error) }
     finally { if (!silent) setLoading(false) }
@@ -142,10 +164,10 @@ export function NominaSection() {
 
   // Sincronizar egresos faltantes: si un pago está marcado pero no tiene egreso, crearlo
   const syncEgresosFromNomina = async (nominaData: NominaRecord[]) => {
-    if (!currentMonth) return
+    if (!activeMes) return
     try {
       // Obtener todos los egresos de nómina del mes
-      const { data: egresosExistentes } = await supabase.from("egresos").select("observacion").eq("mes_id", currentMonth.id).eq("categoria_principal", "PAGO DE NOMINA")
+      const { data: egresosExistentes } = await supabase.from("egresos").select("observacion").eq("mes_id", activeMes.id).eq("categoria_principal", "PAGO DE NOMINA")
       const observaciones = new Set((egresosExistentes || []).map((e: any) => e.observacion?.toLowerCase() || ""))
 
       for (const r of nominaData) {
@@ -155,8 +177,8 @@ export function NominaSection() {
         if (r.primera_quincena_pagada && !tieneTransporte) {
           const obs = `1ra quincena de ${r.nombre} — ${r.primera_quincena_metodo || "Transferencia"}`.toLowerCase()
           if (!observaciones.has(obs)) {
-            await storage.addEgreso(currentMonth.id, {
-              mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
+            await storage.addEgreso(activeMes.id, {
+              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
               detalle: r.detalle || "Nómina", observacion: `1ra quincena de ${r.nombre} — ${r.primera_quincena_metodo || "Transferencia"}`,
               monto: r.primera_quincena_valor || 0, fecha: r.primera_quincena_fecha || new Date().toISOString().split("T")[0],
               metodo_pago: r.primera_quincena_metodo || "Transferencia", estado: "Procesado",
@@ -168,8 +190,8 @@ export function NominaSection() {
         if (r.segunda_quincena_pagada && !tieneTransporte) {
           const obs = `2da quincena de ${r.nombre} — ${r.segunda_quincena_metodo || "Transferencia"}`.toLowerCase()
           if (!observaciones.has(obs)) {
-            await storage.addEgreso(currentMonth.id, {
-              mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
+            await storage.addEgreso(activeMes.id, {
+              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
               detalle: r.detalle || "Nómina", observacion: `2da quincena de ${r.nombre} — ${r.segunda_quincena_metodo || "Transferencia"}`,
               monto: r.segunda_quincena_valor || 0, fecha: r.segunda_quincena_fecha || new Date().toISOString().split("T")[0],
               metodo_pago: r.segunda_quincena_metodo || "Transferencia", estado: "Procesado",
@@ -183,8 +205,8 @@ export function NominaSection() {
           const obs = `${label} de ${r.nombre} — ${r.movilizacion_metodo || "Transferencia"}`.toLowerCase()
           const obsAlt = `movilización del mes de ${r.nombre}`.toLowerCase()
           if (!observaciones.has(obs) && !observaciones.has(obsAlt)) {
-            await storage.addEgreso(currentMonth.id, {
-              mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
+            await storage.addEgreso(activeMes.id, {
+              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
               detalle: r.detalle || "Nómina", observacion: `${label} de ${r.nombre} — ${r.movilizacion_metodo || "Transferencia"}`,
               monto: r.movilizacion_valor || 0, fecha: r.movilizacion_fecha || new Date().toISOString().split("T")[0],
               metodo_pago: r.movilizacion_metodo || "Transferencia", estado: "Procesado",
@@ -196,8 +218,8 @@ export function NominaSection() {
         if (r.movilizacion_con_quincenas && r.movilizacion_segunda_pagada) {
           const obs = `2da quincena movilización de ${r.nombre} — ${r.movilizacion_segunda_metodo || "Transferencia"}`.toLowerCase()
           if (!observaciones.has(obs)) {
-            await storage.addEgreso(currentMonth.id, {
-              mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
+            await storage.addEgreso(activeMes.id, {
+              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
               detalle: r.detalle || "Nómina", observacion: `2da quincena movilización de ${r.nombre} — ${r.movilizacion_segunda_metodo || "Transferencia"}`,
               monto: r.movilizacion_segunda_valor || 0, fecha: r.movilizacion_segunda_fecha || new Date().toISOString().split("T")[0],
               metodo_pago: r.movilizacion_segunda_metodo || "Transferencia", estado: "Procesado",
@@ -210,7 +232,7 @@ export function NominaSection() {
 
   // Auto-copiar personas del mes anterior (sin pagos ni descuentos)
   const autoCopyFromPreviousMonth = async () => {
-    if (!currentMonth) return
+    if (!activeMes) return
     try {
       const allMonths = [...monthHistory].sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year
@@ -219,7 +241,7 @@ export function NominaSection() {
 
       let previousRecords: NominaRecord[] = []
       for (const m of allMonths) {
-        if (m.id === currentMonth.id) continue
+        if (m.id === activeMes.id) continue
         const { data } = await supabase.from("nomina").select("*").eq("mes_id", m.id)
         if (data && data.length > 0) { previousRecords = data; break }
       }
@@ -245,7 +267,7 @@ export function NominaSection() {
         const movilizacion_valor = teniaTransporte ? r.movilizacion_valor : null
 
         return {
-          mes_id: currentMonth.id,
+          mes_id: activeMes.id,
           cedula: r.cedula,
           nombre: r.nombre,
           telefono: r.telefono,
@@ -301,14 +323,18 @@ export function NominaSection() {
 
 
   const registerEgreso = async (nombre: string, valor: number, fecha: string, metodo: string, quincena: string, detalle: string | null) => {
-    if (!currentMonth) return
+    if (!activeMes) return
     try {
-      await storage.addEgreso(currentMonth.id, {
-        mes_id: currentMonth.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
+      await storage.addEgreso(activeMes.id, {
+        mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
         detalle: detalle || "Nómina", observacion: `${quincena} de ${nombre} — ${metodo}`,
         monto: valor, fecha, metodo_pago: metodo, estado: "Procesado",
       }, { user_id: user!.id, user_name: user!.username })
-    } catch (e) { console.error("Error registrando egreso:", e) }
+    } catch (e: any) {
+      console.error("Error registrando egreso:", e)
+      // Transparencia: avisar si el pago quedó marcado pero el egreso NO se registró
+      toast.error(`El pago de ${nombre} se marcó, pero no se pudo registrar el egreso: ${e?.message || "error de permisos"}. Verifícalo en Ingresos/Egresos.`)
+    }
   }
 
   // Notificación para quincenas de nómina
@@ -363,13 +389,13 @@ export function NominaSection() {
 
 
   const handleAdd = async () => {
-    if (!formData.cedula || !formData.nombre || !formData.valor_sueldo || !currentMonth) { toast.error("Complete los campos obligatorios"); return }
+    if (!formData.cedula || !formData.nombre || !formData.valor_sueldo || !activeMes) { toast.error("Complete los campos obligatorios"); return }
     setSaving(true)
     try {
       const vap = Math.max(0, (parseFloat(formData.valor_sueldo) || 0) - (parseFloat(formData.descuento_valor) || 0))
       const esTransporte = formData.movilizacion_valor !== "" && !formData.movilizacion_con_quincenas
       const { error } = await supabase.from("nomina").insert({
-        mes_id: currentMonth.id, cedula: formData.cedula, nombre: formData.nombre,
+        mes_id: activeMes.id, cedula: formData.cedula, nombre: formData.nombre,
         telefono: formData.telefono || null, email: formData.email || null,
         valor_sueldo: parseFloat(formData.valor_sueldo), descuento: formData.descuento || null,
         descuento_valor: parseFloat(formData.descuento_valor) || 0, descuento_motivo: formData.descuento_motivo || null,
@@ -824,7 +850,7 @@ export function NominaSection() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2"><span>💰</span> Nómina de Pago</CardTitle>
-              <CardDescription>Gestión de pagos — {currentMonth?.name}</CardDescription>
+              <CardDescription>Gestión de pagos — {activeMes?.name || currentMonth?.name}{!esMesActivo && activeMes ? " (mes anterior)" : ""}</CardDescription>
             </div>
             <div className="flex gap-2">
               <SortToggleButton ascending={sortAsc} onToggle={toggleSort} label={sortAsc ? "A → Z" : "Z → A"} />
@@ -850,6 +876,27 @@ export function NominaSection() {
         <CardContent>
           {activeTab === "actual" ? (
             <>
+              {/* Selector de mes: permite pagar/registrar nómina del mes activo o de meses anteriores */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+                <Label className="whitespace-nowrap text-sm">Mes a gestionar:</Label>
+                <select
+                  value={activeMes?.id || ""}
+                  onChange={(e) => setSelectedMesId(e.target.value)}
+                  className="w-full sm:max-w-xs h-9 px-3 rounded-md border text-sm"
+                >
+                  {mesesDisponibles.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}{currentMonth && m.id === currentMonth.id ? " (activo)" : ""}
+                    </option>
+                  ))}
+                </select>
+                {!esMesActivo && activeMes && (
+                  <Badge className="bg-amber-100 text-amber-800 border border-amber-300 w-fit">
+                    Editando mes anterior — los pagos se registran en {activeMes.name}
+                  </Badge>
+                )}
+              </div>
+
               {/* Tarjetas de resumen */}
               <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-6">
                 <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-100">

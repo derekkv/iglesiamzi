@@ -860,7 +860,7 @@ function AdministracionContent({ canEdit, canAdmin }: { canEdit: boolean; canAdm
           </Dialog>
 
           <Dialog open={isPermissionsDialogOpen} onOpenChange={setIsPermissionsDialogOpen}>
-            <DialogContent className="w-[75vw] max-w-none max-h-[85vh] flex flex-col">
+            <DialogContent className="w-[90vw] max-w-none sm:max-w-none max-h-[85vh] flex flex-col">
               <DialogHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 -mx-6 -mt-6 px-6 py-5 rounded-t-lg">
                 <DialogTitle className="text-white text-lg">Permisos de {selectedUser?.displayName}</DialogTitle>
                 <DialogDescription className="text-blue-100">Configure los permisos de Vista, Edición y Líder por grupo para este usuario.</DialogDescription>

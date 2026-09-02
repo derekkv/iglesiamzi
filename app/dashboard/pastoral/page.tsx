@@ -18,7 +18,7 @@ import { supabase } from "@/lib/secure-db"
 import { currentMonthNameEcuador, currentMonthEcuador, currentYearEcuador, todayEcuador } from "@/lib/timezone"
 import { CHURCH } from "@/lib/branding"
 
-import { ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home, Cake, ClipboardCheck, CalendarDays, ExternalLink } from "lucide-react"
+import { ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight, Heart, UserCheck, GraduationCap, Palette, AlertTriangle, Home, Cake, ClipboardCheck, CalendarDays, ExternalLink, Wallet } from "lucide-react"
 import { censoService } from "@/lib/mod/censo-service"
 import { censoMdgService } from "@/lib/mod/censo-mdg-service"
 import { censoJovenesService } from "@/lib/mod/censo-jovenes-service"
@@ -27,6 +27,7 @@ import { getLunesSemanaActual } from "@/lib/mod/gestion-celulas-service"
 import { discipuladoCiclosService, CICLO_CONFIG, type CicloTipo } from "@/lib/mod/discipulado-ciclos-service"
 import { proyectoMarioCiclosService, PROYECTO_MARIO_CICLO_CONFIG, type ProyectoMarioCicloTipo } from "@/lib/mod/proyecto-mario-ciclos-service"
 import { getCumpleanerosMes, getHistorialEnvios } from "@/lib/mod/cumpleanos-service"
+import { pasivosService, type Pasivo, type PasivoAbono, calcAbonado, calcSaldo, esVencido, anioDePasivo, mesDePasivo } from "@/lib/mod/pasivos-service"
 import { useMonth } from "@/contexts/month-context"
 import { getAlfoliMes } from "@/lib/mod/alfoli-service"
 
@@ -66,6 +67,8 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
   const [ingresosData, setIngresosData] = useState<any[]>([])
   const [egresosData, setEgresosData] = useState<any[]>([])
   const [nominaData, setNominaData] = useState<any[]>([])
+  const [pasivos, setPasivos] = useState<Pasivo[]>([])
+  const [pasivoAbonos, setPasivoAbonos] = useState<PasivoAbono[]>([])
 
 
   // Estadísticas generales
@@ -107,9 +110,22 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
   const [modalServidores, setModalServidores] = useState(false)
   const [modalAtrasados, setModalAtrasados] = useState(false)
   const [modalAsistenciaCulto, setModalAsistenciaCulto] = useState(false)
+  const [modalPasivosMes, setModalPasivosMes] = useState(false)
+  const [modalPasivosVencidos, setModalPasivosVencidos] = useState(false)
 
   useEffect(() => { loadEstadisticas() }, [])
+  useEffect(() => { loadPasivos() }, [])
   useEffect(() => { if (currentMonth?.id) loadFinanciero() }, [currentMonth])
+
+  const loadPasivos = async () => {
+    try {
+      const [p, a] = await Promise.all([pasivosService.getPasivos(), pasivosService.getAbonos()])
+      setPasivos(p)
+      setPasivoAbonos(a)
+    } catch (error) {
+      console.error("Error cargando pasivos:", error)
+    }
+  }
 
 
   const loadFinanciero = async () => {
@@ -235,6 +251,17 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
   if (!user) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div></div>
 
+  // === PASIVOS ===
+  const hoyEc = todayEcuador()
+  const mesActivoNum = currentMonth?.month ?? currentMonthEcuador()
+  const anioActivoNum = currentMonth?.year ?? currentYearEcuador()
+  const pasivosDelMes = pasivos.filter((p) => anioDePasivo(p) === anioActivoNum && mesDePasivo(p) === mesActivoNum)
+  const pasivosDelMesTotal = pasivosDelMes.reduce((s, p) => s + Number(p.monto_total), 0)
+  const pasivosDelMesSaldo = pasivosDelMes.reduce((s, p) => s + calcSaldo(p, pasivoAbonos), 0)
+  const pasivosVencidos = pasivos.filter((p) => esVencido(p, calcSaldo(p, pasivoAbonos), hoyEc))
+  const pasivosVencidosMonto = pasivosVencidos.reduce((s, p) => s + calcSaldo(p, pasivoAbonos), 0)
+  const fmtPasivoFecha = (s: string) => (s ? new Date(s + "T00:00:00").toLocaleDateString("es-EC") : "-")
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -290,6 +317,40 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
           <Card className="border-purple-200 bg-purple-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalAsistencia(true)}>
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center justify-between"><div><p className="text-xs text-purple-700">Asistencia Total</p><p className="text-xl font-bold text-purple-700">{totalAsistencia}</p><p className="text-[10px] text-purple-600">{asistenciaDias} días · Prom: {asistenciaDias > 0 ? Math.round(totalAsistencia / asistenciaDias) : 0}/día</p></div><Users className="w-6 h-6 text-purple-400" /></div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Fila 1b: Pasivos */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card className="border-blue-200 bg-blue-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalPasivosMes(true)}>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-blue-700 flex items-center gap-1"><Wallet className="w-3.5 h-3.5" /> Pasivos del Mes</p>
+                  <p className="text-xl font-bold text-blue-700">${pasivosDelMesSaldo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-blue-600 mt-0.5">{pasivosDelMes.length} pasivo(s) con pago en {currentMonthNameEcuador()} · Total ${pasivosDelMesTotal.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                </div>
+                <Wallet className="w-6 h-6 text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className={`cursor-pointer hover:shadow-md transition-shadow ${pasivosVencidos.length > 0 ? "border-red-300 bg-red-50/60" : "border-gray-200 bg-gray-50/50"}`}
+            onClick={() => setModalPasivosVencidos(true)}
+          >
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-xs flex items-center gap-1 ${pasivosVencidos.length > 0 ? "text-red-700" : "text-gray-600"}`}>
+                    <AlertTriangle className={`w-3.5 h-3.5 ${pasivosVencidos.length > 0 ? "text-red-500" : "text-gray-400"}`} /> Pasivos Vencidos
+                  </p>
+                  <p className={`text-xl font-bold ${pasivosVencidos.length > 0 ? "text-red-700" : "text-gray-700"}`}>${pasivosVencidosMonto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-gray-500 mt-0.5">{pasivosVencidos.length} debieron pagarse antes de hoy</p>
+                </div>
+                <Badge className={pasivosVencidos.length > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}>{pasivosVencidos.length}</Badge>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -572,6 +633,79 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
               {egresosData.length === 0 && <p className="text-center text-gray-500 py-4">No hay egresos registrados</p>}
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/ingresos-egresos")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Ingresos/Egresos</Button>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal Pasivos del Mes */}
+        <Dialog open={modalPasivosMes} onOpenChange={setModalPasivosMes}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-blue-700"><Wallet className="w-5 h-5" /> Pasivos del Mes</DialogTitle>
+              <DialogDescription>Con pago en {currentMonthNameEcuador()}: ${pasivosDelMesSaldo.toLocaleString("es-CO", { minimumFractionDigits: 2 })} de saldo · {pasivosDelMes.length} pasivo(s)</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              {pasivosDelMes.map((p) => {
+                const saldo = calcSaldo(p, pasivoAbonos)
+                const abonado = calcAbonado(pasivoAbonos, p.id)
+                const vencido = esVencido(p, saldo, hoyEc)
+                return (
+                  <div key={`m-${p.id}`} className={`p-3 rounded border ${vencido ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-100"}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className={`text-sm font-semibold ${vencido ? "text-red-800" : "text-blue-800"}`}>{p.acreedor}</p>
+                        <p className="text-xs text-gray-600 mt-0.5">{p.detalle || "Sin detalle"}</p>
+                        <p className="text-[11px] text-gray-500 mt-1">Total ${Number(p.monto_total).toLocaleString("es-CO", { minimumFractionDigits: 2 })} · Abonado ${abonado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="text-right ml-3">
+                        <p className={`font-bold ${vencido ? "text-red-700" : "text-blue-700"}`}>${saldo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs text-gray-500">Pago: {fmtPasivoFecha(p.fecha)}</p>
+                        {vencido ? (
+                          <Badge className="bg-red-100 text-red-800 mt-1">Vencido</Badge>
+                        ) : (
+                          <Badge className={`mt-1 ${p.estado === "pagado" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{p.estado === "pagado" ? "Pagado" : "Pendiente"}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {pasivosDelMes.length === 0 && <p className="text-center text-gray-500 py-4">No hay pasivos con pago programado este mes</p>}
+            </div>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/pasivos")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Pasivos</Button>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal Pasivos Vencidos */}
+        <Dialog open={modalPasivosVencidos} onOpenChange={setModalPasivosVencidos}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-700"><AlertTriangle className="w-5 h-5" /> Pasivos Vencidos</DialogTitle>
+              <DialogDescription>Debieron pagarse antes de hoy · {pasivosVencidos.length} pasivo(s) · ${pasivosVencidosMonto.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              {pasivosVencidos.map((p) => {
+                const saldo = calcSaldo(p, pasivoAbonos)
+                const abonado = calcAbonado(pasivoAbonos, p.id)
+                return (
+                  <div key={`v-${p.id}`} className="p-3 bg-red-50 rounded border border-red-200">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-800">{p.acreedor}</p>
+                        <p className="text-xs text-red-600 mt-0.5">{p.detalle || "Sin detalle"}</p>
+                        <p className="text-[11px] text-gray-500 mt-1">Total ${Number(p.monto_total).toLocaleString("es-CO", { minimumFractionDigits: 2 })} · Abonado ${abonado.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="text-right ml-3">
+                        <p className="font-bold text-red-700">${saldo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs text-red-500">Venció: {fmtPasivoFecha(p.fecha)}</p>
+                        <Badge className="bg-red-100 text-red-800 mt-1">Vencido</Badge>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {pasivosVencidos.length === 0 && <p className="text-center text-gray-500 py-4">No hay pasivos vencidos</p>}
+            </div>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/pasivos")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Pasivos</Button>
           </DialogContent>
         </Dialog>
 
