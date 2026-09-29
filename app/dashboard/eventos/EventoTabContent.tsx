@@ -67,16 +67,21 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
 
   useEffect(() => {
     loadData()
+    // Sync de catch-up una sola vez al abrir/cambiar de evento (con candado
+    // anti-concurrencia en el servicio). NO se lanza en cada refresco realtime.
+    eventoParticipantesService.syncMissingIngresos(evento.id)
+      .then((r) => { if (r.creados || r.actualizados || r.eliminados) loadData() })
+      .catch(() => {})
   }, [evento.id])
 
-  useRealtimeMultiple(["evento_participantes"], loadData)
+  // Realtime acotado SOLO a este evento (evita recargar por cambios de otros
+  // eventos, que era lo que multiplicaba el sync durante una importacion).
+  useRealtimeMultiple(["evento_participantes"], loadData, `evento_id=eq.${evento.id}`)
 
   async function loadData() {
     try {
       const data = await eventoParticipantesService.getByEvento(evento.id)
       setParticipantes(data)
-      // Sync automático con ingresos (silencioso, no bloquea la UI)
-      eventoParticipantesService.syncMissingIngresos(evento.id).catch(() => {})
     } catch (error) {
       console.error("Error cargando participantes:", error)
       toast.error("Error al cargar participantes")

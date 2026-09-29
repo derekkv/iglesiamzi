@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { jwtVerify } from "jose"
 
+// Debe coincidir con el fallback de lib/jwt.ts para que el token firmado y el
+// verificado usen el MISMO secreto si process.env.JWT_SECRET no estuviera cargado.
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback-dev-secret-change-in-production"
+  process.env.JWT_SECRET || "IglesiaMZIuwuXDDDDDDDDD"
 )
 
 /**

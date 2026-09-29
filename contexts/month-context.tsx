@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react"
 import { storage } from "@/lib/storage"
 import { todayEcuador, currentMonthEcuador, currentYearEcuador, MONTH_NAMES } from "@/lib/timezone"
+import { useAuth } from "@/contexts/auth-context"
 
 interface MonthData {
   id: string
@@ -47,12 +48,15 @@ export function MonthProvider({ children }: { children: ReactNode }) {
   const [currentMonth, setCurrentMonth] = useState<MonthData | null>(null)
   const [monthHistory, setMonthHistory] = useState<MonthData[]>([])
 
-  const initRef = useRef(false)
+  const { user, isLoading: authLoading } = useAuth()
+  const loadedForUserRef = useRef<string | null>(null)
 
   useEffect(() => {
-    // Guard: solo ejecutar una vez aunque el componente re-monte (StrictMode, etc.)
-    if (initRef.current) return
-    initRef.current = true
+    // Cargar SOLO con sesión resuelta y usuario autenticado (token listo para /api/db).
+    // Antes corría en la pantalla de login sin token, fallaba y no reintentaba.
+    if (authLoading || !user) { loadedForUserRef.current = null; return }
+    if (loadedForUserRef.current === user.id) return
+    loadedForUserRef.current = user.id
 
     const autoManageMonth = async () => {
       try {
@@ -61,8 +65,13 @@ export function MonthProvider({ children }: { children: ReactNode }) {
         const monthId  = `${nowYear}-${nowMonth}`
         const monthName = `${MONTH_NAMES[nowMonth - 1]} ${nowYear}`
 
-        // 1. Cerrar cualquier mes activo que no sea el del calendario actual
-        await storage.closeStaleActiveMonths(nowYear, nowMonth)
+        // 1. Cerrar meses obsoletos. Aislado: si falla (p.ej. permisos), NO debe
+        //    impedir leer/cargar el mes activo.
+        try {
+          await storage.closeStaleActiveMonths(nowYear, nowMonth)
+        } catch (e) {
+          console.error("Error cerrando meses obsoletos:", e)
+        }
 
         // 2. Buscar si el mes actual ya existe como activo
         let active = await storage.getActiveMonth()
@@ -92,11 +101,12 @@ export function MonthProvider({ children }: { children: ReactNode }) {
         if (closed) setMonthHistory(closed)
       } catch (error) {
         console.error("Error en auto-gestión de mes:", error)
+        loadedForUserRef.current = null
       }
     }
 
     autoManageMonth()
-  }, [])
+  }, [user, authLoading])
 
   const createInitialMonth = async (startDate: string, endDate: string | null) => {
 

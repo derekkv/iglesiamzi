@@ -117,6 +117,9 @@ export const eventosTabsService = {
   },
 
   async update(id: number, input: Partial<EventoTabInput>, audit?: { userId: string; userName: string }): Promise<EventoTab> {
+    // Nombre anterior (para re-vincular ingresos si se renombra el evento)
+    const { data: antes } = await supabase.from("eventos_tabs").select("nombre").eq("id", id).maybeSingle()
+
     const { data, error } = await supabase
       .from("eventos_tabs")
       .update({ ...input, updated_at: new Date().toISOString() })
@@ -124,6 +127,33 @@ export const eventosTabsService = {
       .select()
       .single()
     if (error) throw error
+
+    // === RE-VINCULAR INGRESOS AL RENOMBRAR ===
+    // El detalle de los ingresos auto-evento incluye el nombre del evento:
+    // "Abono evento - <nombre> (<EVENTO>)". Si el evento se renombra y no se
+    // actualiza, los ingresos viejos quedan "huerfanos" y el sincronizador crea
+    // nuevos -> duplicados. Aqui reescribimos el sufijo "(viejo)" -> "(nuevo)".
+    const nombreViejo = antes?.nombre
+    const nombreNuevo = input.nombre
+    if (nombreViejo && nombreNuevo && nombreViejo !== nombreNuevo) {
+      try {
+        const sufijoViejo = `(${nombreViejo})`
+        const { data: ings } = await supabase
+          .from("ingresos")
+          .select("id, detalle, observacion")
+          .eq("concepto", "auto-evento")
+          .like("detalle", `%${sufijoViejo}`)
+        for (const ing of (ings || [])) {
+          if (!String(ing.detalle).endsWith(sufijoViejo)) continue
+          const nuevoDetalle = String(ing.detalle).slice(0, -sufijoViejo.length) + `(${nombreNuevo})`
+          const nuevaObs = String(ing.observacion || "").split(nombreViejo).join(nombreNuevo)
+          await supabase.from("ingresos").update({ detalle: nuevoDetalle, observacion: nuevaObs }).eq("id", ing.id)
+        }
+      } catch (e) {
+        console.error("[eventos] Error re-vinculando ingresos tras renombrar:", e)
+      }
+    }
+
     if (audit) {
       auditService.log({
         user_id: audit.userId,
@@ -183,6 +213,15 @@ async function _getEventoNombre(eventoId: number): Promise<string> {
     .maybeSingle()
   return data?.nombre || `Evento #${eventoId}`
 }
+
+/**
+ * Candado anti-concurrencia para syncMissingIngresos.
+ * Evita que multiples llamadas simultaneas (p.ej. varios eventos realtime
+ * disparando loadData durante una importacion) creen ingresos duplicados por
+ * una condicion de carrera. Si ya hay un sync en curso para un evento, se
+ * reutiliza esa misma promesa en vez de lanzar otro.
+ */
+const _syncIngresosLocks = new Map<number, Promise<{ creados: number; actualizados: number; eliminados: number }>>()
 
 export const eventoParticipantesService = {
   async getByEvento(eventoId: number): Promise<EventoParticipante[]> {
@@ -363,6 +402,30 @@ export const eventoParticipantesService = {
 
       const eventoNombre = await _getEventoNombre(record.evento_id)
       const detalle = _ingresoDetalle(record.nombre, eventoNombre)
+      const observacion = `Abono de ${record.nombre} para ${eventoNombre} (valor total: $${Number(record.valor).toFixed(2)})`
+
+      // === MEDIDA ANTI-DUPLICADOS ===
+      // Cada participante debe tener UN solo ingreso auto-evento por mes. Si esta
+      // funcion se invoca mas de una vez (doble clic, reintentos, realtime, etc.),
+      // en lugar de insertar otra fila se ACTUALIZA la existente. Esto previene el
+      // problema que genero decenas de ingresos duplicados en "Curso de Matrimonios".
+      const { data: existente } = await supabase
+        .from("ingresos")
+        .select("id")
+        .eq("concepto", "auto-evento")
+        .eq("detalle", detalle)
+        .eq("mes_id", mesId)
+        .limit(1)
+        .maybeSingle()
+
+      if (existente) {
+        await supabase.from("ingresos").update({
+          monto: record.abono,
+          observacion,
+          metodo_pago: record.metodo_pago || "Efectivo",
+        }).eq("id", existente.id)
+        return
+      }
 
       await supabase.from("ingresos").insert({
         mes_id: mesId,
@@ -372,7 +435,7 @@ export const eventoParticipantesService = {
         ministerio: "Administración",
         categoria_principal: "Ingresos x Eventos",
         detalle,
-        observacion: `Abono de ${record.nombre} para ${eventoNombre} (valor total: $${Number(record.valor).toFixed(2)})`,
+        observacion,
         estado: "Procesado",
         metodo_pago: record.metodo_pago || "Efectivo",
       })
@@ -443,6 +506,18 @@ export const eventoParticipantesService = {
    * - Elimina ingresos huérfanos (de participantes que ya no existen o abono = 0)
    */
   async syncMissingIngresos(eventoId: number): Promise<{ creados: number; actualizados: number; eliminados: number }> {
+    // === MEDIDA ANTI-DUPLICADOS (concurrencia) ===
+    // Si ya hay un sync en curso para este evento, reutilizar esa promesa.
+    const enCurso = _syncIngresosLocks.get(eventoId)
+    if (enCurso) return enCurso
+
+    const promesa = this._syncMissingIngresosImpl(eventoId)
+      .finally(() => { _syncIngresosLocks.delete(eventoId) })
+    _syncIngresosLocks.set(eventoId, promesa)
+    return promesa
+  },
+
+  async _syncMissingIngresosImpl(eventoId: number): Promise<{ creados: number; actualizados: number; eliminados: number }> {
     try {
       const mesId = await _getActiveMesId()
       if (!mesId) return { creados: 0, actualizados: 0, eliminados: 0 }
@@ -450,16 +525,21 @@ export const eventoParticipantesService = {
       const eventoNombre = await _getEventoNombre(eventoId)
       const participantes = await this.getByEvento(eventoId)
 
-      // Obtener ingresos auto-evento existentes (todos los del mes con concepto auto-evento)
+      // Obtener ingresos auto-evento del MES actual (filtrado por mes_id, NO por
+      // nombre con ilike: el ilike se rompe al renombrar el evento y puede
+      // cruzar "X" con "X 1"). Luego se acota por sufijo EXACTO "(<evento>)".
+      const sufijo = `(${eventoNombre})`
       const { data: ingresosExistentes } = await supabase
         .from("ingresos")
         .select("id, detalle, monto, metodo_pago")
         .eq("concepto", "auto-evento")
-        .ilike("detalle", `%${eventoNombre}%`)
+        .eq("mes_id", mesId)
 
-      // Mapa de ingresos existentes por detalle
+      // Mapa de ingresos existentes por detalle, SOLO los de este evento
+      // (detalle termina exactamente en "(<eventoNombre>)").
       const ingresosMap = new Map<string, { id: number; monto: number; metodo_pago: string }>()
       for (const ing of (ingresosExistentes || [])) {
+        if (!String(ing.detalle).endsWith(sufijo)) continue
         ingresosMap.set(ing.detalle, { id: ing.id, monto: Number(ing.monto), metodo_pago: ing.metodo_pago })
       }
 
@@ -478,7 +558,22 @@ export const eventoParticipantesService = {
         const existente = ingresosMap.get(detalle)
 
         if (!existente) {
-          // No tiene ingreso, crear
+          // No tiene ingreso: RE-VERIFICAR en BD justo antes de insertar
+          // (segunda barrera anti-duplicado ante posibles carreras).
+          const { data: yaExiste } = await supabase
+            .from("ingresos")
+            .select("id")
+            .eq("concepto", "auto-evento")
+            .eq("mes_id", mesId)
+            .eq("detalle", detalle)
+            .limit(1)
+            .maybeSingle()
+
+          if (yaExiste) {
+            ingresosMap.set(detalle, { id: yaExiste.id, monto: Number(p.abono), metodo_pago: p.metodo_pago || "Efectivo" })
+            continue
+          }
+
           await supabase.from("ingresos").insert({
             mes_id: mesId,
             concepto: "auto-evento",
@@ -503,7 +598,8 @@ export const eventoParticipantesService = {
         }
       }
 
-      // Eliminar ingresos huérfanos (participante eliminado o abono puesto a 0)
+      // Eliminar ingresos huérfanos (participante eliminado o abono puesto a 0).
+      // Solo afecta ingresos de ESTE evento (por el filtro de sufijo de arriba).
       for (const [detalle, ing] of ingresosMap) {
         if (!detallesActivos.has(detalle)) {
           await supabase.from("ingresos").delete().eq("id", ing.id)

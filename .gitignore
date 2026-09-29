@@ -42,3 +42,7 @@ yarn-error.log*
 next-env.d.ts
 
 .agents
+
+
+# Respaldos financieros con datos sensibles (nombres/montos) — no versionar
+respaldos-limpieza-financiera/

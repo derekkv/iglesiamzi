@@ -19,6 +19,9 @@ export interface PagoDiarioRecord {
   updated_at?: string
 }
 
+/** Candado anti-concurrencia para syncMissingEgresos. */
+const _syncEgresosLocks = new Map<string, Promise<void>>()
+
 export const pagoDiarioService = {
   // === CRUD ===
 
@@ -115,6 +118,15 @@ export const pagoDiarioService = {
   // === EGRESO SYNC ===
 
   async syncMissingEgresos(mesId: string) {
+    // MEDIDA ANTI-DUPLICADOS: coalesce de llamadas concurrentes por mes.
+    const enCurso = _syncEgresosLocks.get(mesId)
+    if (enCurso) return enCurso
+    const promesa = this._syncMissingEgresosImpl(mesId).finally(() => { _syncEgresosLocks.delete(mesId) })
+    _syncEgresosLocks.set(mesId, promesa)
+    return promesa
+  },
+
+  async _syncMissingEgresosImpl(mesId: string) {
     // Obtener todos los pagos diarios del mes
     const { data: pagos } = await supabase.from("pago_diario").select("*").eq("mes_id", mesId)
     if (!pagos || pagos.length === 0) return

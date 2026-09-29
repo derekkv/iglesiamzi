@@ -96,6 +96,10 @@ export const DENOMINACIONES = [
 
 // === SERVICIO ===
 
+/** Candado anti-concurrencia para syncIngresosCajaChica (evita duplicados por
+ * llamadas simultaneas disparadas por realtime + carga). */
+const _syncCajaChicaLocks = new Map<string, Promise<void>>()
+
 export const cajaChicaService = {
   // --- MOVIMIENTOS ---
 
@@ -401,6 +405,15 @@ export const cajaChicaService = {
    * - Elimina huérfanos
    */
   async syncIngresosCajaChica(mesId: string): Promise<void> {
+    // MEDIDA ANTI-DUPLICADOS: coalesce de llamadas concurrentes por mes.
+    const enCurso = _syncCajaChicaLocks.get(mesId)
+    if (enCurso) return enCurso
+    const promesa = this._syncIngresosCajaChicaImpl(mesId).finally(() => { _syncCajaChicaLocks.delete(mesId) })
+    _syncCajaChicaLocks.set(mesId, promesa)
+    return promesa
+  },
+
+  async _syncIngresosCajaChicaImpl(mesId: string): Promise<void> {
     try {
       const gestiones = await this.getGestionEfectivo(mesId)
       

@@ -74,8 +74,6 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
       ])
       setArqueos(arqs)
       setGestiones(gest)
-      // Sync automático: corrige metodo_pago y registros faltantes
-      cajaChicaService.syncIngresosCajaChica(currentMonth.id).catch(() => {})
     } catch (error: any) {
       console.error("Error cargando caja chica:", error)
       if (!silent) toast.error("Error al cargar datos")
@@ -85,6 +83,12 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   }, [currentMonth])
 
   useEffect(() => { loadData() }, [loadData])
+  // Sync de catch-up UNA sola vez al cambiar de mes (con candado anti-concurrencia
+  // en el servicio). NO se dispara en cada refresco realtime para evitar duplicados.
+  useEffect(() => {
+    if (!currentMonth) return
+    cajaChicaService.syncIngresosCajaChica(currentMonth.id).then(() => loadData(true)).catch(() => {})
+  }, [currentMonth?.id])
   useRealtime({ table: "caja_chica_movimientos", onChange: () => loadData(true) })
   useRealtime({ table: "caja_chica_arqueos", onChange: () => loadData(true) })
 

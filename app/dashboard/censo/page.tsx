@@ -267,14 +267,20 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
 
     try {
       setIsLoadingB(true)
-      // Validar cédula duplicada en todos los censos
+      // Validar cédula: bloquear SOLO si ya está en el mismo censo (duplicado real)
       const validacion = await validarCedulaEnCensos(formData.cedula, "censo")
-      if (validacion.existe) {
-        setCedulaDuplicadaInfo({ open: true, tabla: validacion.tabla!, nombre: validacion.nombre! })
+      const mismaTabla = validacion.coincidencias.find((c) => c.tablaKey === "censo")
+      if (mismaTabla) {
+        setCedulaDuplicadaInfo({ open: true, tabla: mismaTabla.tabla, nombre: mismaTabla.nombre })
         setIsLoadingB(false)
         return
       }
       const created = await censoService.create(formData, { user_id: user!.id, user_name: user!.username })
+      // Informar (sin bloquear) si la persona también está en otros censos
+      const otrosCensos = validacion.coincidencias.filter((c) => c.tablaKey !== "censo")
+      if (otrosCensos.length > 0) {
+        toast({ title: "Persona también en otros censos", description: `Se agregó al Censo Protocolo. Ya estaba registrada en: ${otrosCensos.map((c) => c.tabla).join(", ")}.` })
+      }
       // Subir archivos pendientes si hay
       if (pendingFiles.length > 0 && created.id) {
         const token = localStorage.getItem("authToken")
@@ -325,14 +331,20 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
 
     try {
       setIsLoadingB(true)
-      // Validar cédula duplicada en todos los censos (excluyendo el registro actual)
+      // Validar cédula: bloquear SOLO si ya está en el mismo censo (excluyendo el registro actual)
       const validacion = await validarCedulaEnCensos(formData.cedula, "censo", currentRecord.id)
-      if (validacion.existe) {
-        setCedulaDuplicadaInfo({ open: true, tabla: validacion.tabla!, nombre: validacion.nombre! })
+      const mismaTabla = validacion.coincidencias.find((c) => c.tablaKey === "censo")
+      if (mismaTabla) {
+        setCedulaDuplicadaInfo({ open: true, tabla: mismaTabla.tabla, nombre: mismaTabla.nombre })
         setIsLoadingB(false)
         return
       }
       await censoService.update(currentRecord.id, formData, { user_id: user!.id, user_name: user!.username })
+      // Informar (sin bloquear) si la persona también está en otros censos
+      const otrosCensos = validacion.coincidencias.filter((c) => c.tablaKey !== "censo")
+      if (otrosCensos.length > 0) {
+        toast({ title: "Persona también en otros censos", description: `Se guardó en Censo Protocolo. También está registrada en: ${otrosCensos.map((c) => c.tabla).join(", ")}.` })
+      }
       setSavedRecord(formData)
       setIsSavedModalOpen(true)
       setIsEditDialogOpen(false)
@@ -735,7 +747,7 @@ function CensoContent({ canEdit }: { canEdit: boolean }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Cédula ya registrada</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta cédula ya se encuentra registrada en <strong>{cedulaDuplicadaInfo.tabla}</strong> a nombre de <strong>{cedulaDuplicadaInfo.nombre}</strong>. No se puede duplicar en otro censo.
+                Esta cédula ya se encuentra registrada en <strong>{cedulaDuplicadaInfo.tabla}</strong> a nombre de <strong>{cedulaDuplicadaInfo.nombre}</strong>. No se puede duplicar dentro del mismo censo.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -108,7 +108,10 @@ export interface ConfiguracionesGlobales {
  * - Convierte 0 a null en campos numéricos opcionales
  */
 function cleanRecordForInsert(record: Partial<CensoRecord>): Record<string, any> {
-  const { id, created_at, updated_at, fecha_nacimiento_display, fecha_bautizo_display, fecha_matrimonio_display, ...rest } = record as any
+  // nuevo_creyente NO es columna de la tabla `censo` (solo existe en censo_mdg).
+  // El interface/formulario compartido puede traerlo; lo descartamos aquí para
+  // que no rompa el insert/update de censo protocolo.
+  const { id, created_at, updated_at, fecha_nacimiento_display, fecha_bautizo_display, fecha_matrimonio_display, nuevo_creyente, ...rest } = record as any
   const cleaned: Record<string, any> = {}
 
   for (const [key, value] of Object.entries(rest)) {
