@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/secure-db"
 import { auditService } from "@/lib/mod/audit-service"
+import { authFetch } from "@/lib/auth-fetch"
 
 // ==================== TIPOS ====================
 
@@ -137,17 +138,13 @@ export const eventosTabsService = {
     const nombreNuevo = input.nombre
     if (nombreViejo && nombreNuevo && nombreViejo !== nombreNuevo) {
       try {
-        const sufijoViejo = `(${nombreViejo})`
-        const { data: ings } = await supabase
-          .from("ingresos")
-          .select("id, detalle, observacion")
-          .eq("concepto", "auto-evento")
-          .like("detalle", `%${sufijoViejo}`)
-        for (const ing of (ings || [])) {
-          if (!String(ing.detalle).endsWith(sufijoViejo)) continue
-          const nuevoDetalle = String(ing.detalle).slice(0, -sufijoViejo.length) + `(${nombreNuevo})`
-          const nuevaObs = String(ing.observacion || "").split(nombreViejo).join(nombreNuevo)
-          await supabase.from("ingresos").update({ detalle: nuevoDetalle, observacion: nuevaObs }).eq("id", ing.id)
+        const res = await authFetch("/api/finanzas/eventos", {
+          method: "POST",
+          body: JSON.stringify({ action: "rename", nombre_viejo: nombreViejo, nombre_nuevo: nombreNuevo }),
+        })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          console.error("[eventos] Error re-vinculando ingresos tras renombrar:", json.error || res.status)
         }
       } catch (e) {
         console.error("[eventos] Error re-vinculando ingresos tras renombrar:", e)
@@ -197,11 +194,6 @@ async function _getActiveMesId(): Promise<string | null> {
     .order("start_date", { ascending: false })
     .limit(1)
   return data && data.length > 0 ? data[0].id : null
-}
-
-/** Genera el detalle único para vincular ingreso con participante del evento */
-function _ingresoDetalle(nombre: string, eventoNombre: string): string {
-  return `Abono evento - ${nombre} (${eventoNombre})`
 }
 
 /** Obtiene el nombre del evento por su ID */
@@ -393,52 +385,29 @@ export const eventoParticipantesService = {
     return { importados, duplicados }
   },
 
-  // ==================== SYNC CON INGRESOS ====================
+  // ==================== SYNC CON INGRESOS (server-side atómico) ====================
 
   async _syncIngresoCreate(record: EventoParticipante) {
     try {
       const mesId = await _getActiveMesId()
       if (!mesId) return // No hay mes activo, no se puede registrar ingreso
-
       const eventoNombre = await _getEventoNombre(record.evento_id)
-      const detalle = _ingresoDetalle(record.nombre, eventoNombre)
-      const observacion = `Abono de ${record.nombre} para ${eventoNombre} (valor total: $${Number(record.valor).toFixed(2)})`
-
-      // === MEDIDA ANTI-DUPLICADOS ===
-      // Cada participante debe tener UN solo ingreso auto-evento por mes. Si esta
-      // funcion se invoca mas de una vez (doble clic, reintentos, realtime, etc.),
-      // en lugar de insertar otra fila se ACTUALIZA la existente. Esto previene el
-      // problema que genero decenas de ingresos duplicados en "Curso de Matrimonios".
-      const { data: existente } = await supabase
-        .from("ingresos")
-        .select("id")
-        .eq("concepto", "auto-evento")
-        .eq("detalle", detalle)
-        .eq("mes_id", mesId)
-        .limit(1)
-        .maybeSingle()
-
-      if (existente) {
-        await supabase.from("ingresos").update({
-          monto: record.abono,
-          observacion,
+      const res = await authFetch("/api/finanzas/eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "ingreso-upsert",
+          mes_id: mesId,
+          nombre: record.nombre,
+          evento_nombre: eventoNombre,
+          abono: record.abono,
+          valor: record.valor,
           metodo_pago: record.metodo_pago || "Efectivo",
-        }).eq("id", existente.id)
-        return
-      }
-
-      await supabase.from("ingresos").insert({
-        mes_id: mesId,
-        concepto: "auto-evento",
-        monto: record.abono,
-        fecha: new Date().toISOString().split("T")[0],
-        ministerio: "Administración",
-        categoria_principal: "Ingresos x Eventos",
-        detalle,
-        observacion,
-        estado: "Procesado",
-        metodo_pago: record.metodo_pago || "Efectivo",
+        }),
       })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("[eventos] Error sync ingreso create:", json.error || res.status)
+      }
     } catch (e) {
       console.error("[eventos] Error sync ingreso create:", e)
     }
@@ -446,38 +415,29 @@ export const eventoParticipantesService = {
 
   async _syncIngresoUpdate(antes: EventoParticipante, despues: EventoParticipante) {
     try {
+      const mesId = await _getActiveMesId()
+      if (!mesId) return
       const eventoNombre = await _getEventoNombre(antes.evento_id)
-      const oldDetalle = _ingresoDetalle(antes.nombre, eventoNombre)
-
-      // Buscar ingreso vinculado
-      const { data: ingreso } = await supabase
-        .from("ingresos")
-        .select("id")
-        .eq("concepto", "auto-evento")
-        .eq("detalle", oldDetalle)
-        .limit(1)
-        .maybeSingle()
-
-      const abonoAntes = Number(antes.abono)
       const abonoDespues = Number(despues.abono)
 
-      if (abonoAntes === 0 && abonoDespues > 0) {
-        // No tenía ingreso, crear uno nuevo
-        await this._syncIngresoCreate(despues)
-      } else if (abonoAntes > 0 && abonoDespues === 0) {
-        // Abono eliminado, borrar ingreso
-        if (ingreso) {
-          await supabase.from("ingresos").delete().eq("id", ingreso.id)
-        }
-      } else if (abonoAntes > 0 && abonoDespues > 0 && ingreso) {
-        // Actualizar monto y datos del ingreso
-        const newDetalle = _ingresoDetalle(despues.nombre, eventoNombre)
-        await supabase.from("ingresos").update({
-          monto: abonoDespues,
-          detalle: newDetalle,
-          observacion: `Abono de ${despues.nombre} para ${eventoNombre} (valor total: $${Number(despues.valor).toFixed(2)})`,
+      // El endpoint maneja todos los casos: abono 0 → elimina; abono > 0 →
+      // crea/actualiza. keyNombre = nombre ANTERIOR para re-vincular si cambió.
+      const res = await authFetch("/api/finanzas/eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "ingreso-upsert",
+          mes_id: mesId,
+          nombre: despues.nombre,
+          evento_nombre: eventoNombre,
+          abono: abonoDespues,
+          valor: despues.valor,
           metodo_pago: despues.metodo_pago || "Efectivo",
-        }).eq("id", ingreso.id)
+          keyNombre: antes.nombre,
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("[eventos] Error sync ingreso update:", json.error || res.status)
       }
     } catch (e) {
       console.error("[eventos] Error sync ingreso update:", e)
@@ -486,14 +446,21 @@ export const eventoParticipantesService = {
 
   async _syncIngresoDelete(record: EventoParticipante) {
     try {
+      const mesId = await _getActiveMesId()
       const eventoNombre = await _getEventoNombre(record.evento_id)
-      const detalle = _ingresoDetalle(record.nombre, eventoNombre)
-
-      await supabase
-        .from("ingresos")
-        .delete()
-        .eq("concepto", "auto-evento")
-        .eq("detalle", detalle)
+      const res = await authFetch("/api/finanzas/eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "ingreso-delete",
+          mes_id: mesId || undefined,
+          nombre: record.nombre,
+          evento_nombre: eventoNombre,
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("[eventos] Error sync ingreso delete:", json.error || res.status)
+      }
     } catch (e) {
       console.error("[eventos] Error sync ingreso delete:", e)
     }
@@ -525,89 +492,30 @@ export const eventoParticipantesService = {
       const eventoNombre = await _getEventoNombre(eventoId)
       const participantes = await this.getByEvento(eventoId)
 
-      // Obtener ingresos auto-evento del MES actual (filtrado por mes_id, NO por
-      // nombre con ilike: el ilike se rompe al renombrar el evento y puede
-      // cruzar "X" con "X 1"). Luego se acota por sufijo EXACTO "(<evento>)".
-      const sufijo = `(${eventoNombre})`
-      const { data: ingresosExistentes } = await supabase
-        .from("ingresos")
-        .select("id, detalle, monto, metodo_pago")
-        .eq("concepto", "auto-evento")
-        .eq("mes_id", mesId)
-
-      // Mapa de ingresos existentes por detalle, SOLO los de este evento
-      // (detalle termina exactamente en "(<eventoNombre>)").
-      const ingresosMap = new Map<string, { id: number; monto: number; metodo_pago: string }>()
-      for (const ing of (ingresosExistentes || [])) {
-        if (!String(ing.detalle).endsWith(sufijo)) continue
-        ingresosMap.set(ing.detalle, { id: ing.id, monto: Number(ing.monto), metodo_pago: ing.metodo_pago })
-      }
-
-      let creados = 0
-      let actualizados = 0
-      let eliminados = 0
-
-      // Recorrer participantes con abono > 0
-      const detallesActivos = new Set<string>()
-      for (const p of participantes) {
-        if (Number(p.abono) <= 0) continue
-
-        const detalle = _ingresoDetalle(p.nombre, eventoNombre)
-        detallesActivos.add(detalle)
-
-        const existente = ingresosMap.get(detalle)
-
-        if (!existente) {
-          // No tiene ingreso: RE-VERIFICAR en BD justo antes de insertar
-          // (segunda barrera anti-duplicado ante posibles carreras).
-          const { data: yaExiste } = await supabase
-            .from("ingresos")
-            .select("id")
-            .eq("concepto", "auto-evento")
-            .eq("mes_id", mesId)
-            .eq("detalle", detalle)
-            .limit(1)
-            .maybeSingle()
-
-          if (yaExiste) {
-            ingresosMap.set(detalle, { id: yaExiste.id, monto: Number(p.abono), metodo_pago: p.metodo_pago || "Efectivo" })
-            continue
-          }
-
-          await supabase.from("ingresos").insert({
-            mes_id: mesId,
-            concepto: "auto-evento",
-            monto: p.abono,
-            fecha: new Date().toISOString().split("T")[0],
-            ministerio: "Administración",
-            categoria_principal: "Ingresos x Eventos",
-            detalle,
-            observacion: `Abono de ${p.nombre} para ${eventoNombre} (valor total: $${Number(p.valor).toFixed(2)})`,
-            estado: "Procesado",
+      const res = await authFetch("/api/finanzas/eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "sync",
+          mes_id: mesId,
+          evento_nombre: eventoNombre,
+          participantes: participantes.map((p) => ({
+            nombre: p.nombre,
+            abono: Number(p.abono),
+            valor: Number(p.valor),
             metodo_pago: p.metodo_pago || "Efectivo",
-          })
-          creados++
-        } else if (existente.monto !== Number(p.abono) || existente.metodo_pago !== (p.metodo_pago || "Efectivo")) {
-          // Monto o método desincronizado, actualizar
-          await supabase.from("ingresos").update({
-            monto: p.abono,
-            observacion: `Abono de ${p.nombre} para ${eventoNombre} (valor total: $${Number(p.valor).toFixed(2)})`,
-            metodo_pago: p.metodo_pago || "Efectivo",
-          }).eq("id", existente.id)
-          actualizados++
-        }
+          })),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        console.error("[eventos] Error syncMissingIngresos:", json.error || res.status)
+        return { creados: 0, actualizados: 0, eliminados: 0 }
       }
-
-      // Eliminar ingresos huérfanos (participante eliminado o abono puesto a 0).
-      // Solo afecta ingresos de ESTE evento (por el filtro de sufijo de arriba).
-      for (const [detalle, ing] of ingresosMap) {
-        if (!detallesActivos.has(detalle)) {
-          await supabase.from("ingresos").delete().eq("id", ing.id)
-          eliminados++
-        }
+      return {
+        creados: json.creados || 0,
+        actualizados: json.actualizados || 0,
+        eliminados: json.eliminados || 0,
       }
-
-      return { creados, actualizados, eliminados }
     } catch (e) {
       console.error("[eventos] Error syncMissingIngresos:", e)
       return { creados: 0, actualizados: 0, eliminados: 0 }

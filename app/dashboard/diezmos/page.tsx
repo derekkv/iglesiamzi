@@ -28,6 +28,7 @@ import { useSortOrder } from "@/hooks/use-sort-order"
 import { SortToggleButton } from "@/components/SortToggleButton"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
 import { todayEcuador } from "@/lib/timezone"
+import { toast } from "sonner"
 
 type TipoOfrenda = "diezmo" | "primicia" | "diezmo_especial"
 const TIPO_LABELS: Record<TipoOfrenda, string> = { diezmo: "Diezmo", primicia: "Primicia", diezmo_especial: "Ofrenda Especial" }
@@ -90,6 +91,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
       await loadData(true)
     } catch (error) {
       console.error("Error creando:", error)
+      toast.error(error instanceof Error ? error.message : "No se pudo registrar el diezmo")
     } finally { setSaving(false) }
   }
 
@@ -108,6 +110,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
       await loadData(true)
     } catch (error) {
       console.error("Error editando:", error)
+      toast.error(error instanceof Error ? error.message : "No se pudo editar el diezmo")
     } finally { setSaving(false) }
   }
 
@@ -117,6 +120,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
       await loadData(true)
     } catch (error) {
       console.error("Error eliminando:", error)
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el diezmo")
     }
   }
 

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/secure-db"
+import { authFetch } from "@/lib/auth-fetch"
 import { auditService, type AuditInfo } from "./audit-service"
 
 // === TIPOS ===
@@ -161,114 +162,64 @@ class PasivosService {
     }
   }
 
-  /** Elimina un pasivo, sus abonos (cascada) y los egresos generados por esos abonos. */
+  /** Elimina un pasivo, sus abonos (cascada) y los egresos generados por esos abonos. Atómico server-side. */
   async deletePasivo(pasivo: Pasivo, audit?: AuditInfo): Promise<void> {
-    // 1. Borrar los egresos vinculados a los abonos de este pasivo
-    const { data: abonos } = await supabase
-      .from("pasivos_abonos")
-      .select("egreso_id")
-      .eq("pasivo_id", pasivo.id)
-    const egresoIds = (abonos || []).map((a: any) => a.egreso_id).filter((x: any) => x != null)
-    if (egresoIds.length > 0) {
-      const { error: egErr } = await supabase.from("egresos").delete().in("id", egresoIds)
-      if (egErr) throw egErr
-    }
-
-    // 2. Borrar el pasivo (los abonos se eliminan por ON DELETE CASCADE)
-    const { error } = await supabase.from("pasivos").delete().eq("id", pasivo.id)
-    if (error) throw error
-
-    if (audit) {
-      auditService.log({
-        ...audit,
-        module: "pasivos",
-        action: "eliminar",
-        description: `Pasivo eliminado: ${pasivo.acreedor} - $${pasivo.monto_total}`,
-        details: { id: pasivo.id, acreedor: pasivo.acreedor, egresos_eliminados: egresoIds.length },
-      })
+    const res = await authFetch("/api/finanzas/pasivos", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "delete-pasivo",
+        pasivo: { id: pasivo.id, acreedor: pasivo.acreedor, monto_total: pasivo.monto_total },
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error || "Error eliminando el pasivo")
     }
   }
 
   // --- ABONOS ---
 
   /**
-   * Registra un abono a un pasivo. Además crea un EGRESO en el mes activo
-   * (categoría "PAGO DE PASIVOS"), igual que la nómina. Guarda el `egreso_id`
-   * en el abono para poder revertirlo si el abono se elimina.
+   * Registra un abono a un pasivo. Crea un EGRESO ("PAGO DE PASIVOS") + el abono
+   * vinculado de forma ATÓMICA en el servidor (/api/finanzas/pasivos). Evita el
+   * fallo silencioso por permisos sobre `egresos`.
    */
   async addAbono(pasivo: Pasivo, mesId: string, input: AbonoInput, audit?: AuditInfo): Promise<PasivoAbono> {
     if (!input.monto || input.monto <= 0) throw new Error("El monto del abono debe ser mayor a 0")
     if (!mesId) throw new Error("No hay mes activo para registrar el egreso del abono")
 
-    // 1. Crear el egreso en el mes activo
-    const observacionEgreso = `Abono a ${pasivo.acreedor}${input.metodo_pago ? ` — ${input.metodo_pago}` : ""}${input.observacion ? ` (${input.observacion})` : ""}`
-    const { data: egreso, error: egErr } = await supabase
-      .from("egresos")
-      .insert({
+    const res = await authFetch("/api/finanzas/pasivos", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "add-abono",
+        pasivo: { id: pasivo.id, acreedor: pasivo.acreedor, detalle: pasivo.detalle, monto_total: pasivo.monto_total },
         mes_id: mesId,
-        concepto: "pasivo",
-        monto: input.monto,
-        fecha: input.fecha,
-        ministerio: "Administración",
-        categoria_principal: CATEGORIA_PASIVOS,
-        detalle: pasivo.detalle || pasivo.acreedor,
-        observacion: observacionEgreso,
-        metodo_pago: input.metodo_pago || "N/A",
-      })
-      .select("id")
-      .single()
-    if (egErr) throw egErr
-
-    // 2. Crear el abono, vinculando el egreso
-    const { data: abono, error: abErr } = await supabase
-      .from("pasivos_abonos")
-      .insert({
-        pasivo_id: pasivo.id,
-        monto: input.monto,
-        fecha: input.fecha,
-        metodo_pago: input.metodo_pago || null,
-        observacion: input.observacion?.trim() || null,
-        egreso_id: egreso?.id ?? null,
-      })
-      .select()
-      .single()
-    if (abErr) throw abErr
-
-    // 3. Recalcular estado del pasivo
-    await this.recomputeEstado(pasivo.id, pasivo.monto_total)
-
-    if (audit) {
-      auditService.log({
-        ...audit,
-        module: "pasivos",
-        action: "crear",
-        description: `Abono a ${pasivo.acreedor}: $${input.monto}`,
-        details: { pasivo_id: pasivo.id, monto: input.monto, fecha: input.fecha, metodo_pago: input.metodo_pago, egreso_id: egreso?.id, mes_id: mesId },
-      })
+        input,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(json.error || "Error registrando el abono")
     }
-    return abono
+    return json.data as PasivoAbono
   }
 
-  /** Elimina un abono y su egreso vinculado, y recalcula el estado del pasivo. */
+  /** Elimina un abono y su egreso vinculado, y recalcula el estado del pasivo. Atómico server-side. */
   async deleteAbono(abono: PasivoAbono, acreedor: string, audit?: AuditInfo): Promise<void> {
-    if (abono.egreso_id) {
-      const { error: egErr } = await supabase.from("egresos").delete().eq("id", abono.egreso_id)
-      if (egErr) throw egErr
-    }
-    const { error } = await supabase.from("pasivos_abonos").delete().eq("id", abono.id)
-    if (error) throw error
-
-    const { data: p } = await supabase.from("pasivos").select("monto_total").eq("id", abono.pasivo_id).single()
-    await this.recomputeEstado(abono.pasivo_id, Number(p?.monto_total ?? 0))
-
-    if (audit) {
-      auditService.log({
-        ...audit,
-        module: "pasivos",
-        action: "eliminar",
-        description: `Abono eliminado de ${acreedor}: $${abono.monto}`,
-        details: { pasivo_id: abono.pasivo_id, abono_id: abono.id, monto: abono.monto, egreso_id: abono.egreso_id },
-      })
+    const res = await authFetch("/api/finanzas/pasivos", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "delete-abono",
+        abono: { id: abono.id, pasivo_id: abono.pasivo_id, monto: abono.monto, egreso_id: abono.egreso_id },
+        acreedor,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error || "Error eliminando el abono")
     }
   }
 

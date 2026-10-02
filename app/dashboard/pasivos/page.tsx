@@ -53,6 +53,10 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "pendiente" | "pagado" | "vencido">("todos")
+  const [busqueda, setBusqueda] = useState("")
+  const [filtroAcreedor, setFiltroAcreedor] = useState<string>("todos")
+  const [fechaDesde, setFechaDesde] = useState("")
+  const [fechaHasta, setFechaHasta] = useState("")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
 
   // Crear/editar pasivo
@@ -115,17 +119,49 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
     return Array.from(map.values()).sort((a, b) => b.saldo - a.saldo || b.total - a.total)
   })()
 
+  // Lista de acreedores únicos (para el filtro desplegable)
+  const acreedoresUnicos = Array.from(new Set(pasivos.map((p) => p.acreedor))).sort((a, b) => a.localeCompare(b))
+
+  const hayFiltrosActivos =
+    filtroEstado !== "todos" || busqueda.trim() !== "" || filtroAcreedor !== "todos" || fechaDesde !== "" || fechaHasta !== ""
+
+  const limpiarFiltros = () => {
+    setFiltroEstado("todos")
+    setBusqueda("")
+    setFiltroAcreedor("todos")
+    setFechaDesde("")
+    setFechaHasta("")
+  }
+
   const pasivosFiltrados = pasivos
     .filter((p) => {
-      if (filtroEstado === "todos") return true
-      if (filtroEstado === "vencido") return esVencidoP(p)
-      return p.estado === filtroEstado
+      // Estado
+      if (filtroEstado === "vencido") {
+        if (!esVencidoP(p)) return false
+      } else if (filtroEstado !== "todos") {
+        if (p.estado !== filtroEstado) return false
+      }
+      // Acreedor
+      if (filtroAcreedor !== "todos" && p.acreedor !== filtroAcreedor) return false
+      // Búsqueda de texto (acreedor / detalle / observación)
+      if (busqueda.trim()) {
+        const q = busqueda.trim().toLowerCase()
+        const campos = `${p.acreedor} ${p.detalle || ""} ${p.observacion || ""}`.toLowerCase()
+        if (!campos.includes(q)) return false
+      }
+      // Rango de fecha de pago
+      if (fechaDesde && p.fecha < fechaDesde) return false
+      if (fechaHasta && p.fecha > fechaHasta) return false
+      return true
     })
     .sort((a, b) => {
       const da = new Date(a.fecha + "T00:00:00").getTime()
       const db = new Date(b.fecha + "T00:00:00").getTime()
       return sortDir === "desc" ? db - da : da - db
     })
+
+  // Totales de los pasivos actualmente filtrados (para reflejar la selección)
+  const totalSaldoFiltrado = pasivosFiltrados.reduce((s, p) => s + saldoDe(p), 0)
 
   // --- Handlers pasivo ---
   const openNuevo = () => {
@@ -347,18 +383,52 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
           </Card>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Label className="text-sm text-gray-600">Estado:</Label>
-            <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as any)}>
-              <SelectTrigger className="w-40 h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendiente">Pendientes</SelectItem>
-                <SelectItem value="pagado">Pagados</SelectItem>
-                <SelectItem value="vencido">Vencidos</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex items-end gap-3 flex-wrap">
+            {/* Búsqueda por texto */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-gray-600">Buscar</Label>
+              <Input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Acreedor, detalle u observación..."
+                className="w-56 h-9"
+              />
+            </div>
+            {/* Acreedor */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-gray-600">Acreedor</Label>
+              <Select value={filtroAcreedor} onValueChange={setFiltroAcreedor}>
+                <SelectTrigger className="w-48 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {acreedoresUnicos.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Estado */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-gray-600">Estado</Label>
+              <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as any)}>
+                <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="pendiente">Pendientes</SelectItem>
+                  <SelectItem value="pagado">Pagados</SelectItem>
+                  <SelectItem value="vencido">Vencidos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Rango de fecha de pago */}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-gray-600">Fecha pago desde</Label>
+              <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="w-40 h-9" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-gray-600">Hasta</Label>
+              <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="w-40 h-9" />
+            </div>
+            {/* Orden */}
             <Button
               variant="outline"
               size="sm"
@@ -372,6 +442,11 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                 <><ArrowUp className="w-4 h-4" /> Más antiguos</>
               )}
             </Button>
+            {hayFiltrosActivos && (
+              <Button variant="ghost" size="sm" className="h-9 text-gray-600" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </Button>
+            )}
           </div>
           {canEdit && (
             <Button size="sm" onClick={openNuevo}><Plus className="w-4 h-4 mr-2" /> Nuevo pasivo</Button>
@@ -380,7 +455,14 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Pasivos ({pasivosFiltrados.length})</CardTitle>
+            <CardTitle className="text-base flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Pasivos ({pasivosFiltrados.length})</span>
+              {hayFiltrosActivos && (
+                <span className="text-sm font-normal text-gray-500">
+                  — Saldo filtrado: <span className="font-semibold text-red-700">{fmtMoney(totalSaldoFiltrado)}</span>
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -465,7 +547,9 @@ function PasivosContent({ canEdit }: { canEdit: boolean }) {
                   })}
                   {pasivosFiltrados.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">No hay pasivos registrados.</TableCell>
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                        {hayFiltrosActivos ? "No hay pasivos que coincidan con los filtros." : "No hay pasivos registrados."}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>

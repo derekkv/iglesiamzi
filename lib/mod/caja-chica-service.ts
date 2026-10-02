@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/secure-db"
+import { authFetch } from "@/lib/auth-fetch"
 import { auditService, type AuditInfo } from "./audit-service"
 
 // === TIPOS ===
@@ -201,37 +202,28 @@ export const cajaChicaService = {
     return data || []
   },
 
+  /**
+   * Registra una Gestión de Efectivo + su ingreso vinculado de forma ATÓMICA
+   * en el servidor (/api/finanzas/caja-chica). Evita el fallo silencioso por
+   * permisos sobre la tabla `ingresos`.
+   */
   async registrarGestionEfectivo(
     input: GestionEfectivoInput,
     audit?: AuditInfo
   ): Promise<CajaChicaMovimiento> {
-    // 1. Crear movimiento como INGRESO en caja_chica_movimientos
-    const movimiento = await this.createMovimiento({
-      fecha: input.fecha,
-      tipo: "Ingreso",
-      concepto: "Gestion de Efectivo",
-      detalle: input.detalle,
-      monto: input.valor,
-      metodo_pago: input.metodo_pago,
-      responsable: input.responsable,
-      mes_id: input.mes_id,
-    }, audit)
-
-    // 2. Sincronizar con tabla de ingresos
-    await supabase.from("ingresos").insert({
-      mes_id: input.mes_id,
-      concepto: "auto-caja-chica",
-      monto: input.valor,
-      fecha: input.fecha,
-      ministerio: "Administracion",
-      categoria_principal: "Caja Chica",
-      detalle: `Gestion de Efectivo - ${input.responsable}`,
-      observacion: `${input.detalle} (${input.metodo_pago})`,
-      estado: "Procesado",
-      metodo_pago: "Transferencia",
+    const res = await authFetch("/api/finanzas/caja-chica", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create",
+        input,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
     })
-
-    return movimiento
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(json.error || "Error registrando la gestión de efectivo")
+    }
+    return json.data as CajaChicaMovimiento
   },
 
   async updateGestionEfectivo(
@@ -239,82 +231,34 @@ export const cajaChicaService = {
     input: GestionEfectivoInput,
     audit?: AuditInfo
   ): Promise<CajaChicaMovimiento> {
-    // Obtener datos anteriores para buscar el ingreso vinculado
-    const { data: antes } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).maybeSingle()
-
-    // 1. Actualizar en caja_chica_movimientos
-    const { data, error } = await supabase
-      .from("caja_chica_movimientos")
-      .update({
-        fecha: input.fecha,
-        detalle: input.detalle,
-        monto: input.valor,
-        metodo_pago: input.metodo_pago,
-        responsable: input.responsable,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single()
-    if (error) throw error
-
-    if (audit) {
-      auditService.log({
-        ...audit, module: "caja_chica", action: "editar",
-        description: `Gestion editada: ${input.responsable} - $${input.valor}`,
-        details: { id, antes: { responsable: antes?.responsable, monto: antes?.monto }, despues: { responsable: input.responsable, monto: input.valor } },
-      })
+    const res = await authFetch("/api/finanzas/caja-chica", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "update",
+        id,
+        input,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(json.error || "Error actualizando la gestión de efectivo")
     }
-
-    // 2. Sincronizar con ingreso vinculado
-    if (antes) {
-      const { data: ingresoVinculado } = await supabase
-        .from("ingresos")
-        .select("id")
-        .eq("concepto", "auto-caja-chica")
-        .eq("detalle", `Gestion de Efectivo - ${antes.responsable}`)
-        .eq("mes_id", antes.mes_id)
-        .limit(1)
-        .maybeSingle()
-
-      if (ingresoVinculado) {
-        await supabase.from("ingresos").update({
-          monto: input.valor,
-          fecha: input.fecha,
-          detalle: `Gestion de Efectivo - ${input.responsable}`,
-          observacion: `${input.detalle} (${input.metodo_pago})`,
-          metodo_pago: "Transferencia",
-        }).eq("id", ingresoVinculado.id)
-      }
-    }
-
-    return data
+    return json.data as CajaChicaMovimiento
   },
 
   async deleteGestionEfectivo(id: number, audit?: AuditInfo): Promise<void> {
-    // Obtener datos antes de eliminar
-    const { data } = await supabase.from("caja_chica_movimientos").select("*").eq("id", id).maybeSingle()
-
-    // 1. Eliminar de caja_chica_movimientos
-    const { error } = await supabase.from("caja_chica_movimientos").delete().eq("id", id)
-    if (error) throw error
-
-    if (audit) {
-      auditService.log({
-        ...audit, module: "caja_chica", action: "eliminar",
-        description: `Gestion eliminada: ${data?.responsable} - $${data?.monto}`,
-        details: { id, responsable: data?.responsable, monto: data?.monto },
-      })
-    }
-
-    // 2. Eliminar ingreso vinculado
-    if (data) {
-      await supabase
-        .from("ingresos")
-        .delete()
-        .eq("concepto", "auto-caja-chica")
-        .eq("detalle", `Gestion de Efectivo - ${data.responsable}`)
-        .eq("mes_id", data.mes_id)
+    const res = await authFetch("/api/finanzas/caja-chica", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "delete",
+        id,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error || "Error eliminando la gestión de efectivo")
     }
   },
 
@@ -415,55 +359,13 @@ export const cajaChicaService = {
 
   async _syncIngresosCajaChicaImpl(mesId: string): Promise<void> {
     try {
-      const gestiones = await this.getGestionEfectivo(mesId)
-      
-      // Obtener todos los ingresos auto-caja-chica del mes
-      const { data: ingresosExistentes } = await supabase
-        .from("ingresos")
-        .select("id, detalle, monto, metodo_pago")
-        .eq("concepto", "auto-caja-chica")
-        .eq("mes_id", mesId)
-
-      const ingresosMap = new Map<string, { id: number; monto: number; metodo_pago: string }>()
-      for (const ing of (ingresosExistentes || [])) {
-        ingresosMap.set(ing.detalle, { id: ing.id, monto: Number(ing.monto), metodo_pago: ing.metodo_pago })
-      }
-
-      const detallesActivos = new Set<string>()
-
-      for (const g of gestiones) {
-        const detalle = `Gestion de Efectivo - ${g.responsable}`
-        detallesActivos.add(detalle)
-        const existente = ingresosMap.get(detalle)
-
-        if (!existente) {
-          // Crear faltante
-          await supabase.from("ingresos").insert({
-            mes_id: mesId,
-            concepto: "auto-caja-chica",
-            monto: g.monto,
-            fecha: g.fecha,
-            ministerio: "Administracion",
-            categoria_principal: "Caja Chica",
-            detalle,
-            observacion: `${g.detalle} (${g.metodo_pago})`,
-            estado: "Procesado",
-            metodo_pago: "Transferencia",
-          })
-        } else if (existente.metodo_pago !== "Transferencia" || existente.monto !== Number(g.monto)) {
-          // Corregir metodo_pago o monto desincronizado
-          await supabase.from("ingresos").update({
-            metodo_pago: "Transferencia",
-            monto: g.monto,
-          }).eq("id", existente.id)
-        }
-      }
-
-      // Eliminar huérfanos
-      for (const [detalle, ing] of ingresosMap) {
-        if (!detallesActivos.has(detalle)) {
-          await supabase.from("ingresos").delete().eq("id", ing.id)
-        }
+      const res = await authFetch("/api/finanzas/caja-chica", {
+        method: "POST",
+        body: JSON.stringify({ action: "sync", mes_id: mesId }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("[caja-chica] Error syncIngresosCajaChica:", json.error || res.status)
       }
     } catch (e) {
       console.error("[caja-chica] Error syncIngresosCajaChica:", e)

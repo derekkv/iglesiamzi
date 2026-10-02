@@ -1,5 +1,6 @@
 import { GlobalConfig } from "./globalConfig";
 import { supabase } from "@/lib/secure-db";
+import { authFetch } from "@/lib/auth-fetch";
 import { auditService, type AuditInfo } from "./mod/audit-service";
 
 interface StorageAdapter {
@@ -217,26 +218,27 @@ async updateIngreso(id: number, ingreso: any, audit?: AuditInfo) {
   if (error) throw new Error(`Supabase updateIngreso error: ${error.message}`);
   if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "editar", description: `Ingreso #${id}: ${ingreso.detalle} - $${ingreso.monto}`, details: { tipo: "Ingreso", antes: { monto: antes?.monto, fecha: antes?.fecha, ministerio: antes?.ministerio, categoria: antes?.categoria_principal, detalle: antes?.detalle, estado: antes?.estado }, despues: { monto: ingreso.monto, fecha: ingreso.fecha, ministerio: ingreso.ministerio, categoria: ingreso.categoria_principal, detalle: ingreso.detalle, estado: ingreso.estado } } })
 
-  // Si es auto-diezmo, sincronizar con la tabla diezmos
+  // Si es auto-diezmo, sincronizar con la tabla diezmos (server-side atómico,
+  // evita 403 silencioso si el usuario no tiene permiso sobre "diezmos").
   if (antes?.concepto === "auto-diezmo" && antes?.mes_id) {
-    // Buscar el diezmo vinculado por detalle y mes
-    const { data: diezmoVinculado } = await supabase
-      .from("diezmos")
-      .select("id")
-      .eq("mes_id", antes.mes_id)
-      .eq("transaccion", "transferencia")
-      .ilike("donador", `%${antes.detalle?.split(" - ")[1] || ""}%`)
-      .limit(1)
-      .single()
-
-    if (diezmoVinculado) {
-      const newDonador = ingreso.detalle?.split(" - ").slice(1).join(" - ") || ""
-      await supabase.from("diezmos").update({
-        valor: Number(ingreso.monto),
-        fecha: ingreso.fecha,
-        donador: newDonador || undefined,
-        updated_at: new Date().toISOString(),
-      }).eq("id", diezmoVinculado.id)
+    try {
+      const res = await authFetch("/api/finanzas/ingreso-diezmo-sync", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "update",
+          mes_id: antes.mes_id,
+          old_detalle: antes.detalle,
+          new_detalle: ingreso.detalle,
+          monto: ingreso.monto,
+          fecha: ingreso.fecha,
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        console.error("[storage] Error sincronizando diezmo vinculado:", json.error || res.status);
+      }
+    } catch (e) {
+      console.error("[storage] Error sincronizando diezmo vinculado:", e);
     }
   }
 }
@@ -266,17 +268,27 @@ async deleteIngreso(id: number, audit?: AuditInfo) {
   if (error) throw new Error(`Supabase deleteIngreso error: ${error.message}`);
   if (audit) auditService.log({ ...audit, module: "ingresos_egresos", action: "eliminar", description: `Ingreso #${id}: ${rec?.detalle} - $${rec?.monto}`, details: { tipo: "Ingreso", id, monto: rec?.monto, detalle: rec?.detalle, ministerio: rec?.ministerio, fecha: rec?.fecha } })
 
-  // Si era auto-diezmo, eliminar el diezmo vinculado
+  // Si era auto-diezmo, eliminar el diezmo vinculado (server-side atómico).
   if (rec?.concepto === "auto-diezmo" && rec?.mes_id) {
     const donador = rec.detalle?.split(" - ").slice(1).join(" - ") || ""
     if (donador) {
-      await supabase
-        .from("diezmos")
-        .delete()
-        .eq("mes_id", rec.mes_id)
-        .eq("donador", donador)
-        .eq("transaccion", "transferencia")
-        .eq("valor", Number(rec.monto))
+      try {
+        const res = await authFetch("/api/finanzas/ingreso-diezmo-sync", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "delete",
+            mes_id: rec.mes_id,
+            donador,
+            monto: rec.monto,
+          }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          console.error("[storage] Error eliminando diezmo vinculado:", json.error || res.status);
+        }
+      } catch (e) {
+        console.error("[storage] Error eliminando diezmo vinculado:", e);
+      }
     }
   }
 }

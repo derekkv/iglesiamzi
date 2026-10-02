@@ -27,7 +27,6 @@ import { useRealtime } from "@/hooks/use-realtime"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useSortOrder, sortByName } from "@/hooks/use-sort-order"
 import { SortToggleButton } from "@/components/SortToggleButton"
-import { storage } from "@/lib/storage"
 import { toast } from "sonner"
 import { auditService } from "@/lib/mod/audit-service"
 
@@ -166,66 +165,61 @@ export function NominaSection() {
   const syncEgresosFromNomina = async (nominaData: NominaRecord[]) => {
     if (!activeMes) return
     try {
-      // Obtener todos los egresos de nómina del mes
-      const { data: egresosExistentes } = await supabase.from("egresos").select("observacion").eq("mes_id", activeMes.id).eq("categoria_principal", "PAGO DE NOMINA")
-      const observaciones = new Set((egresosExistentes || []).map((e: any) => e.observacion?.toLowerCase() || ""))
+      const hoy = new Date().toISOString().split("T")[0]
+      const esperados: Array<{ detalle: string; observacion: string; monto: number; fecha: string; metodo_pago: string }> = []
 
       for (const r of nominaData) {
         const tieneTransporte = Number(r.movilizacion_valor || 0) > 0 && !r.movilizacion_con_quincenas
 
         // 1ra quincena (solo si no es transporte)
         if (r.primera_quincena_pagada && !tieneTransporte) {
-          const obs = `1ra quincena de ${r.nombre} — ${r.primera_quincena_metodo || "Transferencia"}`.toLowerCase()
-          if (!observaciones.has(obs)) {
-            await storage.addEgreso(activeMes.id, {
-              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
-              detalle: r.detalle || "Nómina", observacion: `1ra quincena de ${r.nombre} — ${r.primera_quincena_metodo || "Transferencia"}`,
-              monto: r.primera_quincena_valor || 0, fecha: r.primera_quincena_fecha || new Date().toISOString().split("T")[0],
-              metodo_pago: r.primera_quincena_metodo || "Transferencia", estado: "Procesado",
-            }, { user_id: user!.id, user_name: user!.username })
-          }
+          esperados.push({
+            detalle: r.detalle || "Nómina", observacion: `1ra quincena de ${r.nombre} — ${r.primera_quincena_metodo || "Transferencia"}`,
+            monto: r.primera_quincena_valor || 0, fecha: r.primera_quincena_fecha || hoy,
+            metodo_pago: r.primera_quincena_metodo || "Transferencia",
+          })
         }
 
         // 2da quincena (solo si no es transporte)
         if (r.segunda_quincena_pagada && !tieneTransporte) {
-          const obs = `2da quincena de ${r.nombre} — ${r.segunda_quincena_metodo || "Transferencia"}`.toLowerCase()
-          if (!observaciones.has(obs)) {
-            await storage.addEgreso(activeMes.id, {
-              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
-              detalle: r.detalle || "Nómina", observacion: `2da quincena de ${r.nombre} — ${r.segunda_quincena_metodo || "Transferencia"}`,
-              monto: r.segunda_quincena_valor || 0, fecha: r.segunda_quincena_fecha || new Date().toISOString().split("T")[0],
-              metodo_pago: r.segunda_quincena_metodo || "Transferencia", estado: "Procesado",
-            }, { user_id: user!.id, user_name: user!.username })
-          }
+          esperados.push({
+            detalle: r.detalle || "Nómina", observacion: `2da quincena de ${r.nombre} — ${r.segunda_quincena_metodo || "Transferencia"}`,
+            monto: r.segunda_quincena_valor || 0, fecha: r.segunda_quincena_fecha || hoy,
+            metodo_pago: r.segunda_quincena_metodo || "Transferencia",
+          })
         }
 
         // Transporte
         if (r.movilizacion_pagada) {
           const label = r.movilizacion_con_quincenas ? "1ra quincena movilización" : "Transporte del mes"
-          const obs = `${label} de ${r.nombre} — ${r.movilizacion_metodo || "Transferencia"}`.toLowerCase()
-          const obsAlt = `movilización del mes de ${r.nombre}`.toLowerCase()
-          if (!observaciones.has(obs) && !observaciones.has(obsAlt)) {
-            await storage.addEgreso(activeMes.id, {
-              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
-              detalle: r.detalle || "Nómina", observacion: `${label} de ${r.nombre} — ${r.movilizacion_metodo || "Transferencia"}`,
-              monto: r.movilizacion_valor || 0, fecha: r.movilizacion_fecha || new Date().toISOString().split("T")[0],
-              metodo_pago: r.movilizacion_metodo || "Transferencia", estado: "Procesado",
-            }, { user_id: user!.id, user_name: user!.username })
-          }
+          esperados.push({
+            detalle: r.detalle || "Nómina", observacion: `${label} de ${r.nombre} — ${r.movilizacion_metodo || "Transferencia"}`,
+            monto: r.movilizacion_valor || 0, fecha: r.movilizacion_fecha || hoy,
+            metodo_pago: r.movilizacion_metodo || "Transferencia",
+          })
         }
 
         // 2da quincena movilización (legacy)
         if (r.movilizacion_con_quincenas && r.movilizacion_segunda_pagada) {
-          const obs = `2da quincena movilización de ${r.nombre} — ${r.movilizacion_segunda_metodo || "Transferencia"}`.toLowerCase()
-          if (!observaciones.has(obs)) {
-            await storage.addEgreso(activeMes.id, {
-              mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
-              detalle: r.detalle || "Nómina", observacion: `2da quincena movilización de ${r.nombre} — ${r.movilizacion_segunda_metodo || "Transferencia"}`,
-              monto: r.movilizacion_segunda_valor || 0, fecha: r.movilizacion_segunda_fecha || new Date().toISOString().split("T")[0],
-              metodo_pago: r.movilizacion_segunda_metodo || "Transferencia", estado: "Procesado",
-            }, { user_id: user!.id, user_name: user!.username })
-          }
+          esperados.push({
+            detalle: r.detalle || "Nómina", observacion: `2da quincena movilización de ${r.nombre} — ${r.movilizacion_segunda_metodo || "Transferencia"}`,
+            monto: r.movilizacion_segunda_valor || 0, fecha: r.movilizacion_segunda_fecha || hoy,
+            metodo_pago: r.movilizacion_segunda_metodo || "Transferencia",
+          })
         }
+      }
+
+      if (esperados.length === 0) return
+
+      // El endpoint omite por observacion los que ya existan (no duplica) y
+      // registra los egresos server-side con service_role.
+      const res = await authFetch("/api/finanzas/nomina", {
+        method: "POST",
+        body: JSON.stringify({ action: "sync", mes_id: activeMes.id, egresos: esperados }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("Error sincronizando egresos:", json.error || res.status)
       }
     } catch (e) { console.error("Error sincronizando egresos:", e) }
   }
@@ -325,15 +319,46 @@ export function NominaSection() {
   const registerEgreso = async (nombre: string, valor: number, fecha: string, metodo: string, quincena: string, detalle: string | null) => {
     if (!activeMes) return
     try {
-      await storage.addEgreso(activeMes.id, {
-        mes_id: activeMes.id, ministerio: "Administración", categoria_principal: "PAGO DE NOMINA",
-        detalle: detalle || "Nómina", observacion: `${quincena} de ${nombre} — ${metodo}`,
-        monto: valor, fecha, metodo_pago: metodo, estado: "Procesado",
-      }, { user_id: user!.id, user_name: user!.username })
+      const res = await authFetch("/api/finanzas/nomina", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "add-egreso",
+          mes_id: activeMes.id,
+          egreso: {
+            detalle: detalle || "Nómina",
+            observacion: `${quincena} de ${nombre} — ${metodo}`,
+            monto: valor,
+            fecha,
+            metodo_pago: metodo,
+            ministerio: "Administración",
+          },
+          usuario: { id: user!.id, nombre: user!.username },
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error || "error de permisos")
+      }
     } catch (e: any) {
       console.error("Error registrando egreso:", e)
       // Transparencia: avisar si el pago quedó marcado pero el egreso NO se registró
       toast.error(`El pago de ${nombre} se marcó, pero no se pudo registrar el egreso: ${e?.message || "error de permisos"}. Verifícalo en Ingresos/Egresos.`)
+    }
+  }
+
+  /** Elimina egresos de nómina del mes por patrón de observación (server-side). */
+  const deleteEgresoNominaLike = async (mesId: string, observacionLike: string) => {
+    try {
+      const res = await authFetch("/api/finanzas/nomina", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete-like", mes_id: mesId, observacion_like: observacionLike }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("Error eliminando egreso de nómina:", json.error || res.status)
+      }
+    } catch (e) {
+      console.error("Error eliminando egreso de nómina:", e)
     }
   }
 
@@ -525,7 +550,7 @@ export function NominaSection() {
           await registerEgreso(formData.nombre, v, formData.primera_quincena_fecha || new Date().toISOString().split("T")[0], formData.primera_quincena_metodo, "1ra quincena", formData.detalle)
         } else if (!formData.primera_quincena_pagada && editingRecord.primera_quincena_pagada) {
           // Desmarcó pagada → eliminar egreso
-          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
+          await deleteEgresoNominaLike(editingRecord.mes_id, `%1ra quincena de ${editingRecord.nombre}%`)
         }
       }
 
@@ -536,7 +561,7 @@ export function NominaSection() {
           await sendPaymentNotification(formData.nombre, formData.telefono, formData.email, v, formData.segunda_quincena_metodo, "segunda")
           await registerEgreso(formData.nombre, v, formData.segunda_quincena_fecha || new Date().toISOString().split("T")[0], formData.segunda_quincena_metodo, "2da quincena", formData.detalle)
         } else if (!formData.segunda_quincena_pagada && editingRecord.segunda_quincena_pagada) {
-          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
+          await deleteEgresoNominaLike(editingRecord.mes_id, `%2da quincena de ${editingRecord.nombre}%`)
         }
       }
 
@@ -544,10 +569,10 @@ export function NominaSection() {
       const antesTeniaTransporte = Number(editingRecord.movilizacion_valor || 0) > 0 && !editingRecord.movilizacion_con_quincenas
       if (esTransporte && !antesTeniaTransporte) {
         if (editingRecord.primera_quincena_pagada) {
-          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%1ra quincena de ${editingRecord.nombre}%`)
+          await deleteEgresoNominaLike(editingRecord.mes_id, `%1ra quincena de ${editingRecord.nombre}%`)
         }
         if (editingRecord.segunda_quincena_pagada) {
-          await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena de ${editingRecord.nombre}%`)
+          await deleteEgresoNominaLike(editingRecord.mes_id, `%2da quincena de ${editingRecord.nombre}%`)
         }
       }
 
@@ -560,8 +585,8 @@ export function NominaSection() {
         await registerEgreso(formData.nombre, v, formData.movilizacion_fecha || new Date().toISOString().split("T")[0], formData.movilizacion_metodo, label, formData.detalle)
       } else if (!formData.movilizacion_pagada && editingRecord.movilizacion_pagada) {
         // Desmarcó transporte pagado → eliminar egreso
-        await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%Movilización del mes de ${editingRecord.nombre}%`)
-        await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%Transporte del mes de ${editingRecord.nombre}%`)
+        await deleteEgresoNominaLike(editingRecord.mes_id, `%Movilización del mes de ${editingRecord.nombre}%`)
+        await deleteEgresoNominaLike(editingRecord.mes_id, `%Transporte del mes de ${editingRecord.nombre}%`)
       }
 
       // Movilización 2da quincena (legacy)
@@ -570,7 +595,7 @@ export function NominaSection() {
         await sendMovilizacionNotification(formData.nombre, formData.telefono, formData.email, v, formData.movilizacion_segunda_metodo, "segunda", true)
         await registerEgreso(formData.nombre, v, formData.movilizacion_segunda_fecha || new Date().toISOString().split("T")[0], formData.movilizacion_segunda_metodo, "2da quincena movilización", formData.detalle)
       } else if ((!formData.movilizacion_con_quincenas || !formData.movilizacion_segunda_pagada) && editingRecord.movilizacion_segunda_pagada) {
-        await supabase.from("egresos").delete().eq("mes_id", editingRecord.mes_id).eq("categoria_principal", "PAGO DE NOMINA").ilike("observacion", `%2da quincena movilización de ${editingRecord.nombre}%`)
+        await deleteEgresoNominaLike(editingRecord.mes_id, `%2da quincena movilización de ${editingRecord.nombre}%`)
       }
 
       // Actualizar quincenas aplicadas del descuento cuando cambian pagos

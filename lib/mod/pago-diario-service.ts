@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/secure-db"
-import { auditService, type AuditInfo } from "./audit-service"
-import { getInternalHeaders } from "@/lib/auth-fetch"
+import { type AuditInfo } from "./audit-service"
+import { authFetch, getInternalHeaders } from "@/lib/auth-fetch"
 import { formatPhoneForWhatsApp } from "@/lib/format-phone"
 
 export interface PagoDiarioRecord {
@@ -58,61 +58,51 @@ export const pagoDiarioService = {
   },
 
   async create(record: Omit<PagoDiarioRecord, "id" | "created_at" | "updated_at">, audit?: AuditInfo): Promise<PagoDiarioRecord> {
-    const { data, error } = await supabase
-      .from("pago_diario")
-      .insert({
-        mes_id: record.mes_id,
-        fecha: record.fecha,
-        nombre: record.nombre,
-        telefono: record.telefono || null,
-        email: record.email || null,
-        ministerio: record.ministerio,
-        categoria: record.categoria,
-        detalle: record.detalle,
-        valor: record.valor,
-        metodo_pago: record.metodo_pago,
-      })
-      .select()
-      .single()
-    if (error) throw error
-
-    // Registrar egreso sincronizado
-    await this._syncEgresoCreate(data)
-
-    // Audit
-    if (audit) auditService.log({ ...audit, module: "pago_diario", action: "crear", description: `Pago: ${record.nombre} - $${record.valor} (${record.detalle})`, details: { nombre: record.nombre, valor: record.valor, ministerio: record.ministerio, detalle: record.detalle, fecha: record.fecha, metodo_pago: record.metodo_pago } })
-
-    return data
+    const res = await authFetch("/api/finanzas/pago-diario", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create",
+        record,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(json.error || "Error creando el pago diario")
+    }
+    return json.data as PagoDiarioRecord
   },
 
   async update(id: number, updates: Partial<Omit<PagoDiarioRecord, "id" | "created_at" | "updated_at">>, audit?: AuditInfo): Promise<PagoDiarioRecord> {
-    const { data: antes } = await supabase.from("pago_diario").select("*").eq("id", id).single()
-
-    const { data, error } = await supabase
-      .from("pago_diario")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-    if (error) throw error
-
-    // Sincronizar egreso
-    if (antes) await this._syncEgresoUpdate(antes, data)
-
-    if (audit) auditService.log({ ...audit, module: "pago_diario", action: "editar", description: `Pago editado: ${data.nombre} - $${data.valor}`, details: { antes: { nombre: antes?.nombre, valor: antes?.valor, detalle: antes?.detalle }, despues: { nombre: data.nombre, valor: data.valor, detalle: data.detalle } } })
-
-    return data
+    const res = await authFetch("/api/finanzas/pago-diario", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "update",
+        id,
+        updates,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(json.error || "Error actualizando el pago diario")
+    }
+    return json.data as PagoDiarioRecord
   },
 
   async delete(id: number, audit?: AuditInfo): Promise<void> {
-    const { data } = await supabase.from("pago_diario").select("*").eq("id", id).single()
-    const { error } = await supabase.from("pago_diario").delete().eq("id", id)
-    if (error) throw error
-
-    // Eliminar egreso sincronizado
-    if (data) await this._syncEgresoDelete(data)
-
-    if (audit) auditService.log({ ...audit, module: "pago_diario", action: "eliminar", description: `Pago eliminado: ${data?.nombre} - $${data?.valor}`, details: { id, nombre: data?.nombre, valor: data?.valor, detalle: data?.detalle } })
+    const res = await authFetch("/api/finanzas/pago-diario", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "delete",
+        id,
+        usuario: audit ? { id: audit.user_id, nombre: audit.user_name } : undefined,
+      }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error || "Error eliminando el pago diario")
+    }
   },
 
   // === EGRESO SYNC ===
@@ -127,69 +117,18 @@ export const pagoDiarioService = {
   },
 
   async _syncMissingEgresosImpl(mesId: string) {
-    // Obtener todos los pagos diarios del mes
-    const { data: pagos } = await supabase.from("pago_diario").select("*").eq("mes_id", mesId)
-    if (!pagos || pagos.length === 0) return
-
-    // Obtener egresos sincronizados existentes
-    const { data: egresosExistentes } = await supabase.from("egresos").select("detalle, monto, observacion").eq("mes_id", mesId).eq("concepto", "auto-pago-diario")
-    const existingSet = new Set((egresosExistentes || []).map((e: any) => `${e.detalle}|${e.monto}|${e.observacion}`))
-
-    for (const record of pagos) {
-      const key = `Pago diario - ${record.nombre}|${record.valor}|${record.detalle}`
-      if (!existingSet.has(key)) {
-        await this._syncEgresoCreate(record)
+    try {
+      const res = await authFetch("/api/finanzas/pago-diario", {
+        method: "POST",
+        body: JSON.stringify({ action: "sync", mes_id: mesId }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error("[pago-diario] Error syncMissingEgresos:", json.error || res.status)
       }
+    } catch (e) {
+      console.error("[pago-diario] Error syncMissingEgresos:", e)
     }
-  },
-
-  async _syncEgresoCreate(record: PagoDiarioRecord) {
-    await supabase.from("egresos").insert({
-      mes_id: record.mes_id,
-      concepto: "auto-pago-diario",
-      monto: record.valor,
-      fecha: record.fecha,
-      ministerio: record.ministerio,
-      categoria_principal: record.categoria,
-      detalle: `Pago diario - ${record.nombre}`,
-      observacion: record.detalle,
-      estado: "Procesado",
-      metodo_pago: record.metodo_pago,
-    })
-  },
-
-  async _syncEgresoUpdate(antes: PagoDiarioRecord, despues: PagoDiarioRecord) {
-    // Find linked egreso by concepto + detalle + mes_id (sin monto para soportar ediciones previas)
-    const { data: egreso } = await supabase
-      .from("egresos")
-      .select("id")
-      .eq("concepto", "auto-pago-diario")
-      .eq("detalle", `Pago diario - ${antes.nombre}`)
-      .eq("mes_id", antes.mes_id)
-      .eq("observacion", antes.detalle)
-      .limit(1)
-      .single()
-
-    if (egreso) {
-      await supabase.from("egresos").update({
-        monto: despues.valor,
-        fecha: despues.fecha,
-        ministerio: despues.ministerio,
-        categoria_principal: despues.categoria,
-        detalle: `Pago diario - ${despues.nombre}`,
-        observacion: despues.detalle,
-        metodo_pago: despues.metodo_pago,
-      }).eq("id", egreso.id)
-    }
-  },
-
-  async _syncEgresoDelete(record: PagoDiarioRecord) {
-    await supabase
-      .from("egresos")
-      .delete()
-      .eq("concepto", "auto-pago-diario")
-      .eq("detalle", `Pago diario - ${record.nombre}`)
-      .eq("mes_id", record.mes_id)
   },
 
   // === NOTIFICATIONS ===
