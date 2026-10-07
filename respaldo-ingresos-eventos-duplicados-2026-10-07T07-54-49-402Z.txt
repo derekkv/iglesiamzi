@@ -1,0 +1,1347 @@
+RESPALDO DE INGRESOS auto-evento DUPLICADOS ELIMINADOS
+Fecha: 2026-10-07T07:54:49.402Z
+Modo: APLICADO (filas eliminadas)
+Criterio: por cada 'detalle' se conserva el ingreso MÁS ANTIGUO (created_at) y se eliminan las re-emisiones posteriores.
+Total auto-evento: 162 | Conservados: 72 | Eliminados: 90 ($2475.00)
+
+== RESUMEN POR MES (eliminado) ==
+  2026-10: 67 filas = $1940.00
+  2026-9: 23 filas = $535.00
+
+== FILAS CONSERVADAS (una por detalle) ==
+KEEP id=72 mes=2026-7-1783221941617 $20.00 fecha=2026-07-19 | Abono evento - AVILA AVILA LUCIA ALEJANDRA (ENCUENTRO)
+KEEP id=74 mes=2026-7-1783221941617 $25.00 fecha=2026-07-19 | Abono evento - CEDEÑO VELEZ ANGELA LOURDES (ENCUENTRO)
+KEEP id=76 mes=2026-7-1783221941617 $25.00 fecha=2026-07-19 | Abono evento - MURILLO MENENDEZ JUAN PABLO (ENCUENTRO)
+KEEP id=84 mes=2026-7-1783221941617 $20.00 fecha=2026-07-26 | Abono evento - BRIONES VELEZ CARLOS LUIS  (ENCUENTRO)
+KEEP id=86 mes=2026-8 $25.00 fecha=2026-08-03 | Abono evento - MORAN GUTIERREZ  MAYELA HERMENCIA (ENCUENTRO)
+KEEP id=87 mes=2026-8 $25.00 fecha=2026-08-03 | Abono evento - VERA MORAN JOYCE YALITZA (ENCUENTRO)
+KEEP id=88 mes=2026-8 $25.00 fecha=2026-08-03 | Abono evento - GARCIA MACIAS VICTOR ALFONSO  (ENCUENTRO)
+KEEP id=89 mes=2026-8 $10.00 fecha=2026-08-03 | Abono evento - VERA PALMA ANA ESTHER (ENCUENTRO)
+KEEP id=90 mes=2026-8 $10.00 fecha=2026-08-03 | Abono evento - HEREDIA VERA ALINA VALERIA  (ENCUENTRO)
+KEEP id=91 mes=2026-8 $25.00 fecha=2026-08-03 | Abono evento - MENDOZA CARREÑO JESUS ARNALDO (ENCUENTRO)
+KEEP id=92 mes=2026-8 $24.00 fecha=2026-08-06 | Abono evento - ZAID AXIEL JURADO ZAMBRANO (PRESENTACION DE NIÑOS)
+KEEP id=93 mes=2026-8 $24.00 fecha=2026-08-06 | Abono evento - RICARDO MENDOZA  (PRESENTACION DE NIÑOS)
+KEEP id=94 mes=2026-8 $24.00 fecha=2026-08-06 | Abono evento - GIANLUCCA MACHUCA VELA (PRESENTACION DE NIÑOS)
+KEEP id=95 mes=2026-8 $24.00 fecha=2026-08-06 | Abono evento - SARAI ELIZABETH BRIONES BURGOS  (PRESENTACION DE NIÑOS)
+KEEP id=96 mes=2026-8 $24.00 fecha=2026-08-06 | Abono evento - KARLA RODRIGUEZ (PRESENTACION DE NIÑOS)
+KEEP id=97 mes=2026-8 $25.00 fecha=2026-08-06 | Abono evento - PEÑAHERRERA NATALIA  (ENCUENTRO)
+KEEP id=102 mes=2026-8 $25.00 fecha=2026-08-07 | Abono evento - ZAMBRANO LITARDO CAROLINA ESTEFANIA (ENCUENTRO)
+KEEP id=103 mes=2026-8 $25.00 fecha=2026-08-07 | Abono evento - MEDRANDA MOREIRA CARLOS SIMON (ENCUENTRO)
+KEEP id=105 mes=2026-8 $25.00 fecha=2026-08-07 | Abono evento - MEDRANDA LIDER (ENCUENTRO)
+KEEP id=106 mes=2026-8 $25.00 fecha=2026-08-07 | Abono evento - MOREIRA EDITA  (ENCUENTRO)
+KEEP id=107 mes=2026-8 $25.00 fecha=2026-08-09 | Abono evento - MOREIRA LITARDO WINTER JEYDAN (ENCUENTRO)
+KEEP id=108 mes=2026-8 $25.00 fecha=2026-08-09 | Abono evento - MOREIRA LITARDO JEFFREY JHAIR (ENCUENTRO)
+KEEP id=109 mes=2026-8 $25.00 fecha=2026-08-09 | Abono evento - MOREIRA LITARDO MERY ELIZABETH (ENCUENTRO)
+KEEP id=110 mes=2026-8 $25.00 fecha=2026-08-09 | Abono evento - MOREIRA LITARDO VALESKA ELIZABETH  (ENCUENTRO)
+KEEP id=117 mes=2026-8 $25.00 fecha=2026-08-11 | Abono evento - GARCIA LOOR KATHERINE (ENCUENTRO)
+KEEP id=118 mes=2026-8 $25.00 fecha=2026-08-11 | Abono evento - MURILLO CEDEÑO JUAN ANGEL (ENCUENTRO)
+KEEP id=119 mes=2026-8 $25.00 fecha=2026-08-11 | Abono evento - MURILLO CEDEÑO VIELKA DAYANARA (ENCUENTRO)
+KEEP id=121 mes=2026-8 $25.00 fecha=2026-08-12 | Abono evento - QUIROZ PARRAGA DEXY SARA (ENCUENTRO)
+KEEP id=169 mes=2026-9 $30.00 fecha=2026-09-24 | Abono evento - EURI PACHECO Y CARLOS LOOR  (CURSO DE MATRIMONIO 2)
+KEEP id=170 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - CARLOS BRIONES Y RUTH VELEZ  (CURSO DE MATRIMONIOS 1)
+KEEP id=171 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - CARLOS MEDRANDA Y CAROLINA ZAMBRANO  (CURSO DE MATRIMONIOS 1)
+KEEP id=172 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - CARLOS SAENZ Y NATALIA GUIDOTI (CURSO DE MATRIMONIOS 1)
+KEEP id=173 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - CRISTHIAN MENDOZA Y KATTY GOMEZ (CURSO DE MATRIMONIOS 1)
+KEEP id=174 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - DIEGO MENDOZA Y MERLY ANCHUNDIA  (CURSO DE MATRIMONIOS 1)
+KEEP id=176 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - ESTUARDO ROBALINO Y CATALINA LOPEZ (CURSO DE MATRIMONIOS 1)
+KEEP id=178 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - GUILLEMRO BARRIOS Y RUZZETH TORRES  (CURSO DE MATRIMONIOS 1)
+KEEP id=182 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - JAIME SALAS Y VICKY MOREIRA (CURSO DE MATRIMONIOS 1)
+KEEP id=186 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - JAMIL MACHUCA Y NICOLE VELA (CURSO DE MATRIMONIOS 1)
+KEEP id=193 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - JAVIER ALCIVAR Y ARIANA MENDOZA (CURSO DE MATRIMONIOS 1)
+KEEP id=200 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - JESUS MENDOZA Y LUCIA AVILA  (CURSO DE MATRIMONIOS 1)
+KEEP id=207 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - JOHANA CARREÑO Y ESPOSO (CURSO DE MATRIMONIOS 1)
+KEEP id=217 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - JUAN PABLO MURILLO Y ANGELA CEDEÑO  (CURSO DE MATRIMONIOS 1)
+KEEP id=225 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - LIDER MEDRANDA Y EDITA MOREIRA  (CURSO DE MATRIMONIOS 1)
+KEEP id=235 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - LUIS MARCILLO Y VALERIA ESCOBAR (CURSO DE MATRIMONIOS 1)
+KEEP id=247 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - MIGUEL ROCA Y ALEJANDRA BERMUDEZ (CURSO DE MATRIMONIOS 1)
+KEEP id=258 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - RAFAEL TERREROS Y GEMA REYES (CURSO DE MATRIMONIOS 1)
+KEEP id=269 mes=2026-9 $40.00 fecha=2026-09-24 | Abono evento - WASHINGTON MIELES Y SARA QUIROZ  (CURSO DE MATRIMONIOS 1)
+KEEP id=287 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - CRISTHIAN MENDOZA Y KATTY GOMEZ (CURSO DE PADRES DE FAMILIA)
+KEEP id=288 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - DIEGO MENDOZA Y MERLY ANCHUNDIA (CURSO DE PADRES DE FAMILIA)
+KEEP id=289 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - ESTUARDO ROBALINO Y CATALINA LOPEZ (CURSO DE PADRES DE FAMILIA)
+KEEP id=290 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - JAIME SALAS Y VICKY MOREIRA (CURSO DE PADRES DE FAMILIA)
+KEEP id=291 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - JAMIL MACHUCA Y NICOLE VELA (CURSO DE PADRES DE FAMILIA)
+KEEP id=292 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - JAVIER ALCIVAR Y ARIANA MENDOZA (CURSO DE PADRES DE FAMILIA)
+KEEP id=293 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - JESUS MENDOZA Y LUCIA AVILA (CURSO DE PADRES DE FAMILIA)
+KEEP id=294 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - JUAN PABLO MURILLO Y ANGELA CEDEÑO (CURSO DE PADRES DE FAMILIA)
+KEEP id=295 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - LUIS MARCILLO Y VALERIA ESCOBAR (CURSO DE PADRES DE FAMILIA)
+KEEP id=296 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - MIGUEL ROCA Y ALEJANDRA BERMUDEZ (CURSO DE PADRES DE FAMILIA)
+KEEP id=297 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - CARLOS SAENZ Y NATALIA GUIDOTI (CURSO DE PADRES DE FAMILIA)
+KEEP id=300 mes=2026-9 $5.00 fecha=2026-09-29 | Abono evento - NAVARRO PIÑANGO DAMARIS CIPRIANA (ENCUENTRO)
+KEEP id=301 mes=2026-9 $10.00 fecha=2026-09-29 | Abono evento - NAVARRETE NAVARRO SAMIRA VICTORIA (ENCUENTRO)
+KEEP id=303 mes=2026-9 $30.00 fecha=2026-09-29 | Abono evento - ZAMBRANO LIWLLIZ Y DE LA CRUZ KETTY  (CURSO DE MATRIMONIO 2)
+KEEP id=327 mes=2026-9 $30.00 fecha=2026-09-30 | Abono evento - MADELINE MURILLO Y MAURICIO BARREZUELA  (CURSO DE MATRIMONIO 2)
+KEEP id=328 mes=2026-9 $30.00 fecha=2026-09-30 | Abono evento - VERA ÁLAVA GUSTAVO Y ROBALINO MARÍA BELÉN (CURSO DE MATRIMONIO 2)
+KEEP id=329 mes=2026-9 $25.00 fecha=2026-09-30 | Abono evento - ROBLES AVEIGA SONIA RAQUEL (ENCUENTRO)
+KEEP id=330 mes=2026-9 $25.00 fecha=2026-09-30 | Abono evento -  SIMBAÑA CEVALLOS LUIS ABRAHAN (ENCUENTRO)
+KEEP id=331 mes=2026-9 $25.00 fecha=2026-09-30 | Abono evento - MENDOZA ROBLES DIEGO ANDRÉS (ENCUENTRO)
+KEEP id=332 mes=2026-9 $25.00 fecha=2026-09-30 | Abono evento - EILYN FERNANDA OSEJOS ROBLES (ENCUENTRO)
+KEEP id=365 mes=2026-10 $25.00 fecha=2026-10-01 | Abono evento - NATHALY CASTELLOS  (ENCUENTRO)
+KEEP id=377 mes=2026-10 $30.00 fecha=2026-10-01 | Abono evento - RAFAEL TERREROS Y GEMA REYES (CURSO DE PADRES DE FAMILIA)
+KEEP id=382 mes=2026-10 $30.00 fecha=2026-10-01 | Abono evento - NATHALY CASTELLOS Y JOSUE SERNI  (CURSO DE MATRIMONIO 2)
+KEEP id=410 mes=2026-10 $30.00 fecha=2026-10-05 | Abono evento - JOSSELYN RODRIGUEZ Y CRISTHIAN PARRAGA (CURSO DE MATRIMONIO 2)
+KEEP id=411 mes=2026-10 $30.00 fecha=2026-10-05 | Abono evento - CRISTINA GARCIA Y WALTER DELGADO  (CURSO DE MATRIMONIO 2)
+
+== FILAS ELIMINADAS (JSON completo para restaurar) ==
+[
+  {
+    "id": 304,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 20,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:07.768759+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - AVILA AVILA LUCIA ALEJANDRA (ENCUENTRO)",
+    "observacion": "Abono de AVILA AVILA LUCIA ALEJANDRA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 305,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 20,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:08.739265+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - BRIONES VELEZ CARLOS LUIS  (ENCUENTRO)",
+    "observacion": "Abono de BRIONES VELEZ CARLOS LUIS  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 306,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:09.152483+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CEDEÑO VELEZ ANGELA LOURDES (ENCUENTRO)",
+    "observacion": "Abono de CEDEÑO VELEZ ANGELA LOURDES para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 307,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:10.339753+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - GARCIA LOOR KATHERINE (ENCUENTRO)",
+    "observacion": "Abono de GARCIA LOOR KATHERINE para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 308,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:11.09591+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - GARCIA MACIAS VICTOR ALFONSO  (ENCUENTRO)",
+    "observacion": "Abono de GARCIA MACIAS VICTOR ALFONSO  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 309,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 10,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:12.307051+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - HEREDIA VERA ALINA VALERIA  (ENCUENTRO)",
+    "observacion": "Abono de HEREDIA VERA ALINA VALERIA  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 310,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:12.679684+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MEDRANDA LIDER (ENCUENTRO)",
+    "observacion": "Abono de MEDRANDA LIDER para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 311,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:13.052809+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MEDRANDA MOREIRA CARLOS SIMON (ENCUENTRO)",
+    "observacion": "Abono de MEDRANDA MOREIRA CARLOS SIMON para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 312,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:13.843364+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MENDOZA CARREÑO JESUS ARNALDO (ENCUENTRO)",
+    "observacion": "Abono de MENDOZA CARREÑO JESUS ARNALDO para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 313,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:14.270836+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MORAN GUTIERREZ  MAYELA HERMENCIA (ENCUENTRO)",
+    "observacion": "Abono de MORAN GUTIERREZ  MAYELA HERMENCIA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 314,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:15.185988+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA EDITA  (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA EDITA  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 315,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:16.623901+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO JEFFREY JHAIR (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO JEFFREY JHAIR para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 316,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:18.266301+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO MERY ELIZABETH (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO MERY ELIZABETH para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 317,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:18.987388+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO VALESKA ELIZABETH  (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO VALESKA ELIZABETH  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 318,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:19.356793+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO WINTER JEYDAN (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO WINTER JEYDAN para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 319,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:20.408161+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MURILLO CEDEÑO JUAN ANGEL (ENCUENTRO)",
+    "observacion": "Abono de MURILLO CEDEÑO JUAN ANGEL para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 320,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:20.830067+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MURILLO CEDEÑO VIELKA DAYANARA (ENCUENTRO)",
+    "observacion": "Abono de MURILLO CEDEÑO VIELKA DAYANARA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 321,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:21.857947+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MURILLO MENENDEZ JUAN PABLO (ENCUENTRO)",
+    "observacion": "Abono de MURILLO MENENDEZ JUAN PABLO para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 322,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:22.541912+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - PEÑAHERRERA NATALIA  (ENCUENTRO)",
+    "observacion": "Abono de PEÑAHERRERA NATALIA  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 323,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:24.00973+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - QUIROZ PARRAGA DEXY SARA (ENCUENTRO)",
+    "observacion": "Abono de QUIROZ PARRAGA DEXY SARA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 324,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:24.85208+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - VERA MORAN JOYCE YALITZA (ENCUENTRO)",
+    "observacion": "Abono de VERA MORAN JOYCE YALITZA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 325,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 10,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:26.00568+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - VERA PALMA ANA ESTHER (ENCUENTRO)",
+    "observacion": "Abono de VERA PALMA ANA ESTHER para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 326,
+    "mes_id": "2026-9",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-09-30T00:00:00+00:00",
+    "created_at": "2026-09-30T14:33:26.953354+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ZAMBRANO LITARDO CAROLINA ESTEFANIA (ENCUENTRO)",
+    "observacion": "Abono de ZAMBRANO LITARDO CAROLINA ESTEFANIA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 336,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:02.140599+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento -  SIMBAÑA CEVALLOS LUIS ABRAHAN (ENCUENTRO)",
+    "observacion": "Abono de  SIMBAÑA CEVALLOS LUIS ABRAHAN para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 337,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 20,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:02.529248+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - AVILA AVILA LUCIA ALEJANDRA (ENCUENTRO)",
+    "observacion": "Abono de AVILA AVILA LUCIA ALEJANDRA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 338,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 20,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:02.931845+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - BRIONES VELEZ CARLOS LUIS  (ENCUENTRO)",
+    "observacion": "Abono de BRIONES VELEZ CARLOS LUIS  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 339,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:03.339234+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CEDEÑO VELEZ ANGELA LOURDES (ENCUENTRO)",
+    "observacion": "Abono de CEDEÑO VELEZ ANGELA LOURDES para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 340,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:03.750893+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - EILYN FERNANDA OSEJOS ROBLES (ENCUENTRO)",
+    "observacion": "Abono de EILYN FERNANDA OSEJOS ROBLES para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 341,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:04.167686+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - GARCIA LOOR KATHERINE (ENCUENTRO)",
+    "observacion": "Abono de GARCIA LOOR KATHERINE para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 342,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:04.572319+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - GARCIA MACIAS VICTOR ALFONSO  (ENCUENTRO)",
+    "observacion": "Abono de GARCIA MACIAS VICTOR ALFONSO  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 343,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 10,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:05.017881+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - HEREDIA VERA ALINA VALERIA  (ENCUENTRO)",
+    "observacion": "Abono de HEREDIA VERA ALINA VALERIA  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 344,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:05.394422+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MEDRANDA LIDER (ENCUENTRO)",
+    "observacion": "Abono de MEDRANDA LIDER para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 345,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:05.804018+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MEDRANDA MOREIRA CARLOS SIMON (ENCUENTRO)",
+    "observacion": "Abono de MEDRANDA MOREIRA CARLOS SIMON para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 346,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:06.189054+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MENDOZA CARREÑO JESUS ARNALDO (ENCUENTRO)",
+    "observacion": "Abono de MENDOZA CARREÑO JESUS ARNALDO para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 347,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:06.519733+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MENDOZA ROBLES DIEGO ANDRÉS (ENCUENTRO)",
+    "observacion": "Abono de MENDOZA ROBLES DIEGO ANDRÉS para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 348,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:06.936802+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MORAN GUTIERREZ  MAYELA HERMENCIA (ENCUENTRO)",
+    "observacion": "Abono de MORAN GUTIERREZ  MAYELA HERMENCIA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 349,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:07.331738+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA EDITA  (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA EDITA  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Efectivo"
+  },
+  {
+    "id": 350,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:07.703563+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO JEFFREY JHAIR (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO JEFFREY JHAIR para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 351,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:08.046166+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO MERY ELIZABETH (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO MERY ELIZABETH para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 352,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:08.454736+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO VALESKA ELIZABETH  (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO VALESKA ELIZABETH  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 353,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:08.868049+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MOREIRA LITARDO WINTER JEYDAN (ENCUENTRO)",
+    "observacion": "Abono de MOREIRA LITARDO WINTER JEYDAN para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 354,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:09.213838+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MURILLO CEDEÑO JUAN ANGEL (ENCUENTRO)",
+    "observacion": "Abono de MURILLO CEDEÑO JUAN ANGEL para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 355,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:09.606694+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MURILLO CEDEÑO VIELKA DAYANARA (ENCUENTRO)",
+    "observacion": "Abono de MURILLO CEDEÑO VIELKA DAYANARA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 356,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:09.994998+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MURILLO MENENDEZ JUAN PABLO (ENCUENTRO)",
+    "observacion": "Abono de MURILLO MENENDEZ JUAN PABLO para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 357,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 10,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:10.459318+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - NAVARRETE NAVARRO SAMIRA VICTORIA (ENCUENTRO)",
+    "observacion": "Abono de NAVARRETE NAVARRO SAMIRA VICTORIA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 358,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 5,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:10.729744+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - NAVARRO PIÑANGO DAMARIS CIPRIANA (ENCUENTRO)",
+    "observacion": "Abono de NAVARRO PIÑANGO DAMARIS CIPRIANA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 359,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:11.077859+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - PEÑAHERRERA NATALIA  (ENCUENTRO)",
+    "observacion": "Abono de PEÑAHERRERA NATALIA  para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 360,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:11.630096+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - QUIROZ PARRAGA DEXY SARA (ENCUENTRO)",
+    "observacion": "Abono de QUIROZ PARRAGA DEXY SARA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 361,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:11.93793+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ROBLES AVEIGA SONIA RAQUEL (ENCUENTRO)",
+    "observacion": "Abono de ROBLES AVEIGA SONIA RAQUEL para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 362,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:12.247631+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - VERA MORAN JOYCE YALITZA (ENCUENTRO)",
+    "observacion": "Abono de VERA MORAN JOYCE YALITZA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 363,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 10,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:12.67874+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - VERA PALMA ANA ESTHER (ENCUENTRO)",
+    "observacion": "Abono de VERA PALMA ANA ESTHER para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 364,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 25,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:19:13.064883+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ZAMBRANO LITARDO CAROLINA ESTEFANIA (ENCUENTRO)",
+    "observacion": "Abono de ZAMBRANO LITARDO CAROLINA ESTEFANIA para ENCUENTRO (valor total: $25.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 366,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:44.364247+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CARLOS SAENZ Y NATALIA GUIDOTI (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de CARLOS SAENZ Y NATALIA GUIDOTI para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 367,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:44.742985+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CRISTHIAN MENDOZA Y KATTY GOMEZ (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de CRISTHIAN MENDOZA Y KATTY GOMEZ para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 368,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:45.362861+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - DIEGO MENDOZA Y MERLY ANCHUNDIA (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de DIEGO MENDOZA Y MERLY ANCHUNDIA para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 369,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:45.796405+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ESTUARDO ROBALINO Y CATALINA LOPEZ (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de ESTUARDO ROBALINO Y CATALINA LOPEZ para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 370,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:46.176037+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JAIME SALAS Y VICKY MOREIRA (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de JAIME SALAS Y VICKY MOREIRA para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 371,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:46.595954+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JAMIL MACHUCA Y NICOLE VELA (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de JAMIL MACHUCA Y NICOLE VELA para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 372,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:47.055706+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JAVIER ALCIVAR Y ARIANA MENDOZA (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de JAVIER ALCIVAR Y ARIANA MENDOZA para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 373,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:47.437054+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JESUS MENDOZA Y LUCIA AVILA (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de JESUS MENDOZA Y LUCIA AVILA para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 374,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:47.859407+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JUAN PABLO MURILLO Y ANGELA CEDEÑO (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de JUAN PABLO MURILLO Y ANGELA CEDEÑO para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 375,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:48.27173+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - LUIS MARCILLO Y VALERIA ESCOBAR (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de LUIS MARCILLO Y VALERIA ESCOBAR para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 376,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:24:48.662042+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MIGUEL ROCA Y ALEJANDRA BERMUDEZ (CURSO DE PADRES DE FAMILIA)",
+    "observacion": "Abono de MIGUEL ROCA Y ALEJANDRA BERMUDEZ para CURSO DE PADRES DE FAMILIA (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 378,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:25:15.769935+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - EURI PACHECO Y CARLOS LOOR  (CURSO DE MATRIMONIO 2)",
+    "observacion": "Abono de EURI PACHECO Y CARLOS LOOR  para CURSO DE MATRIMONIO 2 (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 379,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:25:16.177262+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MADELINE MURILLO Y MAURICIO BARREZUELA  (CURSO DE MATRIMONIO 2)",
+    "observacion": "Abono de MADELINE MURILLO Y MAURICIO BARREZUELA  para CURSO DE MATRIMONIO 2 (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 380,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:25:16.49681+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - VERA ÁLAVA GUSTAVO Y ROBALINO MARÍA BELÉN (CURSO DE MATRIMONIO 2)",
+    "observacion": "Abono de VERA ÁLAVA GUSTAVO Y ROBALINO MARÍA BELÉN para CURSO DE MATRIMONIO 2 (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 381,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 30,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T16:25:16.768259+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ZAMBRANO LIWLLIZ Y DE LA CRUZ KETTY  (CURSO DE MATRIMONIO 2)",
+    "observacion": "Abono de ZAMBRANO LIWLLIZ Y DE LA CRUZ KETTY  para CURSO DE MATRIMONIO 2 (valor total: $30.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 383,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 24,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:14.103701+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - GIANLUCCA MACHUCA VELA (PRESENTACION DE NIÑOS)",
+    "observacion": "Abono de GIANLUCCA MACHUCA VELA para PRESENTACION DE NIÑOS (valor total: $24.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 384,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 24,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:14.317081+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - KARLA RODRIGUEZ (PRESENTACION DE NIÑOS)",
+    "observacion": "Abono de KARLA RODRIGUEZ para PRESENTACION DE NIÑOS (valor total: $24.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 385,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 24,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:14.553512+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - RICARDO MENDOZA  (PRESENTACION DE NIÑOS)",
+    "observacion": "Abono de RICARDO MENDOZA  para PRESENTACION DE NIÑOS (valor total: $24.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 386,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 24,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:14.790055+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - SARAI ELIZABETH BRIONES BURGOS  (PRESENTACION DE NIÑOS)",
+    "observacion": "Abono de SARAI ELIZABETH BRIONES BURGOS  para PRESENTACION DE NIÑOS (valor total: $24.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 387,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 24,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:15.013714+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ZAID AXIEL JURADO ZAMBRANO (PRESENTACION DE NIÑOS)",
+    "observacion": "Abono de ZAID AXIEL JURADO ZAMBRANO para PRESENTACION DE NIÑOS (valor total: $24.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 388,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:15.114948+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CARLOS BRIONES Y RUTH VELEZ  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de CARLOS BRIONES Y RUTH VELEZ  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 389,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:15.357191+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CARLOS MEDRANDA Y CAROLINA ZAMBRANO  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de CARLOS MEDRANDA Y CAROLINA ZAMBRANO  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 390,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:15.782776+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CARLOS SAENZ Y NATALIA GUIDOTI (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de CARLOS SAENZ Y NATALIA GUIDOTI para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 391,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:16.164591+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - CRISTHIAN MENDOZA Y KATTY GOMEZ (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de CRISTHIAN MENDOZA Y KATTY GOMEZ para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 392,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:16.391848+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - DIEGO MENDOZA Y MERLY ANCHUNDIA  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de DIEGO MENDOZA Y MERLY ANCHUNDIA  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 393,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:16.678527+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - ESTUARDO ROBALINO Y CATALINA LOPEZ (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de ESTUARDO ROBALINO Y CATALINA LOPEZ para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 394,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:16.899868+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - GUILLEMRO BARRIOS Y RUZZETH TORRES  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de GUILLEMRO BARRIOS Y RUZZETH TORRES  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 395,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:17.106855+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JAIME SALAS Y VICKY MOREIRA (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de JAIME SALAS Y VICKY MOREIRA para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 396,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:17.340718+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JAMIL MACHUCA Y NICOLE VELA (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de JAMIL MACHUCA Y NICOLE VELA para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 397,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:17.5514+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JAVIER ALCIVAR Y ARIANA MENDOZA (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de JAVIER ALCIVAR Y ARIANA MENDOZA para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 398,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:17.758179+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JESUS MENDOZA Y LUCIA AVILA  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de JESUS MENDOZA Y LUCIA AVILA  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 399,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:17.955159+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JOHANA CARREÑO Y ESPOSO (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de JOHANA CARREÑO Y ESPOSO para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 400,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:18.162527+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - JUAN PABLO MURILLO Y ANGELA CEDEÑO  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de JUAN PABLO MURILLO Y ANGELA CEDEÑO  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 401,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:18.404199+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - LIDER MEDRANDA Y EDITA MOREIRA  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de LIDER MEDRANDA Y EDITA MOREIRA  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 402,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:18.645584+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - LUIS MARCILLO Y VALERIA ESCOBAR (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de LUIS MARCILLO Y VALERIA ESCOBAR para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 403,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:18.850503+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - MIGUEL ROCA Y ALEJANDRA BERMUDEZ (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de MIGUEL ROCA Y ALEJANDRA BERMUDEZ para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 404,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:19.071714+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - RAFAEL TERREROS Y GEMA REYES (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de RAFAEL TERREROS Y GEMA REYES para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  },
+  {
+    "id": 405,
+    "mes_id": "2026-10",
+    "concepto": "auto-evento",
+    "monto": 40,
+    "fecha": "2026-10-01T00:00:00+00:00",
+    "created_at": "2026-10-01T18:51:19.270776+00:00",
+    "ministerio": "Administración",
+    "categoria_principal": "Ingresos x Eventos",
+    "detalle": "Abono evento - WASHINGTON MIELES Y SARA QUIROZ  (CURSO DE MATRIMONIOS 1)",
+    "observacion": "Abono de WASHINGTON MIELES Y SARA QUIROZ  para CURSO DE MATRIMONIOS 1 (valor total: $40.00)",
+    "estado": "Procesado",
+    "metodo_pago": "Transferencia"
+  }
+]

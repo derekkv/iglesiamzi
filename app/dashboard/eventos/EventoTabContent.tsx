@@ -67,12 +67,18 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
 
   useEffect(() => {
     loadData()
-    // Sync de catch-up una sola vez al abrir/cambiar de evento (con candado
-    // anti-concurrencia en el servicio). NO se lanza en cada refresco realtime.
-    eventoParticipantesService.syncMissingIngresos(evento.id)
-      .then((r) => { if (r.creados || r.actualizados || r.eliminados) loadData() })
-      .catch(() => {})
-  }, [evento.id])
+    // Sync de catch-up/reconciliación una sola vez al abrir/cambiar de evento.
+    // Reconcilia ingresos cross-month (crea faltantes, corrige montos, elimina
+    // duplicados y huérfanos). SOLO para usuarios con permiso de edición: el
+    // endpoint escribe/borra con service_role, así que un usuario de solo
+    // lectura NO debe poder dispararlo con solo abrir la pestaña.
+    if (canEdit) {
+      eventoParticipantesService.syncMissingIngresos(evento.id)
+        .then((r) => { if (r.creados || r.actualizados || r.eliminados) loadData() })
+        .catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evento.id, canEdit])
 
   // Realtime acotado SOLO a este evento (evita recargar por cambios de otros
   // eventos, que era lo que multiplicaba el sync durante una importacion).
