@@ -30,41 +30,58 @@ export function PushNotificationPrompt() {
     // El SW solo está disponible en producción donde next-pwa lo registra
     if (!navigator.serviceWorker.controller) return
 
-    // Solo mostrar si no ha decidido aún (o si falló antes, reintentar)
-    const dismissed = localStorage.getItem("push_prompt_dismissed")
-    if (dismissed === "subscribed" || dismissed === "denied") return
-
-    // Si hubo un error previo, limpiar para reintentar
-    if (dismissed === "error") {
-      localStorage.removeItem("push_prompt_dismissed")
+    // Sin clave pública VAPID no se puede suscribir: no mostrar ni intentar nada.
+    if (!VAPID_PUBLIC_KEY) {
+      console.warn("[push] NEXT_PUBLIC_VAPID_PUBLIC_KEY no está configurada; push deshabilitado.")
+      return
     }
 
-    // Chequear si ya tiene permiso
+    const dismissed = localStorage.getItem("push_prompt_dismissed")
+
+    // Si el usuario denegó explícitamente, respetar.
+    if (dismissed === "denied" || Notification.permission === "denied") return
+
+    // Si el navegador YA tiene el permiso concedido, asegurar que la suscripción
+    // esté guardada en el servidor. Cubre el caso en que el usuario aceptó antes
+    // pero el guardado falló (y el navegador ya no vuelve a preguntar). Es
+    // idempotente: si ya estaba guardada no cambia nada; si faltaba, la crea.
     if (Notification.permission === "granted") {
-      // Ya tiene permiso, registrar suscripción silenciosamente
       subscribeUser()
       return
     }
 
-    if (Notification.permission === "denied") return
+    // Permiso "default" (nunca preguntado) → mostrar prompt, salvo que lo haya
+    // pospuesto ("later" se re-habilita a los 7 días desde handleDismiss).
+    if (dismissed === "later") return
 
-    // Mostrar prompt después de un delay
     const timeout = setTimeout(() => setShowPrompt(true), 3000)
     return () => clearTimeout(timeout)
   }, [user])
 
   const subscribeUser = async () => {
     if (!user) return
+    if (!VAPID_PUBLIC_KEY) {
+      console.warn("[push] Falta la clave pública VAPID; no se puede suscribir.")
+      return
+    }
     setSubscribing(true)
     try {
       const registration = await navigator.serviceWorker.ready
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      })
+      // Reutilizar la suscripción existente si la hay; crearla si no.
+      // (Si antes se creó pero no se guardó, aquí la recuperamos y la guardamos.)
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        })
+      }
 
       const sub = subscription.toJSON()
+      if (!sub.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) {
+        throw new Error("Suscripción incompleta devuelta por el navegador")
+      }
 
       // Guardar vía API route (usa service key, bypasses RLS)
       const res = await fetch("/api/push-subscription", {
@@ -74,8 +91,8 @@ export function PushNotificationPrompt() {
           token: localStorage.getItem("authToken"),
           user_id: user.id,
           endpoint: sub.endpoint,
-          p256dh: sub.keys?.p256dh,
-          auth: sub.keys?.auth,
+          p256dh: sub.keys.p256dh,
+          auth: sub.keys.auth,
         }),
       })
 
@@ -87,7 +104,9 @@ export function PushNotificationPrompt() {
       localStorage.setItem("push_prompt_dismissed", "subscribed")
     } catch (error) {
       console.error("Error subscribing to push:", error)
-      localStorage.setItem("push_prompt_dismissed", "error")
+      // No marcar como "subscribed": limpiar el flag para que el próximo montaje
+      // (recarga) vuelva a intentar guardar la suscripción.
+      localStorage.removeItem("push_prompt_dismissed")
     } finally {
       setSubscribing(false)
       setShowPrompt(false)

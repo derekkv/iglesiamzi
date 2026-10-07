@@ -381,6 +381,16 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
     modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
   },
+  // Adjuntos (archivos) y notas por etapa de un caso de ayuda social.
+  // Lectura para quien ve el módulo; escritura/edición/eliminación requiere can_edit.
+  redil_adjuntos: {
+    modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
+  redil_notas: {
+    modules: ["redil_ayuda_social", "control_mensual", "resumen-pastoral"],
+    requireEditForWrite: true,
+  },
 
   // === REDIL - EXISTENCIA DE AYUDA (inventario de ayuda social) ===
   existencia_ayuda_categorias: {

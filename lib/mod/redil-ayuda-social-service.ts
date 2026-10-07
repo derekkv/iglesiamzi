@@ -256,6 +256,73 @@ export interface EntregaInput {
 }
 
 // ============================================================
+// ADJUNTOS Y NOTAS POR ETAPA
+// ============================================================
+
+/** Etapa del caso a la que se asocia un adjunto o una nota. */
+export type EtapaRedil = "general" | "solicitud" | "visita" | "entrega"
+
+export const ETAPAS_LABELS: Record<EtapaRedil, string> = {
+  general: "General",
+  solicitud: "Solicitud",
+  visita: "Visita Técnica",
+  entrega: "Entrega",
+}
+
+export const ETAPAS_ORDEN: EtapaRedil[] = ["general", "solicitud", "visita", "entrega"]
+
+/** Archivo adjunto a un caso (tabla redil_adjuntos). */
+export interface AdjuntoRedil {
+  id: number
+  caso_id: number
+  etapa: EtapaRedil
+  url: string
+  path: string | null
+  name: string
+  size: number
+  type: string | null
+  descripcion: string | null
+  subido_por: string | null
+  subido_por_nombre: string | null
+  created_at: string
+}
+
+/** Nota / seguimiento de un caso (tabla redil_notas). */
+export interface NotaRedil {
+  id: number
+  caso_id: number
+  etapa: EtapaRedil
+  contenido: string
+  usuario_id: string | null
+  usuario_nombre: string | null
+  editado: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Datos de un adjunto a punto de guardar (ya subido a storage). */
+export interface AdjuntoInput extends ArchivoSubido {
+  path?: string | null
+  descripcion?: string | null
+}
+
+/** Evento unificado para la línea de tiempo / historial del caso. */
+export interface TimelineEvento {
+  id: string
+  tipo: "hito" | "nota" | "adjunto"
+  etapa: EtapaRedil
+  fecha: string
+  titulo: string
+  descripcion?: string | null
+  usuario?: string | null
+  icon: string
+  color: string
+  /** Datos crudos para render enriquecido (nota o adjunto). */
+  nota?: NotaRedil
+  adjunto?: AdjuntoRedil
+}
+
+// ============================================================
 // SERVICIO
 // ============================================================
 
@@ -571,9 +638,359 @@ class RedilAyudaSocialService {
     if (error) return null
     return data
   }
+
+  // ---- EDICIÓN DE SOLICITUD ----
+
+  /** Actualizar los datos de la solicitud (Paso 1) de un caso. */
+  async actualizarSolicitud(
+    casoId: number,
+    input: SolicitudInput,
+    usuario: { id: string; nombre: string }
+  ): Promise<void> {
+    const { error } = await db
+      .from("solicitudes_redil")
+      .update({
+        nombre_completo: input.nombre_completo,
+        edad: input.edad ?? null,
+        cedula: input.cedula || null,
+        telefono: input.telefono || null,
+        direccion: input.direccion || null,
+        barrio_sector: input.barrio_sector || null,
+        estado_civil: input.estado_civil || null,
+        numero_hijos: input.numero_hijos || 0,
+        edad_hijos: input.edad_hijos || null,
+        tiempo_asistiendo: input.tiempo_asistiendo || null,
+        trabaja_actualmente: input.trabaja_actualmente || false,
+        lugar_trabajo: input.lugar_trabajo || null,
+        ingreso_mensual: input.ingreso_mensual || null,
+        motivo: input.motivo || null,
+        tipo_ayuda: input.tipo_ayuda,
+        tipo_ayuda_otro: input.tipo_ayuda_otro || null,
+        referencia_nombre: input.referencia_nombre || null,
+        referencia_telefono: input.referencia_telefono || null,
+      })
+      .eq("caso_id", casoId)
+
+    if (error) throw new Error(error.message)
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "editar",
+      description: `Solicitud Redil editada - Caso #${casoId} - ${input.nombre_completo}`,
+      details: { caso_id: casoId, nombre: input.nombre_completo, tipo_ayuda: input.tipo_ayuda },
+    })
+  }
+
+  // ---- ADJUNTOS (archivos por etapa) ----
+
+  /** Obtener los adjuntos de un caso (opcionalmente filtrando por etapa). */
+  async getAdjuntos(casoId: number, etapa?: EtapaRedil): Promise<AdjuntoRedil[]> {
+    let query = db.from("redil_adjuntos").select("*").eq("caso_id", casoId)
+    if (etapa) query = query.eq("etapa", etapa)
+    const { data, error } = await query.order("created_at", { ascending: true })
+    if (error) throw new Error(error.message)
+    return data || []
+  }
+
+  /** Registrar un adjunto ya subido a storage, en una etapa del caso. */
+  async agregarAdjunto(
+    casoId: number,
+    etapa: EtapaRedil,
+    archivo: AdjuntoInput,
+    usuario: { id: string; nombre: string }
+  ): Promise<AdjuntoRedil> {
+    const { data, error } = await db
+      .from("redil_adjuntos")
+      .insert({
+        caso_id: casoId,
+        etapa,
+        url: archivo.url,
+        path: archivo.path || null,
+        name: archivo.name,
+        size: archivo.size || 0,
+        type: archivo.type || null,
+        descripcion: archivo.descripcion || null,
+        subido_por: usuario.id,
+        subido_por_nombre: usuario.nombre,
+      })
+      .select("*")
+      .single()
+
+    if (error || !data) throw new Error(error?.message || "Error guardando adjunto")
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "crear",
+      description: `Adjunto agregado (${ETAPAS_LABELS[etapa]}) - Caso #${casoId} - ${archivo.name}`,
+      details: { caso_id: casoId, etapa, archivo: archivo.name },
+    })
+
+    return data
+  }
+
+  /** Actualizar la descripción de un adjunto. */
+  async actualizarAdjunto(
+    id: number,
+    descripcion: string,
+    usuario: { id: string; nombre: string }
+  ): Promise<void> {
+    const { error } = await db
+      .from("redil_adjuntos")
+      .update({ descripcion: descripcion || null })
+      .eq("id", id)
+    if (error) throw new Error(error.message)
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "editar",
+      description: `Descripción de adjunto editada #${id}`,
+      details: { adjunto_id: id, descripcion },
+    })
+  }
+
+  /** Eliminar un adjunto (solo el registro; el archivo permanece en storage). */
+  async eliminarAdjunto(id: number, usuario: { id: string; nombre: string }): Promise<void> {
+    const { error } = await db.from("redil_adjuntos").delete().eq("id", id)
+    if (error) throw new Error(error.message)
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "eliminar",
+      description: `Adjunto eliminado #${id}`,
+      details: { adjunto_id: id },
+    })
+  }
+
+  // ---- NOTAS (seguimiento por etapa) ----
+
+  /** Obtener las notas de un caso (opcionalmente filtrando por etapa). */
+  async getNotas(casoId: number, etapa?: EtapaRedil): Promise<NotaRedil[]> {
+    let query = db.from("redil_notas").select("*").eq("caso_id", casoId)
+    if (etapa) query = query.eq("etapa", etapa)
+    const { data, error } = await query.order("created_at", { ascending: true })
+    if (error) throw new Error(error.message)
+    return data || []
+  }
+
+  /** Agregar una nota a una etapa del caso. */
+  async agregarNota(
+    casoId: number,
+    etapa: EtapaRedil,
+    contenido: string,
+    usuario: { id: string; nombre: string }
+  ): Promise<NotaRedil> {
+    const texto = (contenido || "").trim()
+    if (!texto) throw new Error("La nota no puede estar vacía")
+
+    const { data, error } = await db
+      .from("redil_notas")
+      .insert({
+        caso_id: casoId,
+        etapa,
+        contenido: texto,
+        usuario_id: usuario.id,
+        usuario_nombre: usuario.nombre,
+      })
+      .select("*")
+      .single()
+
+    if (error || !data) throw new Error(error?.message || "Error guardando nota")
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "crear",
+      description: `Nota agregada (${ETAPAS_LABELS[etapa]}) - Caso #${casoId}`,
+      details: { caso_id: casoId, etapa, contenido: texto.slice(0, 200) },
+    })
+
+    return data
+  }
+
+  /** Editar el contenido de una nota. */
+  async actualizarNota(
+    id: number,
+    contenido: string,
+    usuario: { id: string; nombre: string }
+  ): Promise<void> {
+    const texto = (contenido || "").trim()
+    if (!texto) throw new Error("La nota no puede estar vacía")
+
+    const { error } = await db
+      .from("redil_notas")
+      .update({ contenido: texto, editado: true, updated_at: new Date().toISOString() })
+      .eq("id", id)
+    if (error) throw new Error(error.message)
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "editar",
+      description: `Nota editada #${id}`,
+      details: { nota_id: id, contenido: texto.slice(0, 200) },
+    })
+  }
+
+  /** Eliminar una nota. */
+  async eliminarNota(id: number, usuario: { id: string; nombre: string }): Promise<void> {
+    const { error } = await db.from("redil_notas").delete().eq("id", id)
+    if (error) throw new Error(error.message)
+
+    auditService.log({
+      user_id: usuario.id,
+      user_name: usuario.nombre,
+      module: "redil_ayuda_social",
+      action: "eliminar",
+      description: `Nota eliminada #${id}`,
+      details: { nota_id: id },
+    })
+  }
 }
 
 export const redilService = new RedilAyudaSocialService()
+
+// ============================================================
+// LÍNEA DE TIEMPO / HISTORIAL DEL CASO
+// ============================================================
+
+/**
+ * Construye una línea de tiempo unificada de un caso a partir de:
+ * - Hitos derivados del caso (creación, visita técnica, entrega/cierre).
+ * - Notas registradas por etapa.
+ * - Adjuntos subidos por etapa (incluye los archivos legados de la entrega).
+ * Devuelve los eventos ordenados cronológicamente (ascendente).
+ */
+export function construirTimeline(
+  casoCompleto: CasoCompleto,
+  notas: NotaRedil[],
+  adjuntos: AdjuntoRedil[]
+): TimelineEvento[] {
+  const eventos: TimelineEvento[] = []
+  const { caso, solicitud, visita, entrega } = casoCompleto
+
+  // --- Hitos del caso ---
+  if (caso?.fecha_creacion) {
+    eventos.push({
+      id: `hito-creado-${caso.id}`,
+      tipo: "hito",
+      etapa: "solicitud",
+      fecha: caso.fecha_creacion,
+      titulo: "Solicitud creada",
+      descripcion: solicitud?.nombre_completo ? `Beneficiario: ${solicitud.nombre_completo}` : null,
+      usuario: caso.usuario_creador_nombre,
+      icon: "ClipboardList",
+      color: "blue",
+    })
+  }
+
+  if (visita?.fecha_visita) {
+    const aprobado = visita.resultado === "aprobado"
+    eventos.push({
+      id: `hito-visita-${visita.id}`,
+      tipo: "hito",
+      etapa: "visita",
+      fecha: visita.fecha_visita,
+      titulo: aprobado ? "Visita técnica: APROBADO" : "Visita técnica: DENEGADO",
+      descripcion: aprobado
+        ? (visita.observaciones || null)
+        : (visita.motivo_rechazo || visita.observaciones || null),
+      usuario: visita.realizada_por_nombre,
+      icon: aprobado ? "CheckCircle" : "XCircle",
+      color: aprobado ? "green" : "red",
+    })
+  }
+
+  if (entrega?.fecha_entrega) {
+    eventos.push({
+      id: `hito-entrega-${entrega.id}`,
+      tipo: "hito",
+      etapa: "entrega",
+      fecha: entrega.created_at || entrega.fecha_entrega,
+      titulo: "Entrega realizada",
+      descripcion: entrega.observaciones || null,
+      usuario: entrega.entregado_por_nombre,
+      icon: "Package",
+      color: "emerald",
+    })
+  }
+
+  // --- Notas ---
+  for (const nota of notas) {
+    eventos.push({
+      id: `nota-${nota.id}`,
+      tipo: "nota",
+      etapa: nota.etapa,
+      fecha: nota.created_at,
+      titulo: `Nota · ${ETAPAS_LABELS[nota.etapa]}`,
+      descripcion: nota.contenido,
+      usuario: nota.usuario_nombre,
+      icon: "StickyNote",
+      color: "amber",
+      nota,
+    })
+  }
+
+  // --- Adjuntos (tabla redil_adjuntos) ---
+  for (const adj of adjuntos) {
+    eventos.push({
+      id: `adj-${adj.id}`,
+      tipo: "adjunto",
+      etapa: adj.etapa,
+      fecha: adj.created_at,
+      titulo: `Archivo · ${ETAPAS_LABELS[adj.etapa]}`,
+      descripcion: adj.descripcion || adj.name,
+      usuario: adj.subido_por_nombre,
+      icon: "Paperclip",
+      color: "slate",
+      adjunto: adj,
+    })
+  }
+
+  // --- Adjuntos legados de la entrega (columna foto1 JSON) ---
+  if (entrega) {
+    const legacy = parseArchivos(entrega)
+    legacy.forEach((arch, idx) => {
+      eventos.push({
+        id: `adj-legacy-${entrega.id}-${idx}`,
+        tipo: "adjunto",
+        etapa: "entrega",
+        fecha: entrega.created_at || entrega.fecha_entrega,
+        titulo: "Archivo · Entrega",
+        descripcion: arch.name,
+        usuario: entrega.entregado_por_nombre,
+        icon: "Paperclip",
+        color: "slate",
+        adjunto: {
+          id: -1 - idx,
+          caso_id: entrega.caso_id,
+          etapa: "entrega",
+          url: arch.url,
+          path: null,
+          name: arch.name,
+          size: arch.size,
+          type: arch.type,
+          descripcion: null,
+          subido_por: null,
+          subido_por_nombre: entrega.entregado_por_nombre,
+          created_at: entrega.created_at || entrega.fecha_entrega,
+        },
+      })
+    })
+  }
+
+  eventos.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+  return eventos
+}
 
 // ============================================================
 // UTILIDADES DE NOTIFICACIÓN

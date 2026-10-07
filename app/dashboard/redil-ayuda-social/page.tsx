@@ -20,6 +20,7 @@ import {
 import {
   ArrowLeft, Plus, Search, Lock, Loader2, Eye, Trash2, Send, CheckCircle, XCircle,
   Package, History, ClipboardList, Upload, X, FileText, Film, ImageIcon, ShoppingBasket,
+  Pencil, Save,
 } from "lucide-react"
 import { PermissionsGuard } from "@/lib/permissions-guard"
 import { useAuth } from "@/contexts/auth-context"
@@ -28,8 +29,10 @@ import { toast } from "sonner"
 import {
   redilService, enviarNotificacionRedil,
   ESTADOS_LABELS, ESTADOS_COLORS, TIPOS_AYUDA, parseArchivos, parseArticulosEntregados,
-  type CasoRedil, type CasoCompleto, type SolicitudInput, type VisitaTecnicaInput, type EntregaInput, type EstadoCaso, type ArchivoSubido, type ArticuloEntregado,
+  type CasoRedil, type CasoCompleto, type SolicitudRedil, type SolicitudInput, type VisitaTecnicaInput, type EntregaInput, type EstadoCaso, type ArchivoSubido, type ArticuloEntregado,
+  type AdjuntoRedil, type NotaRedil,
 } from "@/lib/mod/redil-ayuda-social-service"
+import { AdjuntosNotasPanel, TimelineCaso, uploadRedilFile } from "@/components/redil/adjuntos-notas"
 import { existenciaAyudaService, type ExistenciaItem } from "@/lib/mod/existencia-ayuda-service"
 
 const CATEGORIA_ALIMENTOS = "Alimentos"
@@ -75,76 +78,23 @@ function formatFileSize(bytes: number): string {
 
 
 // ============================================================
-// COMPONENTE: Formulario Nueva Solicitud (UI mejorada)
+// COMPONENTE: Campos de Solicitud (compartido crear/editar)
 // ============================================================
-function NuevaSolicitudForm({ onClose, onCreated, userId, userName }: {
-  onClose: () => void
-  onCreated: () => void
-  userId: string
-  userName: string
+function SolicitudFormFields({ form, setForm }: {
+  form: SolicitudInput
+  setForm: (f: SolicitudInput) => void
 }) {
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<SolicitudInput>({
-    nombre_completo: "",
-    edad: null,
-    cedula: "",
-    telefono: "",
-    direccion: "",
-    barrio_sector: "",
-    estado_civil: "",
-    numero_hijos: 0,
-    edad_hijos: "",
-    tiempo_asistiendo: "",
-    trabaja_actualmente: false,
-    lugar_trabajo: "",
-    ingreso_mensual: "",
-    motivo: "",
-    tipo_ayuda: [],
-    tipo_ayuda_otro: "",
-    referencia_nombre: "",
-    referencia_telefono: "",
-  })
-
   const toggleTipoAyuda = (value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      tipo_ayuda: prev.tipo_ayuda.includes(value)
-        ? prev.tipo_ayuda.filter((t) => t !== value)
-        : [...prev.tipo_ayuda, value],
-    }))
-  }
-
-  const handleSubmit = async () => {
-    if (!form.nombre_completo.trim()) { toast.error("El nombre completo es requerido"); return }
-    if (form.tipo_ayuda.length === 0) { toast.error("Seleccione al menos un tipo de ayuda"); return }
-
-    setSaving(true)
-    try {
-      await redilService.crearSolicitud(form, { id: userId, nombre: userName })
-      toast.success("Solicitud enviada correctamente")
-      await enviarNotificacionRedil({
-        tipo: "nueva_solicitud",
-        destinatario: { email: "trabajosocial@iglesiaregalodedios.com", telefono: "", nombre: "Gema" },
-        solicitante: form.nombre_completo,
-        tipoAyuda: form.tipo_ayuda,
-      })
-      onCreated()
-      onClose()
-    } catch (error: any) {
-      toast.error("Error al enviar solicitud: " + error.message)
-    } finally {
-      setSaving(false)
-    }
+    setForm({
+      ...form,
+      tipo_ayuda: form.tipo_ayuda.includes(value)
+        ? form.tipo_ayuda.filter((t) => t !== value)
+        : [...form.tipo_ayuda, value],
+    })
   }
 
   return (
-    <div className="space-y-5">
-      {/* Header visual */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
-        <h2 className="text-lg font-bold flex items-center gap-2">🤝 Nueva Solicitud de Ayuda Social</h2>
-        <p className="text-blue-100 text-sm mt-0.5">Complete la información del solicitante</p>
-      </div>
-
+    <>
       {/* Datos Personales */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
         <div className="flex items-center gap-2 mb-2">
@@ -281,12 +231,206 @@ function NuevaSolicitudForm({ onClose, onCreated, userId, userName }: {
           </div>
         </div>
       </div>
+    </>
+  )
+}
+
+
+// ============================================================
+// COMPONENTE: Formulario Nueva Solicitud (UI mejorada)
+// ============================================================
+function NuevaSolicitudForm({ onClose, onCreated, userId, userName }: {
+  onClose: () => void
+  onCreated: () => void
+  userId: string
+  userName: string
+}) {
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<SolicitudInput>({
+    nombre_completo: "",
+    edad: null,
+    cedula: "",
+    telefono: "",
+    direccion: "",
+    barrio_sector: "",
+    estado_civil: "",
+    numero_hijos: 0,
+    edad_hijos: "",
+    tiempo_asistiendo: "",
+    trabaja_actualmente: false,
+    lugar_trabajo: "",
+    ingreso_mensual: "",
+    motivo: "",
+    tipo_ayuda: [],
+    tipo_ayuda_otro: "",
+    referencia_nombre: "",
+    referencia_telefono: "",
+  })
+
+  // Nota y archivos iniciales (opcionales) — se guardan en la etapa "solicitud"
+  const [notaInicial, setNotaInicial] = useState("")
+  const [archivosIniciales, setArchivosIniciales] = useState<File[]>([])
+
+  const handleAddArchivosIniciales = (fileList: FileList | null) => {
+    if (!fileList) return
+    const files = Array.from(fileList)
+    const maxSize = 50 * 1024 * 1024
+    const invalid = files.filter((f) => f.size > maxSize)
+    if (invalid.length > 0) toast.error(`${invalid.length} archivo(s) exceden 50MB y fueron descartados`)
+    setArchivosIniciales((prev) => [...prev, ...files.filter((f) => f.size <= maxSize)])
+  }
+
+  const handleSubmit = async () => {
+    if (!form.nombre_completo.trim()) { toast.error("El nombre completo es requerido"); return }
+    if (form.tipo_ayuda.length === 0) { toast.error("Seleccione al menos un tipo de ayuda"); return }
+
+    setSaving(true)
+    try {
+      const caso = await redilService.crearSolicitud(form, { id: userId, nombre: userName })
+
+      // Guardar nota inicial y archivos iniciales (etapa "solicitud") si los hay
+      try {
+        if (notaInicial.trim()) {
+          await redilService.agregarNota(caso.id, "solicitud", notaInicial, { id: userId, nombre: userName })
+        }
+        for (const file of archivosIniciales) {
+          const subido = await uploadRedilFile(file, caso.id, "solicitud")
+          if (subido) await redilService.agregarAdjunto(caso.id, "solicitud", subido, { id: userId, nombre: userName })
+        }
+      } catch (e: any) {
+        toast.error("La solicitud se creó, pero hubo un problema guardando notas/archivos: " + e.message)
+      }
+
+      toast.success("Solicitud enviada correctamente")
+      await enviarNotificacionRedil({
+        tipo: "nueva_solicitud",
+        destinatario: { email: "trabajosocial@iglesiaregalodedios.com", telefono: "", nombre: "Gema" },
+        solicitante: form.nombre_completo,
+        tipoAyuda: form.tipo_ayuda,
+      })
+      onCreated()
+      onClose()
+    } catch (error: any) {
+      toast.error("Error al enviar solicitud: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header visual */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
+        <h2 className="text-lg font-bold flex items-center gap-2">🤝 Nueva Solicitud de Ayuda Social</h2>
+        <p className="text-blue-100 text-sm mt-0.5">Complete la información del solicitante</p>
+      </div>
+
+      <SolicitudFormFields form={form} setForm={setForm} />
+
+      {/* Nota y archivos iniciales (opcional) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-7 h-7 bg-sky-100 rounded-lg flex items-center justify-center"><span className="text-sky-600 font-bold text-xs">6</span></div>
+          <h3 className="font-semibold text-gray-900 text-sm">Nota y evidencia inicial (opcional)</h3>
+        </div>
+        <p className="text-xs text-gray-500">Puedes dejar una nota inicial y adjuntar archivos (fotos, documentos) desde el principio. También podrás agregar más en cada etapa.</p>
+        <Textarea value={notaInicial} onChange={(e) => setNotaInicial(e.target.value)} placeholder="Nota inicial sobre el caso..." rows={3} className="resize-none" />
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-sky-400 hover:bg-sky-50/30 transition-colors">
+          <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+          <p className="text-xs text-gray-500">Fotos, videos, PDFs, documentos — Máx 50MB por archivo</p>
+          <Input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { handleAddArchivosIniciales(e.target.files); e.currentTarget.value = "" }} className="mt-3 max-w-xs mx-auto text-xs" />
+        </div>
+        {archivosIniciales.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-700">{archivosIniciales.length} archivo(s) seleccionado(s):</p>
+            {archivosIniciales.map((file, idx) => (
+              <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border">
+                {getFileIcon(file.type)}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  <p className="text-xs text-gray-400">{formatFileSize(file.size)}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setArchivosIniciales((prev) => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Botón Enviar */}
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
         <Button onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md">
           {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</> : <><Send className="w-4 h-4 mr-2" />Enviar Solicitud</>}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+
+// ============================================================
+// COMPONENTE: Editar Solicitud
+// ============================================================
+function EditarSolicitudForm({ solicitud, onCancel, onSaved, userId, userName }: {
+  solicitud: SolicitudRedil
+  onCancel: () => void
+  onSaved: () => void
+  userId: string
+  userName: string
+}) {
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<SolicitudInput>({
+    nombre_completo: solicitud.nombre_completo || "",
+    edad: solicitud.edad,
+    cedula: solicitud.cedula || "",
+    telefono: solicitud.telefono || "",
+    direccion: solicitud.direccion || "",
+    barrio_sector: solicitud.barrio_sector || "",
+    estado_civil: solicitud.estado_civil || "",
+    numero_hijos: solicitud.numero_hijos || 0,
+    edad_hijos: solicitud.edad_hijos || "",
+    tiempo_asistiendo: solicitud.tiempo_asistiendo || "",
+    trabaja_actualmente: solicitud.trabaja_actualmente || false,
+    lugar_trabajo: solicitud.lugar_trabajo || "",
+    ingreso_mensual: solicitud.ingreso_mensual || "",
+    motivo: solicitud.motivo || "",
+    tipo_ayuda: solicitud.tipo_ayuda || [],
+    tipo_ayuda_otro: solicitud.tipo_ayuda_otro || "",
+    referencia_nombre: solicitud.referencia_nombre || "",
+    referencia_telefono: solicitud.referencia_telefono || "",
+  })
+
+  const handleGuardar = async () => {
+    if (!form.nombre_completo.trim()) { toast.error("El nombre completo es requerido"); return }
+    if (form.tipo_ayuda.length === 0) { toast.error("Seleccione al menos un tipo de ayuda"); return }
+    setSaving(true)
+    try {
+      await redilService.actualizarSolicitud(solicitud.caso_id, form, { id: userId, nombre: userName })
+      toast.success("Solicitud actualizada")
+      onSaved()
+    } catch (error: any) {
+      toast.error("Error actualizando solicitud: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
+        <h2 className="text-lg font-bold flex items-center gap-2"><Pencil className="w-5 h-5" />Editar Solicitud</h2>
+        <p className="text-blue-100 text-sm mt-0.5">Modifique la información del solicitante</p>
+      </div>
+
+      <SolicitudFormFields form={form} setForm={setForm} />
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button variant="outline" onClick={onCancel} disabled={saving}>Cancelar</Button>
+        <Button onClick={handleGuardar} disabled={saving} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md">
+          {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : <><Save className="w-4 h-4 mr-2" />Guardar Cambios</>}
         </Button>
       </div>
     </div>
@@ -307,6 +451,9 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   const [casoCompleto, setCasoCompleto] = useState<CasoCompleto | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("solicitud")
+  const [notas, setNotas] = useState<NotaRedil[]>([])
+  const [adjuntos, setAdjuntos] = useState<AdjuntoRedil[]>([])
+  const [editandoSolicitud, setEditandoSolicitud] = useState(false)
 
   // Visita técnica form
   const [visitaForm, setVisitaForm] = useState<VisitaTecnicaInput>({
@@ -355,8 +502,14 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   const loadCaso = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true)
-      const data = await redilService.getCasoCompleto(casoId)
+      const [data, notasData, adjData] = await Promise.all([
+        redilService.getCasoCompleto(casoId),
+        redilService.getNotas(casoId).catch(() => []),
+        redilService.getAdjuntos(casoId).catch(() => []),
+      ])
       setCasoCompleto(data)
+      setNotas(notasData)
+      setAdjuntos(adjData)
       if (data?.solicitud && visitaForm.tipo_ayuda_aprobada.length === 0) {
         setVisitaForm((prev) => ({ ...prev, tipo_ayuda_aprobada: data.solicitud!.tipo_ayuda }))
       }
@@ -371,6 +524,12 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
   useRealtime({ table: "casos_redil", filter: `id=eq.${casoId}`, onChange: () => loadCaso(true) })
   useRealtime({ table: "visitas_tecnicas", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
   useRealtime({ table: "entregas_redil", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
+  useRealtime({ table: "redil_notas", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
+  useRealtime({ table: "redil_adjuntos", filter: `caso_id=eq.${casoId}`, onChange: () => loadCaso(true) })
+
+  // Helpers para filtrar notas/adjuntos por etapa
+  const notasDe = (etapa: "general" | "solicitud" | "visita" | "entrega") => notas.filter((n) => n.etapa === etapa)
+  const adjuntosDe = (etapa: "general" | "solicitud" | "visita" | "entrega") => adjuntos.filter((a) => a.etapa === etapa)
 
   const loadExistencia = useCallback(async () => {
     try {
@@ -550,7 +709,7 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
 
       {/* Tabs del caso */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 h-12">
+        <TabsList className="grid w-full grid-cols-4 h-12">
           <TabsTrigger value="solicitud" className="text-xs sm:text-sm gap-1.5 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
             <ClipboardList className="w-4 h-4" /><span className="hidden sm:inline">Solicitud</span>
           </TabsTrigger>
@@ -560,11 +719,29 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
           <TabsTrigger value="entrega" className="text-xs sm:text-sm gap-1.5 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700">
             <Package className="w-4 h-4" /><span className="hidden sm:inline">Entrega</span>
           </TabsTrigger>
+          <TabsTrigger value="historial" className="text-xs sm:text-sm gap-1.5 data-[state=active]:bg-slate-100 data-[state=active]:text-slate-700">
+            <History className="w-4 h-4" /><span className="hidden sm:inline">Historial</span>
+          </TabsTrigger>
         </TabsList>
 
 
         {/* TAB: Solicitud */}
         <TabsContent value="solicitud" className="space-y-4 mt-4">
+          {editandoSolicitud && solicitud && canEdit ? (
+            <EditarSolicitudForm
+              solicitud={solicitud}
+              userId={userId}
+              userName={userName}
+              onCancel={() => setEditandoSolicitud(false)}
+              onSaved={() => { setEditandoSolicitud(false); loadCaso(true) }}
+            />
+          ) : (
+          <>
+          {solicitud && canEdit && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setEditandoSolicitud(true)}><Pencil className="w-4 h-4 mr-1.5" />Editar solicitud</Button>
+            </div>
+          )}
           {solicitud ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="border-blue-100 shadow-sm">
@@ -619,6 +796,9 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
             </div>
           ) : (
             <p className="text-center text-gray-500 py-8">No hay datos de solicitud</p>
+          )}
+          <AdjuntosNotasPanel casoId={casoId} etapa="solicitud" canEdit={canEdit} userId={userId} userName={userName} adjuntos={adjuntosDe("solicitud")} notas={notasDe("solicitud")} onChange={() => loadCaso(true)} />
+          </>
           )}
         </TabsContent>
 
@@ -940,6 +1120,7 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
               </div>
             )
           )}
+          <AdjuntosNotasPanel casoId={casoId} etapa="visita" canEdit={canEdit} userId={userId} userName={userName} adjuntos={adjuntosDe("visita")} notas={notasDe("visita")} onChange={() => loadCaso(true)} />
         </TabsContent>
 
 
@@ -1208,6 +1389,25 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
               </div>
             )
           )}
+          <AdjuntosNotasPanel casoId={casoId} etapa="entrega" canEdit={canEdit} userId={userId} userName={userName} adjuntos={adjuntosDe("entrega")} notas={notasDe("entrega")} onChange={() => loadCaso(true)} titulo="Archivos y notas adicionales — Entrega" />
+        </TabsContent>
+
+
+        {/* TAB: Historial (línea de tiempo) */}
+        <TabsContent value="historial" className="space-y-4 mt-4">
+          <div className="bg-gradient-to-r from-slate-600 to-slate-700 rounded-xl p-5 text-white">
+            <h3 className="font-bold text-lg flex items-center gap-2"><History className="w-5 h-5" />Historial del caso</h3>
+            <p className="text-slate-200 text-sm mt-1">Línea de tiempo con todas las etapas, notas y archivos del caso.</p>
+          </div>
+
+          <Card className="shadow-sm">
+            <CardContent className="pt-6">
+              <TimelineCaso casoCompleto={casoCompleto} notas={notas} adjuntos={adjuntos} />
+            </CardContent>
+          </Card>
+
+          {/* Notas y archivos generales (no atados a una etapa) */}
+          <AdjuntosNotasPanel casoId={casoId} etapa="general" canEdit={canEdit} userId={userId} userName={userName} adjuntos={adjuntosDe("general")} notas={notasDe("general")} onChange={() => loadCaso(true)} titulo="Notas y archivos generales del caso" />
         </TabsContent>
       </Tabs>
     </div>
