@@ -1,5 +1,4 @@
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib"
-import fontkit from "@pdf-lib/fontkit"
 
 export interface PresentacionNinoPDFData {
   nombre_presentado: string
@@ -44,22 +43,16 @@ function drawCenteredLine(page: PDFPage, y: number, widthPercent: number, thickn
   })
 }
 
-async function loadBemdayniFont(doc: PDFDocument): Promise<PDFFont> {
-  const fontResponse = await fetch("/Bemdayni-Demo.otf")
-  const fontBytes = await fontResponse.arrayBuffer()
-  return await doc.embedFont(fontBytes)
-}
-
 export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
-  doc.registerFontkit(fontkit)
 
   const page = doc.addPage([612, 792])
   const { width, height } = page.getSize()
 
   const serifRegular = await doc.embedFont(StandardFonts.TimesRoman)
   const serifBold = await doc.embedFont(StandardFonts.TimesRomanBold)
-  const scriptFont = await loadBemdayniFont(doc)
+  // Fuente destacada: Times Roman Bold Italic, igual que los certificados de bautizo y matrimonio
+  const scriptFont = await doc.embedFont(StandardFonts.TimesRomanBoldItalic)
   const serifItalic = await doc.embedFont(StandardFonts.TimesRomanItalic)
 
   const textColor = rgb(0.133, 0.133, 0.133)       // #222222
@@ -96,13 +89,13 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   drawCentered(page, "CERTIFICADO DE", yPos, serifRegular, 16, textColor)
   yPos -= 44
 
-  drawCentered(page, "Dedicación de Niño", yPos, scriptFont, 38, textColor)
+  drawCentered(page, "Dedicación de Niño", yPos, scriptFont, 32, textColor)
   yPos -= 62
 
   drawCentered(page, "ESTO CERTIFICA QUE", yPos, serifRegular, 14, textColor)
   yPos -= 46
 
-  drawCentered(page, data.nombre_presentado, yPos, scriptFont, 34, textColor)
+  drawCentered(page, data.nombre_presentado, yPos, scriptFont, 28, textColor)
   yPos -= 14
   drawCenteredLine(page, yPos, 0.60, 0.75)
   yPos -= 12
@@ -110,7 +103,7 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   yPos -= 48
 
   const padresText = `${data.nombre_padre} y ${data.nombre_madre}`
-  drawCentered(page, padresText, yPos, scriptFont, 24, textColor)
+  drawCentered(page, padresText, yPos, scriptFont, 20, textColor)
   yPos -= 14
   drawCenteredLine(page, yPos, 0.55, 0.75)
   yPos -= 12
@@ -118,7 +111,7 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   yPos -= 48
 
   const testigosText = `${data.testigo1 || "—"} y ${data.testigo2 || "—"}`
-  drawCentered(page, testigosText, yPos, scriptFont, 24, textColor)
+  drawCentered(page, testigosText, yPos, scriptFont, 20, textColor)
   yPos -= 14
   drawCenteredLine(page, yPos, 0.55, 0.75)
   yPos -= 12
@@ -135,7 +128,7 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
     { text: "EL DÍA ", font: serifRegular, size: 13 },
     { text: diaStr, font: serifBold, size: 18 },
     { text: " DE ", font: serifRegular, size: 13 },
-    { text: mes, font: scriptFont, size: 30 },
+    { text: mes, font: scriptFont, size: 24 },
   ]
 
   let totalWidth = 0
@@ -174,11 +167,11 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   const versLine1 = "Él les dijo: \"Dejen que los niños vengan a mí,"
   const versLine2 = "y no se lo impidan, porque el reino de Dios"
   const versLine3 = "es de quienes son como ellos\"."
-  drawCentered(page, versLine1, yPos, scriptFont, 17, grayText)
+  drawCentered(page, versLine1, yPos, scriptFont, 14, grayText)
   yPos -= 20
-  drawCentered(page, versLine2, yPos, scriptFont, 17, grayText)
+  drawCentered(page, versLine2, yPos, scriptFont, 14, grayText)
   yPos -= 20
-  drawCentered(page, versLine3, yPos, scriptFont, 17, grayText)
+  drawCentered(page, versLine3, yPos, scriptFont, 14, grayText)
   yPos -= 18
   drawCentered(page, "Mateo 19:14", yPos, serifItalic, 11, grayText)
 
