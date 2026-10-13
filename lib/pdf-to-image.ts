@@ -1,7 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 
 const BIRTHDAY_PDF_PATH = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
@@ -53,25 +53,69 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     const tmpDir = os.tmpdir()
     const ts = Date.now()
     const tmpPdf = path.join(tmpDir, `cumple-img-${ts}.pdf`)
+    const tmpRawPng = path.join(tmpDir, `cumple-img-${ts}-raw.png`)
     const tmpPng = path.join(tmpDir, `cumple-img-${ts}.png`)
 
     fs.writeFileSync(tmpPdf, pdfBytes)
 
-    // Convertir PDF a PNG con ImageMagick (intenta 'convert' primero, luego 'magick')
+    // Convertir PDF a PNG en dos etapas, manteniendo el hardening del servidor:
+    //
+    //   Etapa 1: Ghostscript rasteriza el PDF → PNG.
+    //     El policy.xml de ImageMagick bloquea el coder PDF/PS (anti-ImageTragick),
+    //     por eso NO usamos 'convert' sobre el PDF. En su lugar invocamos gs
+    //     directamente con -dSAFER (modo seguro: sin ejecución de código ni
+    //     acceso arbitrario a disco desde el PostScript del PDF). Solo rasterizamos
+    //     la primera página (-dFirstPage/-dLastPage=1).
+    //
+    //   Etapa 2: ImageMagick redimensiona/normaliza el PNG → PNG.
+    //     PNG→PNG sí está permitido por la política; aquí no interviene Ghostscript.
+    //
+    // SEGURIDAD: se usa execFileSync (NO execSync) para no pasar por /bin/sh,
+    // y los argumentos van como array (sin interpolación de shell).
+    const gsArgs = [
+      "-dSAFER", "-dBATCH", "-dNOPAUSE", "-dQUIET",
+      "-dFirstPage=1", "-dLastPage=1",
+      "-sDEVICE=png16m",
+      "-r150",
+      "-dUseCropBox",
+      "-o", tmpRawPng,
+      tmpPdf,
+    ]
     try {
-      execSync(`convert -density 150 "${tmpPdf}[0]" -colorspace sRGB -flatten -depth 8 -quality 85 -resize 1280x "${tmpPng}"`, {
-        timeout: 15000,
-        stdio: "pipe",
-      })
+      execFileSync("gs", gsArgs, { timeout: 20000, stdio: "pipe" })
+    } catch (gsErr: any) {
+      console.error("[getBirthdayImage] Ghostscript falló:", gsErr?.stderr?.toString() || gsErr)
+      try { fs.unlinkSync(tmpPdf) } catch {}
+      try { fs.unlinkSync(tmpRawPng) } catch {}
+      return null
+    }
+
+    if (!fs.existsSync(tmpRawPng)) {
+      console.error("[getBirthdayImage] PNG no fue generado por Ghostscript")
+      try { fs.unlinkSync(tmpPdf) } catch {}
+      return null
+    }
+
+    // Etapa 2: normalizar y redimensionar el PNG con ImageMagick (PNG→PNG permitido).
+    const magickArgs = [
+      tmpRawPng,
+      "-colorspace", "sRGB",
+      "-flatten",
+      "-depth", "8",
+      "-quality", "85",
+      "-resize", "1280x",
+      tmpPng,
+    ]
+    try {
+      execFileSync("convert", magickArgs, { timeout: 15000, stdio: "pipe" })
     } catch {
       try {
-        execSync(`magick -density 150 "${tmpPdf}[0]" -colorspace sRGB -flatten -depth 8 -quality 85 -resize 1280x "${tmpPng}"`, {
-          timeout: 15000,
-          stdio: "pipe",
-        })
+        execFileSync("magick", magickArgs, { timeout: 15000, stdio: "pipe" })
       } catch (magickErr: any) {
-        console.error("[getBirthdayImage] ImageMagick falló:", magickErr?.stderr?.toString() || magickErr)
+        console.error("[getBirthdayImage] ImageMagick (resize) falló:", magickErr?.stderr?.toString() || magickErr)
         try { fs.unlinkSync(tmpPdf) } catch {}
+        try { fs.unlinkSync(tmpRawPng) } catch {}
+        try { fs.unlinkSync(tmpPng) } catch {}
         return null
       }
     }
@@ -80,6 +124,7 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     if (!fs.existsSync(tmpPng)) {
       console.error("[getBirthdayImage] PNG no fue generado por ImageMagick")
       try { fs.unlinkSync(tmpPdf) } catch {}
+      try { fs.unlinkSync(tmpRawPng) } catch {}
       return null
     }
 
@@ -87,6 +132,7 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     if (pngStats.size < 500) {
       console.error(`[getBirthdayImage] PNG demasiado pequeño (${pngStats.size} bytes), posiblemente corrupto`)
       try { fs.unlinkSync(tmpPdf) } catch {}
+      try { fs.unlinkSync(tmpRawPng) } catch {}
       try { fs.unlinkSync(tmpPng) } catch {}
       return null
     }
@@ -94,6 +140,7 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
     const pngBuffer = fs.readFileSync(tmpPng)
 
     try { fs.unlinkSync(tmpPdf) } catch {}
+    try { fs.unlinkSync(tmpRawPng) } catch {}
     try { fs.unlinkSync(tmpPng) } catch {}
 
     return {
@@ -177,14 +224,19 @@ export async function getBirthdayVideo(nombre: string, options?: { maxRetries?: 
       //    -c:a aac -b:a 96k  → audio AAC ligero
       //    -movflags +faststart → mueve el moov atom al inicio (streaming-friendly)
       //    -loglevel error     → solo errores en stderr (reduce ruido)
-      const ffmpegCmd =
-        `ffmpeg -y -loop 1 -i "${tmpPng}" -i "${BIRTHDAY_OGG_PATH}" ` +
-        `-t 60 -shortest -vf "scale=720:-2" ` +
-        `-c:v libx264 -preset ultrafast -crf 28 -profile:v baseline -level 3.0 -pix_fmt yuv420p ` +
-        `-c:a aac -b:a 96k -movflags +faststart -loglevel error "${tmpMp4}"`
+      // SEGURIDAD: args como array + execFileSync (sin /bin/sh) para evitar
+      // cualquier inyección de shell a través de rutas o nombres.
+      const ffmpegArgs = [
+        "-y", "-loop", "1", "-i", tmpPng, "-i", BIRTHDAY_OGG_PATH,
+        "-t", "60", "-shortest", "-vf", "scale=720:-2",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-profile:v", "baseline", "-level", "3.0", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart",
+        "-loglevel", "error", tmpMp4,
+      ]
 
       try {
-        execSync(ffmpegCmd, { timeout: 120_000, stdio: "pipe" })
+        execFileSync("ffmpeg", ffmpegArgs, { timeout: 120_000, stdio: "pipe" })
       } catch (ffmpegErr: any) {
         lastError = ffmpegErr
         const stderr = ffmpegErr?.stderr?.toString() || String(ffmpegErr)
