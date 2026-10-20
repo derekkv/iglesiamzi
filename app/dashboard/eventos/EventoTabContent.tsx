@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
-import { Pencil, Trash2, Plus, Search, Download, Users } from "lucide-react"
+import { Pencil, Trash2, Plus, Search, Download, Users, FileSpreadsheet } from "lucide-react"
 import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import {
   eventoParticipantesService,
@@ -23,6 +23,7 @@ import {
   type MetodoPago,
   EQUIPOS,
 } from "@/lib/mod/eventos-service"
+import { ExportEventosDialog } from "./ExportEventosDialog"
 
 
 interface EventoTabContentProps {
@@ -63,6 +64,9 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
   const [importEventoId, setImportEventoId] = useState<string>("")
   const [importUsarValorDefault, setImportUsarValorDefault] = useState(true)
   const [importing, setImporting] = useState(false)
+
+  // Exportar modal
+  const [showExportDialog, setShowExportDialog] = useState(false)
 
 
   useEffect(() => {
@@ -242,6 +246,14 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                   <Download className="w-4 h-4 mr-1" /> Importar
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExportDialog(true)}
+                className="border-green-300 text-green-700 hover:bg-green-50"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
+              </Button>
               <Button size="sm" onClick={handleOpenCreate} disabled={!canEdit}>
                 <Plus className="w-4 h-4 mr-1" /> Agregar
               </Button>
@@ -595,7 +607,13 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
         </DialogContent>
       </Dialog>
 
-
+      {/* Diálogo de exportación a Excel */}
+      <ExportEventosDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        allTabs={allTabs}
+        defaultEventoId={evento.id}
+      />
 
     </>
   )
