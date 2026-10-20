@@ -66,27 +66,34 @@ export async function POST(request: NextRequest) {
     const appSecret = cfg?.app_secret
     const header = request.headers.get("x-hub-signature-256") || ""
 
-    if (appSecret && header.startsWith("sha256=")) {
+    // SEGURIDAD: sin app_secret NO se puede verificar la autenticidad del
+    // payload. Antes se procesaba igualmente (signatureValid=false), lo que
+    // permitía a cualquiera en Internet inyectar mensajes y disparar la
+    // cadena de keywords. Ahora se exige SIEMPRE firma HMAC válida.
+    if (!appSecret) {
+      console.error("[wa-webhook] app_secret no configurado — se rechaza el evento (no se puede validar firma)")
+      await logEvent("missing_app_secret", safeParse(rawBody), false, "app_secret no configurado")
+      return new NextResponse("Webhook no configurado", { status: 503 })
+    }
+
+    if (header.startsWith("sha256=")) {
       const expected = crypto.createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex")
       const received = header.slice(7)
       // Comparación en tiempo constante
       signatureValid =
         received.length === expected.length &&
         crypto.timingSafeEqual(Buffer.from(received, "hex"), Buffer.from(expected, "hex"))
-    } else if (!appSecret) {
-      // Sin app_secret configurado no se puede validar. Se acepta pero se
-      // marca como no verificado para que se vea en el panel.
-      signatureValid = false
     }
 
-    if (appSecret && !signatureValid) {
-      console.warn("[wa-webhook] Firma inválida — evento descartado")
-      await logEvent("invalid_signature", safeParse(rawBody), false, "Firma HMAC inválida")
+    if (!signatureValid) {
+      console.warn("[wa-webhook] Firma inválida o ausente — evento descartado")
+      await logEvent("invalid_signature", safeParse(rawBody), false, "Firma HMAC inválida o ausente")
       return new NextResponse("Firma inválida", { status: 401 })
     }
   } catch (err: any) {
     console.error("[wa-webhook] Error validando firma:", err?.message)
-    return new NextResponse("EVENT_RECEIVED", { status: 200 })
+    // Ante un error de validación, NO procesar el payload.
+    return new NextResponse("Error de validación", { status: 400 })
   }
 
   // 2. Procesar

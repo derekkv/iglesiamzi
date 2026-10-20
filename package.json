@@ -5,7 +5,7 @@
 	"scripts": {
 		"dev": "next dev --turbopack -p 3001",
 		"build": "next build",
-		"start": "next start -p 3712",
+		"start": "next start -H 127.0.0.1 -p 3712",
 		"deploy": "npm run build && pm2 reload iglesia",
 		"lint": "next lint"
 	},
