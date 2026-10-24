@@ -41,6 +41,19 @@ const CATEGORIA_ALIMENTOS = "Alimentos"
 // ============================================================
 // HELPER: Upload de archivos a Supabase Storage
 // ============================================================
+// HELPER: Sanitiza URLs de Storage almacenadas con dominio loopback
+// (datos históricos subidos cuando SUPABASE_URL era 127.0.0.1:8000).
+// ============================================================
+function fixStorageUrl(url: string): string {
+  if (!url) return url
+  const publicBase = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!publicBase) return url
+  return url
+    .replace(/^http:\/\/127\.\d+\.\d+\.\d+:\d+/, publicBase)
+    .replace(/^http:\/\/localhost:\d+/, publicBase)
+}
+
+// ============================================================
 async function uploadFile(file: File, casoId: number): Promise<ArchivoSubido | null> {
   const token = localStorage.getItem("authToken")
   if (!token) return null
@@ -1187,7 +1200,7 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                     <p className="font-medium text-gray-700 mb-3">Archivos adjuntos ({archivos.length}):</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {archivos.map((archivo, idx) => (
-                        <a key={idx} href={archivo.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                        <a key={idx} href={fixStorageUrl(archivo.url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
                           {getFileIcon(archivo.type)}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{archivo.name}</p>
@@ -1198,16 +1211,19 @@ function CasoDetalle({ casoId, onBack, canEdit, userId, userName }: {
                     </div>
                     {/* Preview de imágenes */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-                      {archivos.filter((a) => a.type.startsWith("image/")).map((img, idx) => (
-                        <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer">
-                          <img src={img.url} alt={img.name} className="rounded-lg border shadow-sm max-h-48 object-cover w-full hover:opacity-90 transition-opacity" />
+                      {archivos.filter((a) => a.type.startsWith("image/")).map((img, idx) => {
+                        const imgUrl = fixStorageUrl(img.url)
+                        return (
+                        <a key={idx} href={imgUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={imgUrl} alt={img.name} className="rounded-lg border shadow-sm max-h-48 object-cover w-full hover:opacity-90 transition-opacity" />
                         </a>
-                      ))}
+                        )
+                      })}
                     </div>
                     {/* Preview de videos */}
                     {archivos.filter((a) => a.type.startsWith("video/")).map((vid, idx) => (
                       <video key={idx} controls className="rounded-lg border shadow-sm max-h-64 w-full mt-3">
-                        <source src={vid.url} type={vid.type} />
+                        <source src={fixStorageUrl(vid.url)} type={vid.type} />
                       </video>
                     ))}
                   </div>

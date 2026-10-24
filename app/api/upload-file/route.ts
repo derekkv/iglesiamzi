@@ -3,6 +3,29 @@ import { supabaseServer } from "@/lib/supabase-server"
 import { verifyApiAuth } from "@/lib/api-auth"
 
 const BUCKET_NAME = "redil-archivos"
+
+/**
+ * Devuelve la URL pública de un objeto en Storage usando siempre el dominio
+ * accesible desde internet (NEXT_PUBLIC_SUPABASE_URL), nunca el loopback
+ * interno que puede tener SUPABASE_URL en el servidor de producción
+ * (ej. http://127.0.0.1:8000).
+ */
+function getPublicUrl(path: string): string {
+  const { data } = supabaseServer.storage.from(BUCKET_NAME).getPublicUrl(path)
+  let url = data.publicUrl
+
+  // Si la URL generada apunta a localhost/loopback (porque SUPABASE_URL lo hace),
+  // sustituirla por la URL pública real definida en NEXT_PUBLIC_SUPABASE_URL.
+  const publicBase = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (publicBase) {
+    url = url
+      .replace(/^http:\/\/127\.\d+\.\d+\.\d+:\d+/, publicBase)
+      .replace(/^http:\/\/localhost:\d+/, publicBase)
+  }
+
+  return url
+}
+
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
 // Extensiones permitidas
@@ -67,14 +90,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Error subiendo archivo: " + error.message }, { status: 500 })
     }
 
-    // Obtener URL pública
-    const { data: urlData } = supabaseServer.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(data.path)
+    // Obtener URL pública (siempre con dominio accesible desde internet)
+    const publicUrl = getPublicUrl(data.path)
 
     return NextResponse.json({
       success: true,
-      url: urlData.publicUrl,
+      url: publicUrl,
       path: data.path,
       name: file.name,
       size: file.size,

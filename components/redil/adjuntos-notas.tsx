@@ -52,6 +52,24 @@ export async function uploadRedilFile(
   }
 }
 
+/**
+ * Sanitiza una URL de archivo almacenada.
+ * Si apunta a localhost/loopback (datos históricos subidos con SUPABASE_URL
+ * local), la reemplaza por el dominio público correcto usando la variable
+ * de entorno NEXT_PUBLIC_SUPABASE_URL.
+ */
+function fixStorageUrl(url: string): string {
+  if (!url) return url
+  const publicBase =
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_SUPABASE_URL
+      : undefined
+  if (!publicBase) return url
+  return url
+    .replace(/^http:\/\/127\.\d+\.\d+\.\d+:\d+/, publicBase)
+    .replace(/^http:\/\/localhost:\d+/, publicBase)
+}
+
 function getFileIcon(type: string | null) {
   if (type?.startsWith("image/")) return <ImageIcon className="w-5 h-5 text-blue-500" />
   if (type?.startsWith("video/")) return <Film className="w-5 h-5 text-purple-500" />
@@ -268,18 +286,20 @@ export function AdjuntosNotasPanel({
 
         {adjuntos.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {adjuntos.map((adj) => (
+            {adjuntos.map((adj) => {
+              const adjUrl = fixStorageUrl(adj.url)
+              return (
               <div key={adj.id} className="bg-white border border-gray-200 rounded-lg p-2.5">
                 <div className="flex items-start gap-2.5">
                   {adj.type?.startsWith("image/") ? (
-                    <a href={adj.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                      <img src={adj.url} alt={adj.name} className="w-12 h-12 rounded object-cover border" />
+                    <a href={adjUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                      <img src={adjUrl} alt={adj.name} className="w-12 h-12 rounded object-cover border" />
                     </a>
                   ) : (
                     <div className="shrink-0 mt-0.5">{getFileIcon(adj.type)}</div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <a href={adj.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium truncate block hover:underline">{adj.name}</a>
+                    <a href={adjUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium truncate block hover:underline">{adj.name}</a>
                     <p className="text-[11px] text-gray-400">{formatFileSize(adj.size)} · {adj.subido_por_nombre || "—"}</p>
                     {editAdjId === adj.id ? (
                       <div className="mt-1.5 space-y-1.5">
@@ -311,7 +331,8 @@ export function AdjuntosNotasPanel({
                   )}
                 </div>
               </div>
-            ))}
+            )
+            })}
           </div>
         )}
 
@@ -396,7 +417,7 @@ export function TimelineCaso({ casoCompleto, notas, adjuntos }: {
                   <span className="text-[11px] text-gray-400 whitespace-nowrap">{formatFecha(ev.fecha)}</span>
                 </div>
                 {ev.tipo === "adjunto" && ev.adjunto ? (
-                  <a href={ev.adjunto.url} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-2 text-sm text-gray-700 hover:underline">
+                  <a href={fixStorageUrl(ev.adjunto.url)} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-2 text-sm text-gray-700 hover:underline">
                     {getFileIcon(ev.adjunto.type)}
                     <span className="truncate">{ev.adjunto.descripcion || ev.adjunto.name}</span>
                   </a>
