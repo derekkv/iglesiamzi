@@ -1,4 +1,5 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
+import { PDFDocument, StandardFonts } from "pdf-lib"
+import { dibujarNombreCumpleanos } from "./cumpleanos-nombre"
 
 /**
  * Genera un PDF de cumpleaños con el nombre del cumpleañero
@@ -12,22 +13,10 @@ export async function generateCumpleanosPDF(nombre: string): Promise<Uint8Array>
 
   const fontCursiva = await templateDoc.embedFont(StandardFonts.TimesRomanBoldItalic)
 
-  const pages = templateDoc.getPages()
-  const page = pages[0]
-  const { width, height } = page.getSize()
+  const page = templateDoc.getPages()[0]
 
-  const nombreFontSize = 28
-  const nombreTextWidth = fontCursiva.widthOfTextAtSize(nombre.toUpperCase(), nombreFontSize)
-  const nombreX = (width - nombreTextWidth) / 2
-  const nombreY = height / 2 + 80
-
-  page.drawText(nombre.toUpperCase(), {
-    x: nombreX,
-    y: nombreY,
-    size: nombreFontSize,
-    font: fontCursiva,
-    color: rgb(0.72, 0.53, 0.04),
-  })
+  // El nombre se ajusta al ancho disponible (entre los globos); si es muy largo, va en dos líneas.
+  dibujarNombreCumpleanos(page, fontCursiva, nombre)
 
   return await templateDoc.save()
 }
