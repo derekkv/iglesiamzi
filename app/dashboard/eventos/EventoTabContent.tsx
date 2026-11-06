@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
-import { Pencil, Trash2, Plus, Search, Download, Users, FileSpreadsheet } from "lucide-react"
+import { Pencil, Trash2, Plus, Search, Download, Users, FileSpreadsheet, FilterX } from "lucide-react"
 import { useRealtimeMultiple } from "@/hooks/use-realtime"
 import {
   eventoParticipantesService,
@@ -24,6 +24,7 @@ import {
   EQUIPOS,
 } from "@/lib/mod/eventos-service"
 import { ExportEventosDialog } from "./ExportEventosDialog"
+import { ColumnFilter } from "@/components/ColumnFilter"
 
 
 interface EventoTabContentProps {
@@ -48,10 +49,36 @@ const emptyForm: Omit<EventoParticipanteInput, "evento_id"> = {
   metodo_pago: "Efectivo",
 }
 
+/** Etiqueta de estado de pago (misma lógica que la columna Status). */
+function statusLabel(p: EventoParticipante): string {
+  if (p.valor <= 0) return "Sin costo"
+  if (p.abono >= p.valor) return "Cancelado"
+  return "Pendiente"
+}
+
+/** Columnas con filtro estilo Excel: id lógico, etiqueta y cómo sacar el valor de cada fila. */
+type ColKey = "genero" | "contextura" | "limitacion" | "ministerio" | "metodo" | "status" | "equipo"
+
+const FILTER_COLUMNS: { key: ColKey; label: string; getValue: (p: EventoParticipante) => string }[] = [
+  { key: "genero", label: "Género", getValue: (p) => (p.genero === "masculino" ? "Masculino" : "Femenino") },
+  { key: "contextura", label: "Contextura", getValue: (p) => p.contextura.charAt(0).toUpperCase() + p.contextura.slice(1) },
+  { key: "limitacion", label: "Limitación física", getValue: (p) => (p.limitacion_fisica ? "Sí" : "No") },
+  { key: "ministerio", label: "Ministerio", getValue: (p) => p.ministerio?.trim() || "(Sin ministerio)" },
+  { key: "metodo", label: "Método de pago", getValue: (p) => (p.abono > 0 ? p.metodo_pago : "(Sin pago)") },
+  { key: "status", label: "Status", getValue: statusLabel },
+  { key: "equipo", label: "Equipo", getValue: (p) => EQUIPOS.find(e => e.id === p.equipo)?.label || "(Sin equipo)" },
+]
+
 export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, onDataChanged }: EventoTabContentProps) {
   const [participantes, setParticipantes] = useState<EventoParticipante[]>([])
   const [loading, setLoading] = useState(true)
   const [searchFilter, setSearchFilter] = useState("")
+  // Filtros por columna estilo Excel: para cada columna, un set de valores incluidos.
+  // Set vacío = columna sin filtrar (muestra todo).
+  const [columnFilters, setColumnFilters] = useState<Record<ColKey, Set<string>>>({
+    genero: new Set(), contextura: new Set(), limitacion: new Set(),
+    ministerio: new Set(), metodo: new Set(), status: new Set(), equipo: new Set(),
+  })
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -212,10 +239,53 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
   }
 
   const filtered = participantes.filter(p => {
-    if (!searchFilter) return true
-    const q = searchFilter.toLowerCase()
-    return p.nombre.toLowerCase().includes(q) || (p.telefono || "").includes(q) || (p.ministerio || "").toLowerCase().includes(q)
+    // Filtro de búsqueda de texto
+    if (searchFilter) {
+      const q = searchFilter.toLowerCase()
+      const matchSearch = p.nombre.toLowerCase().includes(q) || (p.telefono || "").includes(q) || (p.ministerio || "").toLowerCase().includes(q)
+      if (!matchSearch) return false
+    }
+    // Filtros por columna (AND entre columnas, OR dentro de cada una)
+    for (const col of FILTER_COLUMNS) {
+      const sel = columnFilters[col.key]
+      if (sel.size > 0 && !sel.has(col.getValue(p))) return false
+    }
+    return true
   })
+
+  // Valores únicos por columna (sobre TODOS los participantes, ordenados)
+  const columnOptions: Record<ColKey, string[]> = FILTER_COLUMNS.reduce((acc, col) => {
+    const vals = Array.from(new Set(participantes.map(col.getValue))).sort((a, b) => a.localeCompare(b, "es"))
+    acc[col.key] = vals
+    return acc
+  }, {} as Record<ColKey, string[]>)
+
+  const hayFiltrosActivos = FILTER_COLUMNS.some(col => columnFilters[col.key].size > 0)
+
+  const setColFilter = (key: ColKey, next: Set<string>) => {
+    setColumnFilters(prev => ({ ...prev, [key]: next }))
+  }
+
+  const limpiarFiltros = () => {
+    setColumnFilters({
+      genero: new Set(), contextura: new Set(), limitacion: new Set(),
+      ministerio: new Set(), metodo: new Set(), status: new Set(), equipo: new Set(),
+    })
+  }
+
+  // Helper para renderizar el filtro de una columna en el encabezado
+  const colFilter = (key: ColKey, align: "left" | "right" = "left") => {
+    const col = FILTER_COLUMNS.find(c => c.key === key)!
+    return (
+      <ColumnFilter
+        label={col.label}
+        options={columnOptions[key]}
+        selected={columnFilters[key]}
+        onChange={(next) => setColFilter(key, next)}
+        align={align}
+      />
+    )
+  }
 
   const otrosEventos = allTabs.filter(t => t.id !== evento.id)
   const tieneEquipos = participantes.some(p => p.equipo)
@@ -262,8 +332,8 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
         </CardHeader>
 
         <CardContent>
-          <div className="mb-4">
-            <div className="relative max-w-sm">
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+            <div className="relative max-w-sm w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="Buscar por nombre, teléfono o ministerio..."
@@ -271,6 +341,18 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="pl-9"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              {(hayFiltrosActivos || searchFilter) && (
+                <span className="text-xs text-gray-500 normal-case">
+                  {filtered.length} de {participantes.length}
+                </span>
+              )}
+              {hayFiltrosActivos && (
+                <Button variant="outline" size="sm" onClick={limpiarFiltros} className="text-xs">
+                  <FilterX className="w-3.5 h-3.5 mr-1" /> Limpiar filtros
+                </Button>
+              )}
             </div>
           </div>
 
@@ -282,15 +364,29 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                   <TableHead>Nombre</TableHead>
                   <TableHead className="text-center">Edad</TableHead>
                   <TableHead>Teléfono</TableHead>
-                  <TableHead className="text-center">Género</TableHead>
-                  <TableHead className="text-center">Contextura</TableHead>
-                  <TableHead className="text-center">Lim. Física</TableHead>
-                  <TableHead>Ministerio</TableHead>
+                  <TableHead className="text-center">
+                    <span className="inline-flex items-center gap-1">Género {colFilter("genero")}</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="inline-flex items-center gap-1">Contextura {colFilter("contextura")}</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="inline-flex items-center gap-1">Lim. Física {colFilter("limitacion")}</span>
+                  </TableHead>
+                  <TableHead>
+                    <span className="inline-flex items-center gap-1">Ministerio {colFilter("ministerio")}</span>
+                  </TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Abono</TableHead>
-                  <TableHead className="text-center">Método</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Equipo</TableHead>
+                  <TableHead className="text-center">
+                    <span className="inline-flex items-center gap-1">Método {colFilter("metodo")}</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="inline-flex items-center gap-1">Status {colFilter("status")}</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="inline-flex items-center gap-1">Equipo {colFilter("equipo", "right")}</span>
+                  </TableHead>
                   <TableHead className="text-center">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -298,7 +394,7 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={14} className="text-center text-gray-400 py-8">
-                      {searchFilter ? "No se encontraron resultados" : "No hay participantes registrados"}
+                      {searchFilter || hayFiltrosActivos ? "No se encontraron resultados con los filtros aplicados" : "No hay participantes registrados"}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -356,30 +452,37 @@ export function EventoTabContent({ evento, allTabs, canEdit, userId, userName, o
           </div>
 
 
-          {/* Resumen de pagos */}
+          {/* Resumen de pagos (refleja los filtros aplicados) */}
           {participantes.length > 0 && (
-            <div className="mt-4 pt-4 border-t grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="text-center p-2 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Total Participantes</p>
-                <p className="text-lg font-bold">{participantes.length}</p>
-              </div>
-              <div className="text-center p-2 bg-green-50 rounded-lg">
-                <p className="text-xs text-green-600">Cancelados</p>
-                <p className="text-lg font-bold text-green-700">
-                  {participantes.filter(p => p.valor > 0 && p.abono >= p.valor).length}
+            <div className="mt-4 pt-4 border-t">
+              {(hayFiltrosActivos || searchFilter) && (
+                <p className="text-xs text-gray-500 normal-case mb-2">
+                  Resumen sobre {filtered.length} resultado(s) filtrado(s)
                 </p>
-              </div>
-              <div className="text-center p-2 bg-red-50 rounded-lg">
-                <p className="text-xs text-red-600">Pendientes</p>
-                <p className="text-lg font-bold text-red-700">
-                  {participantes.filter(p => p.valor > 0 && p.abono < p.valor).length}
-                </p>
-              </div>
-              <div className="text-center p-2 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600">Total Recaudado</p>
-                <p className="text-lg font-bold text-blue-700">
-                  ${participantes.reduce((s, p) => s + Number(p.abono), 0).toFixed(2)}
-                </p>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">{(hayFiltrosActivos || searchFilter) ? "Mostrados" : "Total Participantes"}</p>
+                  <p className="text-lg font-bold">{filtered.length}</p>
+                </div>
+                <div className="text-center p-2 bg-green-50 rounded-lg">
+                  <p className="text-xs text-green-600">Cancelados</p>
+                  <p className="text-lg font-bold text-green-700">
+                    {filtered.filter(p => p.valor > 0 && p.abono >= p.valor).length}
+                  </p>
+                </div>
+                <div className="text-center p-2 bg-red-50 rounded-lg">
+                  <p className="text-xs text-red-600">Pendientes</p>
+                  <p className="text-lg font-bold text-red-700">
+                    {filtered.filter(p => p.valor > 0 && p.abono < p.valor).length}
+                  </p>
+                </div>
+                <div className="text-center p-2 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-600">Total Recaudado</p>
+                  <p className="text-lg font-bold text-blue-700">
+                    ${filtered.reduce((s, p) => s + Number(p.abono), 0).toFixed(2)}
+                  </p>
+                </div>
               </div>
             </div>
           )}

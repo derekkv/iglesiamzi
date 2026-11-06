@@ -13,9 +13,15 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { Eye, RefreshCw, Loader2, RotateCcw, Megaphone } from "lucide-react"
+import { Eye, RefreshCw, Loader2, RotateCcw, Megaphone, FilterX } from "lucide-react"
 import type { WaCampaign, WaCampaignRecipient } from "../types"
 import { formatDateTime } from "../utils"
+import { useColumnFilters, type FilterColumn } from "@/components/ColumnFilter"
+
+const CAMPAIGN_FILTER_COLUMNS: FilterColumn<WaCampaign>[] = [
+  { key: "tipo", label: "Tipo", getValue: (c) => (c.tipo === "media" ? "Con archivo" : c.tipo === "plantilla" ? "Plantilla" : "Texto") },
+  { key: "estado", label: "Estado", getValue: (c) => c.estado || "(Sin estado)", align: "right" },
+]
 
 const ESTADO_STYLES: Record<string, string> = {
   borrador: "bg-gray-500",
@@ -29,6 +35,7 @@ export function WaCampaigns({ canEdit }: { canEdit: boolean }) {
   const { user } = useAuth()
   const [campaigns, setCampaigns] = useState<WaCampaign[]>([])
   const [loading, setLoading] = useState(true)
+  const campaignsFilter = useColumnFilters(campaigns, CAMPAIGN_FILTER_COLUMNS)
   const [detail, setDetail] = useState<WaCampaign | null>(null)
   const [recipients, setRecipients] = useState<WaCampaignRecipient[]>([])
   const [loadingRecipients, setLoadingRecipients] = useState(false)
@@ -155,22 +162,33 @@ export function WaCampaigns({ canEdit }: { canEdit: boolean }) {
             </div>
           ) : (
             <div className="overflow-x-auto">
+              {campaignsFilter.hasActiveFilters && (
+                <div className="flex items-center justify-end mb-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={campaignsFilter.clearAll}>
+                    <FilterX className="w-3.5 h-3.5 mr-1" /> Limpiar filtros
+                  </Button>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Campaña</TableHead>
+                    <TableHead><span className="inline-flex items-center gap-1">Campaña {campaignsFilter.renderFilter("tipo")}</span></TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Enviados</TableHead>
                     <TableHead className="text-right">Entregados</TableHead>
                     <TableHead className="text-right">Leídos</TableHead>
                     <TableHead className="text-right">Fallidos</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead><span className="inline-flex items-center gap-1">Estado {campaignsFilter.renderFilter("estado")}</span></TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {campaigns.map((c) => (
+                  {campaignsFilter.filteredRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-gray-400 text-sm py-6">No hay campañas con los filtros aplicados</TableCell>
+                    </TableRow>
+                  ) : campaignsFilter.filteredRows.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell>
                         <div className="font-medium text-sm">{c.nombre}</div>

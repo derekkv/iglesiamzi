@@ -29,10 +29,12 @@ import { censoMdgService } from "@/lib/mod/censo-mdg-service"
 import { censoJovenesService } from "@/lib/mod/censo-jovenes-service"
 import { censoNinosService } from "@/lib/mod/censo-ninos-service"
 import { getLunesSemanaActual } from "@/lib/mod/gestion-celulas-service"
+import { getJuevesDelMes, getTodasOfrendasMes } from "@/lib/mod/ofrenda-celulas-service"
 import { discipuladoCiclosService, CICLO_CONFIG, type CicloTipo } from "@/lib/mod/discipulado-ciclos-service"
 import { proyectoMarioCiclosService, PROYECTO_MARIO_CICLO_CONFIG, type ProyectoMarioCicloTipo } from "@/lib/mod/proyecto-mario-ciclos-service"
 import { getCumpleanerosMes, getHistorialEnvios } from "@/lib/mod/cumpleanos-service"
 import { pasivosService, type Pasivo, type PasivoAbono, calcAbonado, calcSaldo, esVencido, anioDePasivo, mesDePasivo } from "@/lib/mod/pasivos-service"
+import { getConteoBautizos, getConteoMatrimonios } from "@/lib/mod/registros-pastorales-service"
 
 // Ministerios para asistencia de servidores
 const MINISTERIOS_SERVIDORES: { key: string; label: string }[] = [
@@ -98,19 +100,21 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
   
   // Estadísticas generales
   const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
-  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosHoy: 0 })
+  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosAnio: 0, nuevosHoy: 0 })
   const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0, baby: 0, kids: 0, explores: 0, champions: 0 })
-  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosMes: 0, nuevosHoy: 0 })
+  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosMes: 0, nuevosAnio: 0, nuevosHoy: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({
     primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
     seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
     siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 },
   })
-  const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, censoBautizados: 0 })
-  const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, censoMatrimonios: 0 })
-  const [statsPresentaciones, setStatsPresentaciones] = useState({ total: 0, esteMes: 0 })
+  const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, esteAnio: 0 })
+  const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, esteAnio: 0 })
+  const [statsPresentaciones, setStatsPresentaciones] = useState({ total: 0, esteMes: 0, esteAnio: 0 })
   const [statsAtrasados, setStatsAtrasados] = useState({ total: 0, sinGestionar: 0 })
   const [statsCelulas, setStatsCelulas] = useState({ totalMiembros: 0, asistieronSemana: 0 })
+  // Total de ofrenda de células por cada jueves del mes (todas las células sumadas)
+  const [celulasPorJueves, setCelulasPorJueves] = useState<{ fecha: string; total: number; totalRecibido: number; registros: number }[]>([])
   const [statsAsistenciaCulto, setStatsAsistenciaCulto] = useState({ asistieron: 0, faltaron: 0, enSeguimiento: 0, sinGestionar: 0 })
   const [statsProyectoMario, setStatsProyectoMario] = useState<Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }>>({
     belleza_integral_sabados: { inscritos: 0, ultimaClase: 0, asistieron: 0, faltaron: 0 },
@@ -132,6 +136,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
     pendientes: 0,
     entregadosSemana: 0,
     entregadosMes: 0,
+    entregadosAnio: 0,
     porTipo: {} as Record<string, number>,
   })
 
@@ -216,6 +221,8 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
     const anioActual = currentYearEcuador()
     const primerDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-01`
     const ultimoDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-${String(new Date(anioActual, mesActual, 0).getDate()).padStart(2, "0")}`
+    const primerDiaAnio = `${anioActual}-01-01`
+    const ultimoDiaAnio = `${anioActual}-12-31`
     const lunesSemana = getLunesSemanaActual()
 
     let completed = 0
@@ -225,6 +232,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
     // Cada sección se lanza en paralelo y actualiza su estado apenas resuelve
     const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => []), censoNinosService.getAll().catch(() => []), censoJovenesService.getAll().catch(() => [])]).then(([censoData, censoMdgData, censoNinosData, censoJovenesData]) => {
       const mesActualStr = `${anioActual}-${String(mesActual).padStart(2, "0")}`
+      const anioActualStr = `${anioActual}`
       const hoyStr = todayEcuador()
       setStatsCenso({
         total: censoData.length,
@@ -237,6 +245,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
         activos: censoMdgData.filter(c => c.miembro_activo).length,
         nuevosCreyentes: censoMdgData.filter((c: any) => c.nuevo_creyente).length,
         nuevosMes: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosAnio: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(anioActualStr)).length,
         nuevosHoy: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(hoyStr)).length,
       })
       setStatsCensoNinos({
@@ -253,21 +262,37 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
         nuevos: censoJovenesData.filter(c => c.nuevo_creyente).length,
         primeraVez: censoJovenesData.filter((c: any) => c.primera_vez_iglesia).length,
         nuevosMes: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosAnio: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(anioActualStr)).length,
         nuevosHoy: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(hoyStr)).length,
       })
       tick()
-      return { censoBautizados: censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length, censoMatrimonios: censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length, totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
+      return { totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
     })
     const p2 = Promise.all((Object.keys(CICLO_CONFIG) as CicloTipo[]).map(tipo => discipuladoCiclosService.getCicloActivoCompleto(tipo).then(r => ({ tipo, data: r })).catch(() => ({ tipo, data: null })))).then(results => {
       const stats: Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }> = { primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } }
       for (const { tipo, data: ciclo } of results) { if (ciclo) { stats[tipo] = { inscritos: ciclo.participantes.length, aprobados: ciclo.participantes.filter(p => p.estatus === "aprobado").length, reprobados: ciclo.participantes.filter(p => p.estatus === "reprobado").length, enCurso: ciclo.participantes.filter(p => p.estatus === "en_curso").length } } }
       setStatsDiscipulado(stats); tick()
     })
-    const p3 = supabase.from("bautizos").select("id, fecha").then(res => { const d = res.data||[]; p1.then(({censoBautizados})=>{setStatsBautizos({total:d.length,esteMes:d.filter(b=>b.fecha>=primerDiaMes&&b.fecha<=ultimoDiaMes).length,censoBautizados})}); tick() })
-    const p4 = supabase.from("matrimonios").select("id, fecha").then(res => { const d = res.data||[]; p1.then(({censoMatrimonios})=>{setStatsMatrimonios({total:d.length,esteMes:d.filter(m=>m.fecha>=primerDiaMes&&m.fecha<=ultimoDiaMes).length,censoMatrimonios})}); tick() })
-    const p5 = supabase.from("presentacion_ninos").select("id, fecha").then(res => { const d = res.data||[]; setStatsPresentaciones({total:d.length,esteMes:d.filter(p=>p.fecha>=primerDiaMes&&p.fecha<=ultimoDiaMes).length}); tick() })
+    const rangoFechas = { primerDiaAnio, ultimoDiaAnio, primerDiaMes, ultimoDiaMes }
+    const p3 = getConteoBautizos(rangoFechas).then(c => { setStatsBautizos(c); tick() }).catch(() => tick())
+    const p4 = getConteoMatrimonios(rangoFechas).then(c => { setStatsMatrimonios(c); tick() }).catch(() => tick())
+    const p5 = supabase.from("presentacion_ninos").select("id, fecha").then(res => { const d = res.data||[]; setStatsPresentaciones({total:d.length,esteMes:d.filter(p=>p.fecha>=primerDiaMes&&p.fecha<=ultimoDiaMes).length,esteAnio:d.filter(p=>p.fecha>=primerDiaAnio&&p.fecha<=ultimoDiaAnio).length}); tick() })
     const p6 = supabase.from("gestion_atrasados").select("id, gestionado, fecha").gte("fecha", primerDiaMes).lte("fecha", ultimoDiaMes).then(res => { const d = res.data||[]; setStatsAtrasados({total:d.length,sinGestionar:d.filter(a=>!a.gestionado).length}); tick() })
     const p7 = supabase.from("gestion_celulas").select("id, asistio").eq("semana_inicio", lunesSemana).then(res => { const d = res.data||[]; p1.then(({totalCelulasMiembros})=>{setStatsCelulas({totalMiembros:totalCelulasMiembros,asistieronSemana:d.filter(g=>g.asistio).length})}); tick() })
+    // Total de ofrenda de células por cada jueves del mes (todas las células)
+    const p7b = getTodasOfrendasMes(mesActual, anioActual).then((ofrendas) => {
+      const jueves = getJuevesDelMes(anioActual, mesActual)
+      const porJueves = jueves.map((fecha) => {
+        const delDia = ofrendas.filter((o: any) => o.fecha === fecha)
+        return {
+          fecha,
+          total: delDia.reduce((s: number, o: any) => s + Number(o.valor || 0), 0),
+          totalRecibido: delDia.filter((o: any) => o.recibido).reduce((s: number, o: any) => s + Number(o.valor || 0), 0),
+          registros: delDia.length,
+        }
+      })
+      setCelulasPorJueves(porJueves)
+    }).catch(() => setCelulasPorJueves([]))
     const p8 = Promise.all((Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => proyectoMarioCiclosService.getCicloActivoCompleto(tipo).then(r => ({ tipo, data: r })).catch(() => ({ tipo, data: null })))).then(results => {
       const pm: Record<ProyectoMarioCicloTipo, { inscritos: number; ultimaClase: number; asistieron: number; faltaron: number }> = { belleza_integral_sabados:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, belleza_integral_viernes:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, manualidades:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, belleza_cejas:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0}, gastronomia:{inscritos:0,ultimaClase:0,asistieron:0,faltaron:0} }
       for (const {tipo,data:ciclo} of results) { if(ciclo){const ins=ciclo.participantes.length;const hoy=new Date();hoy.setHours(0,0,0,0);const fp=ciclo.fechas.filter(f=>new Date(f.fecha+"T00:00:00")<=hoy);const uf=fp[fp.length-1];let a=0,fa=0;if(uf){a=ciclo.asistencia.filter(x=>x.fecha_id===uf.id&&x.status==="A").length;fa=ins-a};pm[tipo]={inscritos:ins,ultimaClase:uf?uf.numero_clase:0,asistieron:a,faltaron:fa}} }
@@ -279,9 +304,9 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
       setStatsServidores(s); tick()
     })
     const p10 = Promise.all([supabase.from("casos_redil").select("id, estado, fecha_creacion"),supabase.from("solicitudes_redil").select("caso_id, tipo_ayuda"),supabase.from("entregas_redil").select("caso_id, fecha_entrega")]).then(([cR,sR,eR])=>{
-      const casos=cR.data||[];const sols=sR.data||[];const ents=eR.data||[];const pend=casos.filter((c:any)=>!["cerrado","rechazado","entregado"].includes(c.estado)).length;const eMes=ents.filter((e:any)=>e.fecha_entrega>=primerDiaMes&&e.fecha_entrega<=ultimoDiaMes).length;const h7=new Date();h7.setDate(h7.getDate()-7);const eSem=ents.filter((e:any)=>e.fecha_entrega>=h7.toISOString().split("T")[0]).length
+      const casos=cR.data||[];const sols=sR.data||[];const ents=eR.data||[];const pend=casos.filter((c:any)=>!["cerrado","rechazado","entregado"].includes(c.estado)).length;const eMes=ents.filter((e:any)=>e.fecha_entrega>=primerDiaMes&&e.fecha_entrega<=ultimoDiaMes).length;const eAnio=ents.filter((e:any)=>e.fecha_entrega>=primerDiaAnio&&e.fecha_entrega<=ultimoDiaAnio).length;const h7=new Date();h7.setDate(h7.getDate()-7);const eSem=ents.filter((e:any)=>e.fecha_entrega>=h7.toISOString().split("T")[0]).length
       const ids=new Set(casos.filter((c:any)=>c.estado==="cerrado"||c.estado==="entregado").map((c:any)=>c.id));const pt:Record<string,number>={};for(const s of sols){if(ids.has((s as any).caso_id)){for(const t of (s as any).tipo_ayuda||[]){pt[t]=(pt[t]||0)+1}}}
-      setStatsRedil({totalCasos:casos.length,pendientes:pend,entregadosSemana:eSem,entregadosMes:eMes,porTipo:pt}); tick()
+      setStatsRedil({totalCasos:casos.length,pendientes:pend,entregadosSemana:eSem,entregadosMes:eMes,entregadosAnio:eAnio,porTipo:pt}); tick()
     })
     const p11 = Promise.all([getCumpleanerosMes(mesActual,anioActual).catch(()=>[] as any[]),getHistorialEnvios(anioActual,mesActual).catch(()=>[] as any[])]).then(([cum,env])=>{
       const pend=cum.length-env.length;setStatsCumpleanos({totalMes:cum.length,enviados:env.length,pendientesEnvio:pend>0?pend:0}); tick()
@@ -302,7 +327,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
       tick()
     })
 
-    await Promise.allSettled([p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13])
+    await Promise.allSettled([p1,p2,p3,p4,p5,p6,p7,p7b,p8,p9,p10,p11,p12,p13])
     setLoadingProgress(100)
     setLoadingStats(false)
   }
@@ -624,7 +649,11 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                     </div>
                   </div>
                   <p className="text-3xl font-bold text-violet-800">{statsCensoMdg.nuevosCreyentes}</p>
-                  <p className="text-[9px] text-violet-600 mt-1">Este mes: {statsCensoMdg.nuevosMes} · Hoy: {statsCensoMdg.nuevosHoy}</p>
+                  <div className="mt-1 flex items-center gap-1 flex-wrap">
+                    <span className="inline-flex items-center rounded bg-violet-100 text-violet-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsCensoMdg.nuevosAnio}</span>
+                    <span className="inline-flex items-center rounded bg-violet-200/70 text-violet-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsCensoMdg.nuevosMes}</span>
+                    <span className="inline-flex items-center rounded bg-violet-50 text-violet-600 text-[9px] font-medium px-1.5 py-0.5">Hoy: {statsCensoMdg.nuevosHoy}</span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -641,15 +670,21 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <Card className="border-teal-200 bg-teal-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalBautizos(true)}>
                 <CardContent className="pt-4 pb-3">
                   <p className="text-[10px] text-teal-600 font-medium">Bautizos</p>
-                  <p className="text-2xl font-bold text-teal-800">{statsBautizos.censoBautizados}</p>
-                  <p className="text-[9px] text-teal-500">total · {statsBautizos.esteMes > 0 ? <span className="text-teal-700 font-semibold">+{statsBautizos.esteMes} este mes</span> : <span>0 este mes</span>}</p>
+                  <p className="text-2xl font-bold text-teal-800">{statsBautizos.total}</p>
+                  <div className="mt-1 flex items-center gap-1 flex-wrap">
+                    <span className="inline-flex items-center rounded bg-teal-100 text-teal-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsBautizos.esteAnio}</span>
+                    <span className="inline-flex items-center rounded bg-teal-200/70 text-teal-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsBautizos.esteMes}</span>
+                  </div>
                 </CardContent>
               </Card>
               <Card className="border-rose-200 bg-rose-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalMatrimonios(true)}>
                 <CardContent className="pt-4 pb-3">
                   <p className="text-[10px] text-rose-600 font-medium">Matrimonios</p>
-                  <p className="text-2xl font-bold text-rose-800">{statsMatrimonios.censoMatrimonios}</p>
-                  <p className="text-[9px] text-rose-500">total · {statsMatrimonios.esteMes > 0 ? <span className="text-rose-700 font-semibold">+{statsMatrimonios.esteMes} este mes</span> : <span>0 este mes</span>}</p>
+                  <p className="text-2xl font-bold text-rose-800">{statsMatrimonios.total}</p>
+                  <div className="mt-1 flex items-center gap-1 flex-wrap">
+                    <span className="inline-flex items-center rounded bg-rose-100 text-rose-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsMatrimonios.esteAnio}</span>
+                    <span className="inline-flex items-center rounded bg-rose-200/70 text-rose-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsMatrimonios.esteMes}</span>
+                  </div>
                 </CardContent>
               </Card>
               <Card className="border-emerald-200 bg-emerald-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalCelulas(true)}>
@@ -660,6 +695,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                   </div>
                   <p className="text-2xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p>
                   <p className="text-[9px] text-emerald-500">miembros activos · {statsCelulas.asistieronSemana} asistieron esta semana</p>
+                  <p className="text-[9px] text-emerald-600 mt-0.5">Ofrenda mes: <span className="font-semibold">${celulasPorJueves.reduce((s, j) => s + j.totalRecibido, 0).toFixed(2)}</span> en {celulasPorJueves.length} jueves</p>
                 </CardContent>
               </Card>
             </div>
@@ -672,8 +708,12 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-lime-700">Redil - Ayuda Social</p>
-                      <p className="text-xl font-bold text-lime-700">{statsRedil.entregadosMes}</p>
-                      <p className="text-[9px] text-lime-600">entregados este mes · {statsRedil.pendientes} pendientes</p>
+                      <p className="text-xl font-bold text-lime-700">{statsRedil.entregadosAnio}</p>
+                      <div className="mt-1 flex items-center gap-1 flex-wrap">
+                        <span className="inline-flex items-center rounded bg-lime-100 text-lime-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsRedil.entregadosAnio}</span>
+                        <span className="inline-flex items-center rounded bg-lime-200/70 text-lime-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsRedil.entregadosMes}</span>
+                      </div>
+                      <p className="text-[9px] text-lime-600 mt-0.5">entregados · {statsRedil.pendientes} pendientes</p>
                     </div>
                     <Heart className="w-6 h-6 text-lime-400" />
                   </div>
@@ -896,24 +936,25 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                             <div className="p-3 bg-teal-50 rounded-lg border border-teal-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/bautizo")}>
                               <p className="text-xs font-semibold text-teal-700 mb-2 flex items-center gap-1"><Heart className="w-3 h-3" /> Bautizos</p>
                               <div className="space-y-1">
-                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">En censos (P+MDG)</span><span className="text-sm font-bold text-teal-800">{statsBautizos.censoBautizados}</span></div>
-                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Manual</span><span className="text-sm font-bold text-teal-700">{statsBautizos.total}</span></div>
-                                {statsBautizos.esteMes > 0 && <Badge className="bg-teal-100 text-teal-800 text-[10px]">+{statsBautizos.esteMes} este mes</Badge>}
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total registrados</span><span className="text-sm font-bold text-teal-800">{statsBautizos.total}</span></div>
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total del año</span><span className="text-sm font-bold text-teal-700">{statsBautizos.esteAnio}</span></div>
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total del mes</span><span className="text-sm font-bold text-teal-700">{statsBautizos.esteMes}</span></div>
                               </div>
                             </div>
                             <div className="p-3 bg-rose-50 rounded-lg border border-rose-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/matrimonio")}>
                               <p className="text-xs font-semibold text-rose-700 mb-2 flex items-center gap-1"><Heart className="w-3 h-3" /> Matrimonios</p>
                               <div className="space-y-1">
-                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">En censos (P+MDG)</span><span className="text-sm font-bold text-rose-800">{statsMatrimonios.censoMatrimonios}</span></div>
-                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Manual</span><span className="text-sm font-bold text-rose-700">{statsMatrimonios.total}</span></div>
-                                {statsMatrimonios.esteMes > 0 && <Badge className="bg-rose-100 text-rose-800 text-[10px]">+{statsMatrimonios.esteMes} este mes</Badge>}
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total registrados</span><span className="text-sm font-bold text-rose-800">{statsMatrimonios.total}</span></div>
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total del año</span><span className="text-sm font-bold text-rose-700">{statsMatrimonios.esteAnio}</span></div>
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total del mes</span><span className="text-sm font-bold text-rose-700">{statsMatrimonios.esteMes}</span></div>
                               </div>
                             </div>
                             <div className="p-3 bg-pink-50 rounded-lg border border-pink-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/presentacion-ninos")}>
                               <p className="text-xs font-semibold text-pink-700 mb-2 flex items-center gap-1"><UserCheck className="w-3 h-3" /> Presentación de Niños</p>
                               <div className="space-y-1">
                                 <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total registrados</span><span className="text-sm font-bold text-pink-800">{statsPresentaciones.total}</span></div>
-                                {statsPresentaciones.esteMes > 0 && <Badge className="bg-pink-100 text-pink-800 text-[10px]">+{statsPresentaciones.esteMes} este mes</Badge>}
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total del año</span><span className="text-sm font-bold text-pink-700">{statsPresentaciones.esteAnio}</span></div>
+                                <div className="flex justify-between"><span className="text-[10px] text-gray-600">Total del mes</span><span className="text-sm font-bold text-pink-700">{statsPresentaciones.esteMes}</span></div>
                               </div>
                             </div>
                           </div>
@@ -1444,19 +1485,23 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-teal-700">💧 Bautizos</DialogTitle>
-              <DialogDescription>Total bautizados: {statsBautizos.censoBautizados}</DialogDescription>
+              <DialogDescription>Total bautizados: {statsBautizos.total}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="flex justify-between p-3 bg-teal-50 rounded">
-                <span>Total Bautizados (censo)</span>
-                <span className="font-bold text-teal-700">{statsBautizos.censoBautizados}</span>
+                <span>Total Bautizados</span>
+                <span className="font-bold text-teal-700">{statsBautizos.total}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-teal-50/60 rounded">
+                <span>Bautizos este año</span>
+                <span className="font-bold text-teal-700">{statsBautizos.esteAnio}</span>
               </div>
               <div className="flex justify-between p-3 bg-green-50 rounded">
                 <span>Bautizos este mes</span>
                 <span className="font-bold text-green-700">{statsBautizos.esteMes}</span>
               </div>
             </div>
-            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/bautizos")}>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/bautizo")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Bautizos
             </Button>
           </DialogContent>
@@ -1467,19 +1512,23 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-rose-700">💒 Matrimonios</DialogTitle>
-              <DialogDescription>Total matrimonios: {statsMatrimonios.censoMatrimonios}</DialogDescription>
+              <DialogDescription>Total matrimonios: {statsMatrimonios.total}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="flex justify-between p-3 bg-rose-50 rounded">
-                <span>Total Matrimonios (censo)</span>
-                <span className="font-bold text-rose-700">{statsMatrimonios.censoMatrimonios}</span>
+                <span>Total Matrimonios</span>
+                <span className="font-bold text-rose-700">{statsMatrimonios.total}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-rose-50/60 rounded">
+                <span>Matrimonios este año</span>
+                <span className="font-bold text-rose-700">{statsMatrimonios.esteAnio}</span>
               </div>
               <div className="flex justify-between p-3 bg-green-50 rounded">
                 <span>Matrimonios este mes</span>
                 <span className="font-bold text-green-700">{statsMatrimonios.esteMes}</span>
               </div>
             </div>
-            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/matrimonios")}>
+            <Button className="w-full mt-4" onClick={() => router.push("/dashboard/matrimonio")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Matrimonios
             </Button>
           </DialogContent>
@@ -1528,6 +1577,48 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                   <p className="text-xl font-bold text-blue-800">{statsCelulas.totalMiembros > 0 ? Math.round(((statsCelulas.totalMiembros - statsCelulas.asistieronSemana) / statsCelulas.totalMiembros) * 100) : 0}%</p>
                 </div>
               </div>
+
+              {/* Total de ofrenda por cada jueves (todas las células) */}
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                  <CalendarDays className="w-3.5 h-3.5 text-emerald-600" /> Total por jueves (todas las células) — {currentMonthNameEcuador()}
+                </p>
+                <div className="rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600">
+                        <th className="text-left px-3 py-1.5 font-medium">Jueves</th>
+                        <th className="text-right px-3 py-1.5 font-medium">Recibido</th>
+                        <th className="text-right px-3 py-1.5 font-medium">Registrado</th>
+                        <th className="text-center px-3 py-1.5 font-medium">Células</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {celulasPorJueves.length === 0 ? (
+                        <tr><td colSpan={4} className="text-center text-gray-400 py-3">Sin datos del mes</td></tr>
+                      ) : celulasPorJueves.map((j) => (
+                        <tr key={j.fecha} className="border-t border-gray-100">
+                          <td className="px-3 py-1.5">{new Date(j.fecha + "T12:00:00").toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}</td>
+                          <td className="px-3 py-1.5 text-right font-semibold text-emerald-700">${j.totalRecibido.toFixed(2)}</td>
+                          <td className="px-3 py-1.5 text-right text-gray-500">${j.total.toFixed(2)}</td>
+                          <td className="px-3 py-1.5 text-center text-gray-500">{j.registros}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {celulasPorJueves.length > 0 && (
+                      <tfoot>
+                        <tr className="border-t border-gray-200 bg-emerald-50/50 font-bold text-emerald-800">
+                          <td className="px-3 py-1.5">Total mes</td>
+                          <td className="px-3 py-1.5 text-right">${celulasPorJueves.reduce((s, j) => s + j.totalRecibido, 0).toFixed(2)}</td>
+                          <td className="px-3 py-1.5 text-right">${celulasPorJueves.reduce((s, j) => s + j.total, 0).toFixed(2)}</td>
+                          <td className="px-3 py-1.5 text-center">{celulasPorJueves.reduce((s, j) => s + j.registros, 0)}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+                <p className="text-[9px] text-gray-400 mt-1 normal-case">"Recibido" = ofrendas confirmadas; "Registrado" = total ingresado aún sin confirmar.</p>
+              </div>
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/celulas")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Ir a Células
@@ -1542,7 +1633,7 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
               <DialogTitle className="flex items-center gap-2 text-lime-700">
                 <Heart className="w-5 h-5" /> Redil - Ayuda Social
               </DialogTitle>
-              <DialogDescription>Total casos: {statsRedil.totalCasos} · Entregados este mes: {statsRedil.entregadosMes}</DialogDescription>
+              <DialogDescription>Total casos: {statsRedil.totalCasos} · Entregados este año: {statsRedil.entregadosAnio} · este mes: {statsRedil.entregadosMes}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1553,6 +1644,10 @@ function ResumenMensualContent({ canEdit }: { canEdit: boolean }) {
                 <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
                   <p className="text-[10px] text-green-600 font-medium">Entregados (mes)</p>
                   <p className="text-2xl font-bold text-green-800">{statsRedil.entregadosMes}</p>
+                </div>
+                <div className="text-center p-3 bg-teal-50 rounded-lg border border-teal-100">
+                  <p className="text-[10px] text-teal-600 font-medium">Entregados (año)</p>
+                  <p className="text-2xl font-bold text-teal-800">{statsRedil.entregadosAnio}</p>
                 </div>
                 <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
                   <p className="text-[10px] text-yellow-600 font-medium">Solicitudes Pendientes</p>

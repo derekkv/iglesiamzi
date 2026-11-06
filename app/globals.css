@@ -130,3 +130,22 @@
     text-transform: none;
   }
 }
+
+/*
+ * Modo "ancho completo" (wide-mode).
+ * Cuando el body tiene la clase .wide-mode, los contenedores de layout
+ * que normalmente centran y limitan el ancho (max-w-* + mx-auto) pasan a
+ * ocupar todo el ancho disponible de la pantalla.
+ *
+ * Se apunta a los contenedores de LAYOUT (el <main> de cada módulo y el
+ * <div> directo dentro del <header>), que es el patrón usado en todas las
+ * pages del dashboard. NO afecta a modales/diálogos (DialogContent,
+ * AlertDialogContent) porque esos no son <main> ni hijos directos de <header>.
+ *
+ * Al apuntar a cualquier max-w-* vía [class*="max-w-"] se cubren todas las
+ * variantes (max-w-7xl, max-w-6xl, max-w-4xl, max-w-[1600px], etc.).
+ */
+body.wide-mode main[class*="max-w-"].mx-auto,
+body.wide-mode header > [class*="max-w-"].mx-auto {
+  max-width: 100% !important;
+}

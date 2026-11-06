@@ -343,6 +343,70 @@ class ProyectoMarioCiclosService {
     }
   }
 
+  /**
+   * Asigna el estatus (aprobado/reprobado) a TODOS los participantes de un ciclo
+   * de forma automática según su número de faltas.
+   *
+   * - Reprobado: si sus faltas (F, y opcionalmente AT) >= `faltasMinReprobar`.
+   * - Aprobado: en caso contrario.
+   *
+   * Recibe los participantes y la asistencia ya cargados (del ciclo completo)
+   * para contar las faltas sin consultas extra. Devuelve el resumen de cuántos
+   * quedaron aprobados/reprobados.
+   */
+  async asignarEstatusMasivo(
+    cicloId: number,
+    participantes: ProyectoMarioCicloParticipante[],
+    asistencia: ProyectoMarioCicloAsistencia[],
+    faltasMinReprobar: number,
+    opciones?: { contarAtrasoComoFalta?: boolean },
+    audit?: AuditInfo
+  ): Promise<{ aprobados: number; reprobados: number }> {
+    const contarAtraso = opciones?.contarAtrasoComoFalta ?? false
+
+    const contarFaltas = (participanteId: number): number =>
+      asistencia.filter(
+        (a) =>
+          a.participante_id === participanteId &&
+          (a.status === "F" || (contarAtraso && a.status === "AT"))
+      ).length
+
+    let aprobados = 0
+    let reprobados = 0
+
+    // Construir las actualizaciones
+    const updates = participantes.map((p) => {
+      const faltas = contarFaltas(p.id)
+      const estatus: "aprobado" | "reprobado" = faltas >= faltasMinReprobar ? "reprobado" : "aprobado"
+      if (estatus === "aprobado") aprobados++
+      else reprobados++
+      return { id: p.id, estatus }
+    })
+
+    // Aplicar en paralelo
+    const now = new Date().toISOString()
+    await Promise.all(
+      updates.map((u) =>
+        supabase
+          .from("proyecto_mario_ciclo_participantes")
+          .update({ estatus: u.estatus, updated_at: now })
+          .eq("id", u.id)
+      )
+    )
+
+    if (audit) {
+      auditService.log({
+        ...audit,
+        module: "proyecto_mario",
+        action: "editar",
+        description: `Estatus asignado automáticamente: ${aprobados} aprobado(s), ${reprobados} reprobado(s) (umbral: ${faltasMinReprobar} falta(s)${contarAtraso ? ", atraso cuenta como falta" : ""})`,
+        details: { ciclo_id: cicloId, faltas_min_reprobar: faltasMinReprobar, contar_atraso: contarAtraso, aprobados, reprobados },
+      })
+    }
+
+    return { aprobados, reprobados }
+  }
+
   // --- FECHAS ---
 
   async getFechas(cicloId: number): Promise<ProyectoMarioCicloFecha[]> {

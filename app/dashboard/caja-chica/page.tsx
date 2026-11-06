@@ -16,8 +16,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Wallet, Lock, DollarSign, Calculator, Trash2 } from "lucide-react"
+import { ArrowLeft, Wallet, Lock, DollarSign, Calculator, Trash2, FilterX } from "lucide-react"
 import { PermissionsGuard } from "@/lib/permissions-guard"
+import { useColumnFilters, type FilterColumn } from "@/components/ColumnFilter"
 import { useMonth } from "@/contexts/month-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useSecurityCheck } from "@/contexts/security-context"
@@ -34,6 +35,11 @@ import {
   type MetodoPagoCaja,
 } from "@/lib/mod/caja-chica-service"
 
+
+const GESTIONES_FILTER_COLUMNS: FilterColumn<CajaChicaMovimiento>[] = [
+  { key: "responsable", label: "Responsable", getValue: (g) => g.responsable?.trim() || "(Sin responsable)" },
+  { key: "metodo", label: "Método", getValue: (g) => g.metodo_pago?.trim() || "(Sin método)" },
+]
 
 function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   const router = useRouter()
@@ -53,6 +59,7 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
   const [savingGestion, setSavingGestion] = useState(false)
   const [gestiones, setGestiones] = useState<CajaChicaMovimiento[]>([])
   const [editingGestionId, setEditingGestionId] = useState<number | null>(null)
+  const gestionesFilter = useColumnFilters(gestiones, GESTIONES_FILTER_COLUMNS)
 
   // Arqueo
   const [arqueoForm, setArqueoForm] = useState({
@@ -438,21 +445,32 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
                     {/* Tabla de registros */}
                     {gestiones.length > 0 && (
                       <div className="border-t pt-4">
-                        <h3 className="text-sm font-semibold mb-3">Registros del mes</h3>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-semibold">Registros del mes</h3>
+                          {gestionesFilter.hasActiveFilters && (
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={gestionesFilter.clearAll}>
+                              <FilterX className="w-3.5 h-3.5 mr-1" /> Limpiar filtros
+                            </Button>
+                          )}
+                        </div>
                         <div className="overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
                                 <TableHead className="text-xs">Fecha</TableHead>
-                                <TableHead className="text-xs">Responsable</TableHead>
+                                <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Responsable {gestionesFilter.renderFilter("responsable")}</span></TableHead>
                                 <TableHead className="text-xs">Detalle</TableHead>
-                                <TableHead className="text-xs">Metodo</TableHead>
+                                <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Metodo {gestionesFilter.renderFilter("metodo")}</span></TableHead>
                                 <TableHead className="text-xs text-right">Valor</TableHead>
                                 <TableHead className="text-xs text-right">Acciones</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {gestiones.map((g) => (
+                              {gestionesFilter.filteredRows.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={6} className="text-center text-gray-400 text-xs py-6">No hay registros con los filtros aplicados</TableCell>
+                                </TableRow>
+                              ) : gestionesFilter.filteredRows.map((g) => (
                                 <TableRow key={g.id}>
                                   <TableCell className="text-xs">{g.fecha}</TableCell>
                                   <TableCell className="text-xs font-medium">{g.responsable}</TableCell>
@@ -475,8 +493,8 @@ function CajaChicaContent({ canEdit }: { canEdit: boolean }) {
                           </Table>
                         </div>
                         <div className="mt-3 p-3 bg-emerald-50 rounded-lg text-center">
-                          <p className="text-xs text-gray-500">Total Gestion del Mes</p>
-                          <p className="text-xl font-bold text-emerald-700">${gestiones.reduce((s, g) => s + Number(g.monto), 0).toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">{gestionesFilter.hasActiveFilters ? "Total filtrado" : "Total Gestion del Mes"}</p>
+                          <p className="text-xl font-bold text-emerald-700">${gestionesFilter.filteredRows.reduce((s, g) => s + Number(g.monto), 0).toFixed(2)}</p>
                         </div>
                       </div>
                     )}
