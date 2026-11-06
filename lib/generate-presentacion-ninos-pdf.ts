@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib"
+import { ajustarTamano } from "./pdf-utils"
 
 export interface PresentacionNinoPDFData {
   nombre_presentado: string
@@ -43,6 +44,25 @@ function drawCenteredLine(page: PDFPage, y: number, widthPercent: number, thickn
   })
 }
 
+/**
+ * Dibuja un texto centrado reduciendo su tamaño si no cabe en `maxWidth` (para que un nombre largo
+ * no se salga del marco). Devuelve el ancho final del texto, para dimensionar la raya que lo subraya.
+ */
+function drawCenteredFit(
+  page: PDFPage, text: string, y: number, font: PDFFont,
+  maxSize: number, minSize: number, maxWidth: number, color = rgb(0.133, 0.133, 0.133)
+): number {
+  const size = ajustarTamano(font, text, maxSize, minSize, maxWidth)
+  drawCentered(page, text, y, font, size, color)
+  return font.widthOfTextAtSize(text, size)
+}
+
+/** Porcentaje de ancho de página para la raya: el habitual, pero nunca más corta que el texto que subraya. */
+function lineaPorcentaje(page: PDFPage, base: number, textoAncho: number, maxAncho: number): number {
+  const { width } = page.getSize()
+  return Math.min(Math.max(base, (textoAncho + 40) / width), maxAncho / width)
+}
+
 export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
 
@@ -83,6 +103,9 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   } catch (e) {
   }
 
+  // Ancho útil dentro del marco (con aire a cada lado): ningún nombre debe tocar el borde
+  const anchoUtil = width - (borderInset + 30) * 2
+
   const contentOffset = 80 // Aumentar para bajar, disminuir para subir
   let yPos = height - contentOffset
 
@@ -95,25 +118,25 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   drawCentered(page, "ESTO CERTIFICA QUE", yPos, serifRegular, 14, textColor)
   yPos -= 46
 
-  drawCentered(page, data.nombre_presentado, yPos, scriptFont, 28, textColor)
+  const nombreAncho = drawCenteredFit(page, data.nombre_presentado, yPos, scriptFont, 28, 14, anchoUtil, textColor)
   yPos -= 14
-  drawCenteredLine(page, yPos, 0.60, 0.75)
+  drawCenteredLine(page, yPos, lineaPorcentaje(page, 0.60, nombreAncho, anchoUtil), 0.75)
   yPos -= 12
   drawCentered(page, "NOMBRE DEL NIÑO", yPos, serifRegular, 9, grayText)
   yPos -= 48
 
   const padresText = `${data.nombre_padre} y ${data.nombre_madre}`
-  drawCentered(page, padresText, yPos, scriptFont, 20, textColor)
+  const padresAncho = drawCenteredFit(page, padresText, yPos, scriptFont, 20, 12, anchoUtil, textColor)
   yPos -= 14
-  drawCenteredLine(page, yPos, 0.55, 0.75)
+  drawCenteredLine(page, yPos, lineaPorcentaje(page, 0.55, padresAncho, anchoUtil), 0.75)
   yPos -= 12
   drawCentered(page, "NOMBRES DE LOS PADRES", yPos, serifRegular, 9, grayText)
   yPos -= 48
 
   const testigosText = `${data.testigo1 || "—"} y ${data.testigo2 || "—"}`
-  drawCentered(page, testigosText, yPos, scriptFont, 20, textColor)
+  const testigosAncho = drawCenteredFit(page, testigosText, yPos, scriptFont, 20, 12, anchoUtil, textColor)
   yPos -= 14
-  drawCenteredLine(page, yPos, 0.55, 0.75)
+  drawCenteredLine(page, yPos, lineaPorcentaje(page, 0.55, testigosAncho, anchoUtil), 0.75)
   yPos -= 12
   drawCentered(page, "TESTIGOS", yPos, serifRegular, 9, grayText)
   yPos -= 56
@@ -158,10 +181,12 @@ export async function generatePresentacionNinoPDF(data: PresentacionNinoPDFData)
   }
   yPos -= 72
 
-  drawCenteredLine(page, yPos, 0.40, 0.75)
-  yPos -= 16
   const pastorText = `Pastor ${data.nombre_pastor}`
-  drawCentered(page, pastorText, yPos, serifRegular, 11, textColor)
+  const pastorSize = ajustarTamano(serifRegular, pastorText, 11, 8, anchoUtil)
+  const pastorAncho = serifRegular.widthOfTextAtSize(pastorText, pastorSize)
+  drawCenteredLine(page, yPos, lineaPorcentaje(page, 0.40, pastorAncho, anchoUtil))
+  yPos -= 16
+  drawCentered(page, pastorText, yPos, serifRegular, pastorSize, textColor)
   yPos -= 55
 
   const versLine1 = "Él les dijo: \"Dejen que los niños vengan a mí,"

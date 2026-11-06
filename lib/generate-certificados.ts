@@ -1,100 +1,35 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 import type { CicloTipo } from "./mod/discipulado-ciclos-service"
+import { generarCertificadosDesdePlantilla, descargarPdf } from "./certificado-plantilla"
 
-const MODULO_LABELS: Record<CicloTipo, string> = {
-  primeros_pasos: "MODULO 1: PRIMEROS PASOS DE LA VIDA CRISTIANA",
-  seguimos_avanzando: "MODULO 2: SEGUIMOS AVANZANDO",
-  siendo_iglesia: "MODULO 3: SIENDO IGLESIA, VIVIENDO JUNTOS LOS UNOS CON LOS OTROS",
+const MODULOS: Record<CicloTipo, { etiqueta: string; lineas: string[] }> = {
+  primeros_pasos: { etiqueta: "MÓDULO 1", lineas: ["PRIMEROS PASOS DE LA VIDA CRISTIANA"] },
+  seguimos_avanzando: { etiqueta: "MÓDULO 2", lineas: ["SEGUIMOS AVANZANDO"] },
+  siendo_iglesia: { etiqueta: "MÓDULO 3", lineas: ["SIENDO IGLESIA,", "VIVIENDO JUNTOS LOS UNOS CON LOS OTROS"] },
 }
 
 /**
- * Genera un PDF con una página de certificado por cada nombre aprobado.
- * Usa el modelo certificado de /public como plantilla base.
+ * Genera un PDF con una página de certificado por cada nombre aprobado de Discipulado.
+ * El diseño vive en ./certificado-plantilla (compartido con Proyecto Mario).
  */
 export async function generateCertificadosPDF(
   aprobados: string[],
   tipo: CicloTipo
 ): Promise<Uint8Array> {
-  const templateResponse = await fetch("/MODELO CERTIFICADO.pdf")
-  const templateBytes = await templateResponse.arrayBuffer()
-
-  const finalDoc = await PDFDocument.create()
-
-  const fontBold = await finalDoc.embedFont(StandardFonts.HelveticaBold)
-  const fontRegular = await finalDoc.embedFont(StandardFonts.Helvetica)
-
-  const hoy = new Date()
-  const meses = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-  ]
-  const fechaText = `Manta, ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`
-
-  const moduloText = MODULO_LABELS[tipo]
-
-  for (const nombre of aprobados) {
-    const templateDoc = await PDFDocument.load(templateBytes)
-    const [templatePage] = await finalDoc.copyPages(templateDoc, [0])
-
-    const { width, height } = templatePage.getSize()
-
-    const moduloFontSize = 12
-    const moduloTextWidth = fontBold.widthOfTextAtSize(moduloText, moduloFontSize)
-    const moduloX = (width - moduloTextWidth) / 2
-    const moduloY = height - 350
-
-    templatePage.drawText(moduloText, {
-      x: moduloX,
-      y: moduloY,
-      size: moduloFontSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
-    })
-
-    const nombreFontSize = 30
-    const nombreTextWidth = fontBold.widthOfTextAtSize(nombre, nombreFontSize)
-    const nombreX = (width - nombreTextWidth) / 2
-    const nombreY = height - 180
-
-    templatePage.drawText(nombre, {
-      x: nombreX,
-      y: nombreY,
-      size: nombreFontSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
-    })
-
-    const fechaFontSize = 12
-    const fechaTextWidth = fontRegular.widthOfTextAtSize(fechaText, fechaFontSize)
-    const fechaX = (width - fechaTextWidth - 50) / 2
-    const fechaY = height - 495.29 + 70
-
-    templatePage.drawText(fechaText, {
-      x: fechaX,
-      y: fechaY,
-      size: fechaFontSize,
-      font: fontRegular,
-      color: rgb(0, 0, 0),
-    })
-
-    finalDoc.addPage(templatePage)
-  }
-
-  return await finalDoc.save()
+  const modulo = MODULOS[tipo]
+  return generarCertificadosDesdePlantilla(aprobados, {
+    // La plantilla trae "DiscipuladoTransformando Vidas" (sin espacio); aquí se corrige.
+    programa: "Discipulado Transformando Vidas",
+    frase: "DANDO A CONOCER QUE HA CURSADO Y CULMINADO SATISFACTORIAMENTE EL DISCIPULADO:",
+    cursoEtiqueta: modulo.etiqueta,
+    cursoLineas: modulo.lineas,
+    firmas: [
+      { nombre: "Jamil Machuca", cargo: "Pastor Principal" },
+      { nombre: "Christian Mendoza", cargo: "Pastor Líder de Curso" },
+    ],
+  })
 }
 
 export async function downloadCertificados(aprobados: string[], tipo: CicloTipo) {
   const pdfBytes = await generateCertificadosPDF(aprobados, tipo)
-
-  const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" })
-  const url = URL.createObjectURL(blob)
-
-  const link = document.createElement("a")
-  link.href = url
-  link.download = `Certificados_${tipo}_${new Date().toISOString().split("T")[0]}.pdf`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-
-  URL.revokeObjectURL(url)
+  descargarPdf(pdfBytes, `Certificados_${tipo}_${new Date().toISOString().split("T")[0]}.pdf`)
 }

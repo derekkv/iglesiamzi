@@ -2,7 +2,8 @@ import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
 import { execSync } from "child_process"
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
+import { PDFDocument, StandardFonts } from "pdf-lib"
+import { dibujarNombreCumpleanos } from "./cumpleanos-nombre"
 
 const BIRTHDAY_PDF_PATH = path.join(process.cwd(), "public", "plantilla de cumpleaños (1).pdf")
 const BIRTHDAY_OGG_PATH = path.join(process.cwd(), "public", "cumpleanos-feliz.ogg")
@@ -25,7 +26,6 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
 
     const pages = templateDoc.getPages()
     const page = pages[0]
-    const { width, height } = page.getSize()
 
     // Sanitizar nombre: eliminar caracteres de control que pdf-lib no soporta
     const nombreLimpio = nombre.replace(/[\x00-\x1F\x7F]/g, "").trim()
@@ -34,19 +34,8 @@ export async function getBirthdayImage(nombre: string): Promise<{ buffer: Buffer
       return null
     }
 
-    const nombreFontSize = 28
-    const nombreUpper = nombreLimpio.toUpperCase()
-    const nombreTextWidth = fontCursiva.widthOfTextAtSize(nombreUpper, nombreFontSize)
-    const nombreX = (width - nombreTextWidth) / 2
-    const nombreY = height / 2 + 80
-
-    page.drawText(nombreUpper, {
-      x: nombreX,
-      y: nombreY,
-      size: nombreFontSize,
-      font: fontCursiva,
-      color: rgb(0.72, 0.53, 0.04),
-    })
+    // Mismo dibujo que el PDF del navegador: ajustado al ancho disponible, en dos líneas si es largo
+    dibujarNombreCumpleanos(page, fontCursiva, nombreLimpio)
 
     const pdfBytes = await templateDoc.save()
 
