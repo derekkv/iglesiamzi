@@ -22,8 +22,15 @@ import { Badge } from "@/components/ui/badge"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Send, Inbox, Mail, Plus, Eye, Lock } from "lucide-react"
+import { ArrowLeft, Send, Inbox, Mail, Plus, Eye, Lock, FilterX } from "lucide-react"
 import { toast } from "sonner"
+import { useColumnFilters, type FilterColumn } from "@/components/ColumnFilter"
+
+const ENVIADOS_FILTER_COLUMNS: FilterColumn<Mensaje>[] = [
+  { key: "tipo", label: "Tipo", getValue: (m) => (m.tipo === "invitacion" ? "Invitación" : "Mensaje") },
+  { key: "para", label: "Para", getValue: (m) => m.destinatario_nombre?.trim() || "(General)" },
+  { key: "evento", label: "Evento/Lugar", getValue: (m) => m.evento_lugar?.trim() || "(Sin evento)", align: "right" },
+]
 
 interface MensajesCitacionesProps {
   moduloKey: string
@@ -72,6 +79,7 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
   const [enviados, setEnviados] = useState<Mensaje[]>([])
   const [recibidos, setRecibidos] = useState<MensajeRecibido[]>([])
   const [loading, setLoading] = useState(true)
+  const enviadosFilter = useColumnFilters(enviados, ENVIADOS_FILTER_COLUMNS)
   const [showCreate, setShowCreate] = useState(false)
   const [showDetail, setShowDetail] = useState<Mensaje | null>(null)
   const [saving, setSaving] = useState(false)
@@ -503,18 +511,29 @@ export function MensajesCitaciones({ moduloKey, title, canEdit }: MensajesCitaci
               </Card>
             ) : (
               <div className="rounded-md border overflow-hidden">
+                {enviadosFilter.hasActiveFilters && (
+                  <div className="flex items-center justify-end px-2 py-1.5 border-b bg-gray-50/50">
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={enviadosFilter.clearAll}>
+                      <FilterX className="w-3.5 h-3.5 mr-1" /> Limpiar filtros
+                    </Button>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">Tipo</TableHead>
-                      <TableHead className="text-xs">Para</TableHead>
+                      <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Tipo {enviadosFilter.renderFilter("tipo")}</span></TableHead>
+                      <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Para {enviadosFilter.renderFilter("para")}</span></TableHead>
                       <TableHead className="text-xs">Detalle</TableHead>
                       <TableHead className="text-xs">Fecha</TableHead>
-                      <TableHead className="text-xs">Evento/Lugar</TableHead>
+                      <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Evento/Lugar {enviadosFilter.renderFilter("evento")}</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {enviados.map((msg) => (
+                    {enviadosFilter.filteredRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-gray-400 text-xs py-6">No hay mensajes con los filtros aplicados</TableCell>
+                      </TableRow>
+                    ) : enviadosFilter.filteredRows.map((msg) => (
                       <TableRow key={msg.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setShowDetail(msg)}>
                         <TableCell>
                           <Badge variant={msg.tipo === "invitacion" ? "default" : "secondary"} className="text-[10px]">

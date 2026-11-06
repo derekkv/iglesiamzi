@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SmartDateInput } from "@/components/ui/smart-date-input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -25,7 +26,7 @@ import {
   discipuladoCiclosService, CICLO_CONFIG,
   type CicloTipo, type CicloCompleto, type CicloParticipante, type CicloFecha,
 } from "@/lib/mod/discipulado-ciclos-service"
-import { Trash2, Plus, ArrowLeft, Edit, Lock, Play, CalendarDays, FileDown } from "lucide-react"
+import { Trash2, Plus, ArrowLeft, Edit, Lock, Play, CalendarDays, FileDown, ClipboardCheck } from "lucide-react"
 import { downloadCertificados } from "@/lib/generate-certificados"
 import { useSecurityCheck } from "@/contexts/security-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -81,6 +82,10 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
   const [editingFecha, setEditingFecha] = useState<CicloFecha | null>(null)
   const [nuevaFechaEdit, setNuevaFechaEdit] = useState("")
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  // Asignación masiva de estatus
+  const [showEstatusMasivo, setShowEstatusMasivo] = useState(false)
+  const [faltasMinReprobar, setFaltasMinReprobar] = useState("3")
+  const [contarAtrasoComoFalta, setContarAtrasoComoFalta] = useState(false)
 
   const audit = user ? { user_id: user.id, user_name: user.username } : undefined
 
@@ -168,6 +173,41 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
     } catch (error: any) {
       toast.error("Error: " + error.message)
     }
+  }
+
+  const handleAsignarEstatusMasivo = async () => {
+    if (!data) return
+    const umbral = parseInt(faltasMinReprobar, 10)
+    if (isNaN(umbral) || umbral < 1) {
+      toast.error("Ingrese un número de faltas válido (mínimo 1)")
+      return
+    }
+    setSaving(true)
+    try {
+      const { aprobados, reprobados } = await discipuladoCiclosService.asignarEstatusMasivo(
+        data.ciclo.id,
+        data.participantes,
+        data.asistencia,
+        umbral,
+        { contarAtrasoComoFalta },
+        audit
+      )
+      toast.success(`Estatus asignado: ${aprobados} aprobado(s) y ${reprobados} reprobado(s)`)
+      setShowEstatusMasivo(false)
+      await loadData()
+    } catch (error: any) {
+      toast.error("Error: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Cuenta las faltas (F, y opcionalmente AT) de un participante. */
+  const contarFaltasParticipante = (participanteId: number, contarAtraso: boolean): number => {
+    if (!data) return 0
+    return data.asistencia.filter(
+      (a) => a.participante_id === participanteId && (a.status === "F" || (contarAtraso && a.status === "AT"))
+    ).length
   }
 
   const handleAttendanceChange = async (participanteId: number, fechaId: number, status: string) => {
@@ -322,6 +362,16 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          )}
+          {canEdit && data && data.participantes.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => setShowEstatusMasivo(true)}
+            >
+              <ClipboardCheck className="w-4 h-4 mr-2" /> Aprobar / Reprobar todos
+            </Button>
           )}
           {canEdit && (
             <AlertDialog>
@@ -568,6 +618,79 @@ export function DiscipuladoCicloView({ tipo, canEdit }: DiscipuladoCicloViewProp
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowEditFecha(false)}>Cancelar</Button>
                 <Button onClick={handleCambiarFecha} disabled={saving || !nuevaFechaEdit}>{saving ? "Guardando..." : "Cambiar y recalcular"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Modal asignar estatus masivo (aprobar/reprobar todos) */}
+        {canEdit && data && (
+          <Dialog open={showEstatusMasivo} onOpenChange={setShowEstatusMasivo}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Aprobar / Reprobar todos</DialogTitle>
+                <DialogDescription>
+                  Asigna el estatus automáticamente a los {data.participantes.length} participantes según sus faltas.
+                  Quien tenga el número indicado de faltas (o más) queda <strong>reprobado</strong>; el resto, <strong>aprobado</strong>.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Número de faltas mínimo para reprobar</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={faltasMinReprobar}
+                    onChange={(e) => setFaltasMinReprobar(e.target.value)}
+                    placeholder="Ej: 3"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Con este valor, se reprueba a quien tenga {faltasMinReprobar || "N"} falta(s) o más.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="contar-atraso-disc"
+                    checked={contarAtrasoComoFalta}
+                    onCheckedChange={(checked) => setContarAtrasoComoFalta(checked === true)}
+                  />
+                  <Label htmlFor="contar-atraso-disc" className="text-sm font-normal cursor-pointer">
+                    Contar atrasos (AT) como falta
+                  </Label>
+                </div>
+
+                {/* Vista previa con el umbral actual */}
+                {(() => {
+                  const umbral = parseInt(faltasMinReprobar, 10)
+                  if (isNaN(umbral) || umbral < 1) return null
+                  let aprob = 0
+                  let reprob = 0
+                  for (const p of data.participantes) {
+                    const faltas = contarFaltasParticipante(p.id, contarAtrasoComoFalta)
+                    if (faltas >= umbral) reprob++
+                    else aprob++
+                  }
+                  return (
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                      <p className="text-sm font-medium text-indigo-900 mb-1">Vista previa</p>
+                      <div className="flex gap-4 text-sm">
+                        <span className="text-green-700 font-semibold">{aprob} aprobado(s)</span>
+                        <span className="text-red-700 font-semibold">{reprob} reprobado(s)</span>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  Esto sobrescribe el estatus actual de todos los participantes. Después podrás ajustar casos individuales a mano.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEstatusMasivo(false)} disabled={saving}>Cancelar</Button>
+                <Button onClick={handleAsignarEstatusMasivo} disabled={saving}>
+                  {saving ? "Asignando..." : "Asignar estatus"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

@@ -9,6 +9,7 @@ import './globals.css'
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SecurityCheckProvider } from "@/contexts/security-context";
+import { LayoutWidthProvider } from "@/contexts/layout-width-context";
 import { SecurityKeyDialog } from "@/components/SecurityKeyDialog";
 import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
 import { ServiceAcknowledgeModal } from "@/components/ServiceAcknowledgeModal";
@@ -41,7 +42,9 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <AuthProvider>
                     <SecurityCheckProvider>
+            <LayoutWidthProvider>
             <MonthProvider>{children}</MonthProvider>
+            </LayoutWidthProvider>
               <SecurityKeyDialog />
               <ServiceAcknowledgeModal />
               <PushNotificationPrompt />

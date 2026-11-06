@@ -29,6 +29,13 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Requerimiento } from "./RequerimientosBienesServicios"
+import { useColumnFilters, type FilterColumn } from "@/components/ColumnFilter"
+
+const REQ_FILTER_COLUMNS: FilterColumn<Requerimiento>[] = [
+  { key: "modulo", label: "Módulo", getValue: (r) => r.modulo?.trim() || "(Sin módulo)" },
+  { key: "solicitante", label: "Solicitante", getValue: (r) => r.persona_nombre?.trim() || "(Sin nombre)" },
+  { key: "ministerio", label: "Ministerio", getValue: (r) => r.ministerio?.trim() || "(Sin ministerio)" },
+]
 import { getSemaforoActual } from "./RequerimientosBienesServicios"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -54,6 +61,7 @@ export function AdminRequerimientos() {
   const { enviarNotificacion } = useNotificaciones()
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([])
   const [loading, setLoading] = useState(true)
+  const reqFilter = useColumnFilters(requerimientos, REQ_FILTER_COLUMNS)
   const [filtroEstado, setFiltroEstado] = useState<string>("pendiente")
   const [filtroModulo, setFiltroModulo] = useState<string>("todos")
   const [isRespondOpen, setIsRespondOpen] = useState(false)
@@ -322,9 +330,9 @@ export function AdminRequerimientos() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Fecha</TableHead>
-                  <TableHead className="text-xs">Módulo</TableHead>
-                  <TableHead className="text-xs">Solicitante</TableHead>
-                  <TableHead className="text-xs">Ministerio</TableHead>
+                  <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Módulo {reqFilter.renderFilter("modulo")}</span></TableHead>
+                  <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Solicitante {reqFilter.renderFilter("solicitante")}</span></TableHead>
+                  <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Ministerio {reqFilter.renderFilter("ministerio")}</span></TableHead>
                   <TableHead className="text-xs">Requerimiento</TableHead>
                   <TableHead className="text-xs">Valor</TableHead>
                   <TableHead className="text-xs">Estado</TableHead>
@@ -333,7 +341,7 @@ export function AdminRequerimientos() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {requerimientos.map((req) => {
+                {reqFilter.filteredRows.map((req) => {
                   const semaforo = getSemaforoActual(req)
                   return (
                   <TableRow key={req.id} className={req.respuesta === "pendiente" ? "bg-yellow-50/50" : ""}>

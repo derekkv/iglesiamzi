@@ -28,6 +28,7 @@ import { discipuladoCiclosService, CICLO_CONFIG, type CicloTipo } from "@/lib/mo
 import { proyectoMarioCiclosService, PROYECTO_MARIO_CICLO_CONFIG, type ProyectoMarioCicloTipo } from "@/lib/mod/proyecto-mario-ciclos-service"
 import { getCumpleanerosMes, getHistorialEnvios } from "@/lib/mod/cumpleanos-service"
 import { pasivosService, type Pasivo, type PasivoAbono, calcAbonado, calcSaldo, esVencido, anioDePasivo, mesDePasivo } from "@/lib/mod/pasivos-service"
+import { getConteoBautizos, getConteoMatrimonios } from "@/lib/mod/registros-pastorales-service"
 import { useMonth } from "@/contexts/month-context"
 import { getAlfoliMes } from "@/lib/mod/alfoli-service"
 
@@ -73,13 +74,13 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
 
   // Estadísticas generales
   const [statsCenso, setStatsCenso] = useState({ total: 0, miembros: 0, activos: 0 })
-  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosHoy: 0 })
+  const [statsCensoMdg, setStatsCensoMdg] = useState({ total: 0, miembros: 0, activos: 0, nuevosCreyentes: 0, nuevosMes: 0, nuevosAnio: 0, nuevosHoy: 0 })
   const [statsCensoNinos, setStatsCensoNinos] = useState({ total: 0, baby: 0, kids: 0, explores: 0, champions: 0 })
-  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosMes: 0, nuevosHoy: 0 })
+  const [statsCensoJovenes, setStatsCensoJovenes] = useState({ total: 0, miembros: 0, activos: 0, nuevos: 0, primeraVez: 0, nuevosMes: 0, nuevosAnio: 0, nuevosHoy: 0 })
   const [statsDiscipulado, setStatsDiscipulado] = useState<Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }>>({ primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } })
-  const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, censoBautizados: 0 })
-  const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, censoMatrimonios: 0 })
-  const [statsPresentaciones, setStatsPresentaciones] = useState({ total: 0, esteMes: 0 })
+  const [statsBautizos, setStatsBautizos] = useState({ total: 0, esteMes: 0, esteAnio: 0 })
+  const [statsMatrimonios, setStatsMatrimonios] = useState({ total: 0, esteMes: 0, esteAnio: 0 })
+  const [statsPresentaciones, setStatsPresentaciones] = useState({ total: 0, esteMes: 0, esteAnio: 0 })
   const [statsAtrasados, setStatsAtrasados] = useState({ total: 0, sinGestionar: 0 })
   const [statsCelulas, setStatsCelulas] = useState({ totalMiembros: 0, asistieronSemana: 0 })
   const [statsAsistenciaCulto, setStatsAsistenciaCulto] = useState({ asistieron: 0, faltaron: 0, enSeguimiento: 0, sinGestionar: 0 })
@@ -163,12 +164,15 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
     const mesActual = currentMonthEcuador(); const anioActual = currentYearEcuador()
     const primerDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-01`
     const ultimoDiaMes = `${anioActual}-${String(mesActual).padStart(2, "0")}-${String(new Date(anioActual, mesActual, 0).getDate()).padStart(2, "0")}`
+    const primerDiaAnio = `${anioActual}-01-01`
+    const ultimoDiaAnio = `${anioActual}-12-31`
     const lunesSemana = getLunesSemanaActual()
     let completed = 0; const totalTasks = 14
     const tick = () => { completed++; setLoadingProgress(Math.round((completed / totalTasks) * 100)) }
 
     const p1 = Promise.all([censoService.getAll().catch(() => []), censoMdgService.getAll().catch(() => []), censoNinosService.getAll().catch(() => []), censoJovenesService.getAll().catch(() => [])]).then(([censoData, censoMdgData, censoNinosData, censoJovenesData]) => {
       const mesActualStr = `${anioActual}-${String(mesActual).padStart(2, "0")}`
+      const anioActualStr = `${anioActual}`
       const hoyStr = todayEcuador()
       setStatsCenso({
         total: censoData.length,
@@ -181,6 +185,7 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         activos: censoMdgData.filter(c => c.miembro_activo).length,
         nuevosCreyentes: censoMdgData.filter((c: any) => c.nuevo_creyente).length,
         nuevosMes: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosAnio: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(anioActualStr)).length,
         nuevosHoy: censoMdgData.filter((c: any) => c.nuevo_creyente && c.created_at && c.created_at.startsWith(hoyStr)).length,
       })
       setStatsCensoNinos({
@@ -197,19 +202,21 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         nuevos: censoJovenesData.filter(c => c.nuevo_creyente).length,
         primeraVez: censoJovenesData.filter((c: any) => c.primera_vez_iglesia).length,
         nuevosMes: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(mesActualStr)).length,
+        nuevosAnio: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(anioActualStr)).length,
         nuevosHoy: censoJovenesData.filter((c: any) => (c.nuevo_creyente || c.primera_vez_iglesia) && c.created_at && c.created_at.startsWith(hoyStr)).length,
       })
       tick()
-      return { censoBautizados: censoData.filter(c => c.bautizo_irdd).length + censoMdgData.filter(c => c.bautizo_irdd).length, censoMatrimonios: censoData.filter(c => c.matrimonio_irdd).length + censoMdgData.filter(c => c.matrimonio_irdd).length, totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
+      return { totalCelulasMiembros: censoData.filter(c => c.celula_asiste).length + censoMdgData.filter((c: any) => c.celula_asiste).length }
     })
     const p2 = Promise.all((Object.keys(CICLO_CONFIG) as CicloTipo[]).map(tipo => discipuladoCiclosService.getCicloActivoCompleto(tipo).then(r => ({ tipo, data: r })).catch(() => ({ tipo, data: null })))).then(results => {
       const stats: Record<CicloTipo, { inscritos: number; aprobados: number; reprobados: number; enCurso: number }> = { primeros_pasos: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, seguimos_avanzando: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 }, siendo_iglesia: { inscritos: 0, aprobados: 0, reprobados: 0, enCurso: 0 } }
       for (const { tipo, data: ciclo } of results) { if (ciclo) { stats[tipo] = { inscritos: ciclo.participantes.length, aprobados: ciclo.participantes.filter(p => p.estatus === "aprobado").length, reprobados: ciclo.participantes.filter(p => p.estatus === "reprobado").length, enCurso: ciclo.participantes.filter(p => p.estatus === "en_curso").length } } }
       setStatsDiscipulado(stats); tick()
     })
-    const p3 = supabase.from("bautizos").select("id, fecha").then(res => { const d = res.data||[]; p1.then(({censoBautizados})=>{setStatsBautizos({total:d.length,esteMes:d.filter(b=>b.fecha>=primerDiaMes&&b.fecha<=ultimoDiaMes).length,censoBautizados})}); tick() })
-    const p4 = supabase.from("matrimonios").select("id, fecha").then(res => { const d = res.data||[]; p1.then(({censoMatrimonios})=>{setStatsMatrimonios({total:d.length,esteMes:d.filter(m=>m.fecha>=primerDiaMes&&m.fecha<=ultimoDiaMes).length,censoMatrimonios})}); tick() })
-    const p5 = supabase.from("presentacion_ninos").select("id, fecha").then(res => { const d = res.data||[]; setStatsPresentaciones({total:d.length,esteMes:d.filter(p=>p.fecha>=primerDiaMes&&p.fecha<=ultimoDiaMes).length}); tick() })
+    const rangoFechas = { primerDiaAnio, ultimoDiaAnio, primerDiaMes, ultimoDiaMes }
+    const p3 = getConteoBautizos(rangoFechas).then(c => { setStatsBautizos(c); tick() }).catch(() => tick())
+    const p4 = getConteoMatrimonios(rangoFechas).then(c => { setStatsMatrimonios(c); tick() }).catch(() => tick())
+    const p5 = supabase.from("presentacion_ninos").select("id, fecha").then(res => { const d = res.data||[]; setStatsPresentaciones({total:d.length,esteMes:d.filter(p=>p.fecha>=primerDiaMes&&p.fecha<=ultimoDiaMes).length,esteAnio:d.filter(p=>p.fecha>=primerDiaAnio&&p.fecha<=ultimoDiaAnio).length}); tick() })
     const p6 = supabase.from("gestion_atrasados").select("id, gestionado, fecha").gte("fecha", primerDiaMes).lte("fecha", ultimoDiaMes).then(res => { const d = res.data||[]; setStatsAtrasados({total:d.length,sinGestionar:d.filter(a=>!a.gestionado).length}); tick() })
     const p7 = supabase.from("gestion_celulas").select("id, asistio").eq("semana_inicio", lunesSemana).then(res => { const d = res.data||[]; p1.then(({totalCelulasMiembros})=>{setStatsCelulas({totalMiembros:totalCelulasMiembros,asistieronSemana:d.filter(g=>g.asistio).length})}); tick() })
     const p8 = Promise.all((Object.keys(PROYECTO_MARIO_CICLO_CONFIG) as ProyectoMarioCicloTipo[]).map(tipo => proyectoMarioCiclosService.getCicloActivoCompleto(tipo).then(r => ({ tipo, data: r })).catch(() => ({ tipo, data: null })))).then(results => {
@@ -419,7 +426,11 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
                 <p className="text-xs text-violet-700 font-semibold">Nuevos Creyentes</p>
               </div>
               <p className="text-3xl font-bold text-violet-800">{statsCensoMdg.nuevosCreyentes}</p>
-              <p className="text-[9px] text-violet-600 mt-1">Este mes: {statsCensoMdg.nuevosMes} · Hoy: {statsCensoMdg.nuevosHoy}</p>
+              <div className="mt-1 flex items-center gap-1 flex-wrap">
+                <span className="inline-flex items-center rounded bg-violet-100 text-violet-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsCensoMdg.nuevosAnio}</span>
+                <span className="inline-flex items-center rounded bg-violet-200/70 text-violet-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsCensoMdg.nuevosMes}</span>
+                <span className="inline-flex items-center rounded bg-violet-50 text-violet-600 text-[9px] font-medium px-1.5 py-0.5">Hoy: {statsCensoMdg.nuevosHoy}</span>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -427,8 +438,8 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
         {/* Fila 3: Discipulado, Bautizos, Matrimonios, Células */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card className="border-sky-200 bg-sky-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalDiscipulado(true)}><CardContent className="pt-4 pb-3"><p className="text-[10px] text-sky-600 font-medium">Discipulado</p><p className="text-2xl font-bold text-sky-800">{Object.values(statsDiscipulado).reduce((s, v) => s + v.inscritos, 0)}</p><p className="text-[9px] text-sky-500">{Object.values(statsDiscipulado).reduce((s, v) => s + v.aprobados, 0)} aprobados · {Object.values(statsDiscipulado).reduce((s, v) => s + v.enCurso, 0)} en curso</p></CardContent></Card>
-          <Card className="border-teal-200 bg-teal-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalBautizos(true)}><CardContent className="pt-4 pb-3"><p className="text-[10px] text-teal-600 font-medium">Bautizos</p><p className="text-2xl font-bold text-teal-800">{statsBautizos.censoBautizados}</p><p className="text-[9px] text-teal-500">total · {statsBautizos.esteMes > 0 ? <span className="text-teal-700 font-semibold">+{statsBautizos.esteMes} este mes</span> : <span>0 este mes</span>}</p></CardContent></Card>
-          <Card className="border-rose-200 bg-rose-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalMatrimonios(true)}><CardContent className="pt-4 pb-3"><p className="text-[10px] text-rose-600 font-medium">Matrimonios</p><p className="text-2xl font-bold text-rose-800">{statsMatrimonios.censoMatrimonios}</p><p className="text-[9px] text-rose-500">total · {statsMatrimonios.esteMes > 0 ? <span className="text-rose-700 font-semibold">+{statsMatrimonios.esteMes} este mes</span> : <span>0 este mes</span>}</p></CardContent></Card>
+          <Card className="border-teal-200 bg-teal-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalBautizos(true)}><CardContent className="pt-4 pb-3"><p className="text-[10px] text-teal-600 font-medium">Bautizos</p><p className="text-2xl font-bold text-teal-800">{statsBautizos.total}</p><div className="mt-1 flex items-center gap-1 flex-wrap"><span className="inline-flex items-center rounded bg-teal-100 text-teal-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsBautizos.esteAnio}</span><span className="inline-flex items-center rounded bg-teal-200/70 text-teal-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsBautizos.esteMes}</span></div></CardContent></Card>
+          <Card className="border-rose-200 bg-rose-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalMatrimonios(true)}><CardContent className="pt-4 pb-3"><p className="text-[10px] text-rose-600 font-medium">Matrimonios</p><p className="text-2xl font-bold text-rose-800">{statsMatrimonios.total}</p><div className="mt-1 flex items-center gap-1 flex-wrap"><span className="inline-flex items-center rounded bg-rose-100 text-rose-700 text-[9px] font-semibold px-1.5 py-0.5">Año: {statsMatrimonios.esteAnio}</span><span className="inline-flex items-center rounded bg-rose-200/70 text-rose-800 text-[9px] font-semibold px-1.5 py-0.5">Mes: {statsMatrimonios.esteMes}</span></div></CardContent></Card>
           <Card className="border-emerald-200 bg-emerald-50/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setModalCelulas(true)}><CardContent className="pt-4 pb-3"><div className="flex items-center gap-1"><Home className="w-3 h-3 text-emerald-600" /><p className="text-[10px] text-emerald-600 font-medium">Células</p></div><p className="text-2xl font-bold text-emerald-800">{statsCelulas.totalMiembros}</p><p className="text-[9px] text-emerald-500">miembros · {statsCelulas.asistieronSemana} esta semana</p></CardContent></Card>
         </div>
 
@@ -869,10 +880,11 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-teal-700">💧 Bautizos</DialogTitle>
-              <DialogDescription>Total bautizados: {statsBautizos.censoBautizados}</DialogDescription>
+              <DialogDescription>Total bautizados: {statsBautizos.total}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-teal-50 rounded"><span>Total Bautizados (censo)</span><span className="font-bold text-teal-700">{statsBautizos.censoBautizados}</span></div>
+              <div className="flex justify-between p-3 bg-teal-50 rounded"><span>Total Bautizados</span><span className="font-bold text-teal-700">{statsBautizos.total}</span></div>
+              <div className="flex justify-between p-3 bg-teal-50/60 rounded"><span>Bautizos este año</span><span className="font-bold text-teal-700">{statsBautizos.esteAnio}</span></div>
               <div className="flex justify-between p-3 bg-green-50 rounded"><span>Bautizos este mes</span><span className="font-bold text-green-700">{statsBautizos.esteMes}</span></div>
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/bautizo")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Bautizos</Button>
@@ -883,10 +895,11 @@ function PastoralContent({ canEdit }: { canEdit: boolean }) {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-rose-700">💒 Matrimonios</DialogTitle>
-              <DialogDescription>Total matrimonios: {statsMatrimonios.censoMatrimonios}</DialogDescription>
+              <DialogDescription>Total matrimonios: {statsMatrimonios.total}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-rose-50 rounded"><span>Total Matrimonios (censo)</span><span className="font-bold text-rose-700">{statsMatrimonios.censoMatrimonios}</span></div>
+              <div className="flex justify-between p-3 bg-rose-50 rounded"><span>Total Matrimonios</span><span className="font-bold text-rose-700">{statsMatrimonios.total}</span></div>
+              <div className="flex justify-between p-3 bg-rose-50/60 rounded"><span>Matrimonios este año</span><span className="font-bold text-rose-700">{statsMatrimonios.esteAnio}</span></div>
               <div className="flex justify-between p-3 bg-green-50 rounded"><span>Matrimonios este mes</span><span className="font-bold text-green-700">{statsMatrimonios.esteMes}</span></div>
             </div>
             <Button className="w-full mt-4" onClick={() => router.push("/dashboard/matrimonio")}><ExternalLink className="w-4 h-4 mr-2" /> Ir a Matrimonios</Button>

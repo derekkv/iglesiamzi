@@ -28,8 +28,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Send, Clock, CheckCircle, XCircle, PauseCircle, Eye, Lock, Pencil, History, Trash2 } from "lucide-react"
+import { Plus, Send, Clock, CheckCircle, XCircle, PauseCircle, Eye, Lock, Pencil, History, Trash2, FilterX } from "lucide-react"
 import { toast } from "sonner"
+import { useColumnFilters, type FilterColumn } from "@/components/ColumnFilter"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -461,6 +462,10 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
     : activeTab === "respondidos" ? respondidos
     : editados
 
+  const listFilter = useColumnFilters<Requerimiento>(currentList, [
+    { key: "ministerio", label: "Ministerio", getValue: (r) => r.ministerio?.trim() || "(Sin ministerio)" },
+    { key: "solicitante", label: "Solicitante", getValue: (r) => r.persona_nombre?.trim() || "(Sin nombre)" },
+  ])
   return (
     <div className="space-y-4">
       {/* Header con stats y botón crear */}
@@ -520,8 +525,8 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-xs">Fecha</TableHead>
-                      <TableHead className="text-xs">Ministerio</TableHead>
-                      <TableHead className="text-xs">Solicitante</TableHead>
+                      <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Ministerio {listFilter.renderFilter("ministerio")}</span></TableHead>
+                      <TableHead className="text-xs"><span className="inline-flex items-center gap-1">Solicitante {listFilter.renderFilter("solicitante")}</span></TableHead>
                       <TableHead className="text-xs">Requerimiento</TableHead>
                       <TableHead className="text-xs">Valor</TableHead>
                       <TableHead className="text-xs">Estado</TableHead>
@@ -530,7 +535,7 @@ export function RequerimientosBienesServicios({ modulo, canEdit }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentList.map((req) => {
+                    {listFilter.filteredRows.map((req) => {
                       const semaforo = getSemaforoActual(req)
                       return (
                       <TableRow key={req.id} className={req.updated_at !== req.created_at ? "bg-blue-50/30" : ""}>
