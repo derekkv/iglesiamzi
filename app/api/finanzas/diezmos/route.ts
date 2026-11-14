@@ -11,9 +11,10 @@
  *   update: { id, updates: {...}, usuario: {id, nombre} }
  *   delete: { id, usuario: {id, nombre} }
  *
- * El "ingreso vinculado" se identifica por:
- *   concepto = "auto-diezmo", detalle = "{TipoLabel} - {donador}", mes_id.
- * Solo existe cuando transaccion === "transferencia".
+ * El "ingreso vinculado" se identifica por (concepto = "auto-diezmo", detalle,
+ * mes_id) y solo existe cuando `transaccion === "transferencia"`. El detalle y
+ * el payload los construye `lib/server/diezmos-ingreso.ts`, compartido con el
+ * detector de discrepancias.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -25,12 +26,12 @@ import {
   deleteMovimientoVinculado,
   logAuditServer,
 } from "@/lib/server/finanzas-sync"
-
-const TIPO_LABEL: Record<string, string> = {
-  diezmo: "Diezmo",
-  primicia: "Primicia",
-  diezmo_especial: "Ofrenda Especial",
-}
+import {
+  descripcionDiezmo,
+  detalleIngresoDiezmo,
+  ingresoInputDesdeDiezmo,
+} from "@/lib/server/diezmos-ingreso"
+import { etiquetaTipoOfrenda, type TipoOfrenda } from "@/lib/mod/diezmos-tipos"
 
 interface DiezmoPayload {
   mes_id: string
@@ -38,32 +39,8 @@ interface DiezmoPayload {
   fecha: string
   donador: string
   valor: number
-  tipo_ofrenda: "diezmo" | "primicia" | "diezmo_especial"
+  tipo_ofrenda: TipoOfrenda
   transaccion: "efectivo" | "transferencia"
-}
-
-/** Construye el input de ingreso vinculado para un diezmo por transferencia. */
-function ingresoInputFromDiezmo(d: {
-  mes_id: string
-  numero: number
-  fecha: string
-  donador: string
-  valor: number
-  tipo_ofrenda: string
-}) {
-  const tipoLabel = TIPO_LABEL[d.tipo_ofrenda] || "Diezmo"
-  return {
-    mes_id: d.mes_id,
-    concepto: "auto-diezmo",
-    monto: d.valor,
-    fecha: d.fecha,
-    ministerio: "Administración",
-    categoria_principal: "Ingresos x Ofrendas, Diezmo y Primicias",
-    detalle: `${tipoLabel} - ${d.donador}`,
-    observacion: `Registrado automáticamente desde módulo Diezmos (#${d.numero})`,
-    estado: "Procesado",
-    metodo_pago: "Transferencia",
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -117,7 +94,7 @@ export async function POST(request: NextRequest) {
       // 2. Ingreso vinculado (solo transferencia) — con rollback si falla
       if (diezmo.transaccion === "transferencia") {
         try {
-          await upsertMovimientoVinculado("ingresos", ingresoInputFromDiezmo(creado))
+          await upsertMovimientoVinculado("ingresos", ingresoInputDesdeDiezmo(creado))
         } catch (syncErr: any) {
           // Rollback: eliminar el diezmo recién creado para no dejar descuadre
           await db.from("diezmos").delete().eq("id", creado.id)
@@ -132,7 +109,7 @@ export async function POST(request: NextRequest) {
         user_name: usuarioNombre,
         module: "diezmos",
         action: "crear",
-        description: `${TIPO_LABEL[creado.tipo_ofrenda] || "Diezmo"} #${creado.numero} - ${creado.donador} ($${creado.valor}) [${creado.transaccion}]`,
+        description: descripcionDiezmo(creado),
         details: {
           numero: creado.numero, fecha: creado.fecha, donador: creado.donador,
           valor: creado.valor, tipo_ofrenda: creado.tipo_ofrenda,
@@ -170,15 +147,19 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Sincronizar ingreso vinculado según transición de transacción.
-      //    keyDetalle = detalle ANTERIOR (por si cambió el donador/tipo).
-      const oldLabel = TIPO_LABEL[antes.tipo_ofrenda] || "Diezmo"
-      const oldDetalle = `${oldLabel} - ${antes.donador}`
+      //    La clave de búsqueda usa el donador y el tipo ANTERIORES, por si
+      //    cambiaron: así se actualiza el ingreso que ya existe en lugar de
+      //    crear otro y duplicar el dinero.
+      const oldDetalle = detalleIngresoDiezmo(despues, {
+        donador: antes.donador,
+        tipo_ofrenda: antes.tipo_ofrenda,
+      })
       try {
         if (despues.transaccion === "transferencia") {
           // Crear o actualizar el ingreso vinculado
           await upsertMovimientoVinculado(
             "ingresos",
-            ingresoInputFromDiezmo(despues),
+            ingresoInputDesdeDiezmo(despues),
             oldDetalle,
           )
         } else {
@@ -206,7 +187,7 @@ export async function POST(request: NextRequest) {
         user_name: usuarioNombre,
         module: "diezmos",
         action: "editar",
-        description: `Diezmo #${despues.numero} - ${despues.donador}`,
+        description: descripcionDiezmo(despues),
         details: {
           antes: { numero: antes.numero, fecha: antes.fecha, donador: antes.donador, valor: antes.valor },
           despues: { numero: despues.numero, fecha: despues.fecha, donador: despues.donador, valor: despues.valor },
@@ -232,10 +213,9 @@ export async function POST(request: NextRequest) {
 
       // Eliminar ingreso vinculado si era transferencia
       if (actual && actual.transaccion === "transferencia") {
-        const tipoLabel = TIPO_LABEL[actual.tipo_ofrenda] || "Diezmo"
         await deleteMovimientoVinculado("ingresos", {
           concepto: "auto-diezmo",
-          detalle: `${tipoLabel} - ${actual.donador}`,
+          detalle: detalleIngresoDiezmo(actual),
           mes_id: actual.mes_id,
         })
       }
@@ -245,8 +225,17 @@ export async function POST(request: NextRequest) {
         user_name: usuarioNombre,
         module: "diezmos",
         action: "eliminar",
-        description: `Diezmo #${actual?.numero} - ${actual?.donador}`,
-        details: { id, numero: actual?.numero, donador: actual?.donador, valor: actual?.valor },
+        description: actual
+          ? descripcionDiezmo(actual)
+          : `Registro de diezmos #${id}`,
+        details: {
+          id,
+          numero: actual?.numero,
+          donador: actual?.donador,
+          valor: actual?.valor,
+          tipo_ofrenda: actual?.tipo_ofrenda,
+          tipo: actual ? etiquetaTipoOfrenda(actual.tipo_ofrenda) : undefined,
+        },
       })
 
       return NextResponse.json({ ok: true })

@@ -59,6 +59,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSecurityCheck } from "@/contexts/security-context"
 import { todayEcuador } from "@/lib/timezone"
 import { getAlfoliMes } from "@/lib/mod/alfoli-service"
+import { TIPOS_OFRENDA, valorTipoOfrenda } from "@/lib/mod/diezmos-tipos"
 import { supabase } from "@/lib/secure-db"
 
 interface FinancialRecord {
@@ -125,9 +126,12 @@ const [gruposMinisterio, setGruposMinisterio] = useState<string[]>([])
 // Totales consolidados de otros módulos
 const [totalCelulas, setTotalCelulas] = useState(0)
 const [totalAlfoli, setTotalAlfoli] = useState(0)
-const [totalDiezmosTransferencia, setTotalDiezmosTransferencia] = useState(0)
-const [totalPrimicias, setTotalPrimicias] = useState(0)
-const [totalDiezmoEspecial, setTotalDiezmoEspecial] = useState(0)
+/**
+ * Totales por tipo de ofrenda (solo transferencia), que son los que ya tienen
+ * su fila en `ingresos` como "auto-diezmo". Es un mapa y no una variable por
+ * tipo para que un tipo nuevo del catálogo aparezca sin tocar esta pantalla.
+ */
+const [totalesOfrenda, setTotalesOfrenda] = useState<Record<string, number>>({})
 const handleDeleteClick = (record: FinancialRecord) => {
   if (!canEdit) {
     setError("No tiene permiso de edición en este módulo");
@@ -225,18 +229,16 @@ const handleDeleteClick = (record: FinancialRecord) => {
       const celulasTotal = (celulasResult.data || []).reduce((sum: number, r: any) => sum + Number(r.valor), 0)
       setTotalCelulas(celulasTotal)
 
-      // Total Diezmos solo transferencia del mes
+      // Totales por tipo de ofrenda, solo transferencia (lo que llega a ingresos).
+      // `tipo_ofrenda` nulo cuenta como diezmo, igual que en el módulo.
       const diezmosData = diezmosResult.data || []
-      const diezmosTotal = diezmosData.filter((r: any) => !r.tipo_ofrenda || r.tipo_ofrenda === "diezmo").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
-      setTotalDiezmosTransferencia(diezmosTotal)
-
-      // Total Primicias (transferencia) del mes
-      const primiciasTotal = diezmosData.filter((r: any) => r.tipo_ofrenda === "primicia").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
-      setTotalPrimicias(primiciasTotal)
-
-      // Total Ofrenda Especial (transferencia) del mes
-      const especialTotal = diezmosData.filter((r: any) => r.tipo_ofrenda === "diezmo_especial").reduce((sum: number, r: any) => sum + Number(r.valor), 0)
-      setTotalDiezmoEspecial(especialTotal)
+      const porTipo: Record<string, number> = {}
+      for (const def of TIPOS_OFRENDA) porTipo[def.valor] = 0
+      for (const fila of diezmosData as any[]) {
+        const tipo = valorTipoOfrenda(fila.tipo_ofrenda)
+        porTipo[tipo] = (porTipo[tipo] || 0) + Number(fila.valor || 0)
+      }
+      setTotalesOfrenda(porTipo)
     } catch (error) {
       console.error("Error loading consolidated totals:", error)
     }
@@ -946,36 +948,19 @@ function formatDateForTable(dateString: string) {
               </div>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-lg font-bold text-teal-600">${totalDiezmosTransferencia.toLocaleString()}</p>
-                <p className="text-xs text-gray-600">Diezmos</p>
-                <p className="text-[10px] text-gray-400">Transferencia</p>
-                <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-lg font-bold text-fuchsia-600">${totalPrimicias.toLocaleString()}</p>
-                <p className="text-xs text-gray-600">Primicias</p>
-                <p className="text-[10px] text-gray-400">Transferencia</p>
-                <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-lg font-bold text-rose-600">${totalDiezmoEspecial.toLocaleString()}</p>
-                <p className="text-xs text-gray-600">Ofrenda Especial</p>
-                <p className="text-[10px] text-gray-400">Transferencia</p>
-                <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Una tarjeta por tipo de ofrenda con movimiento en el mes */}
+          {TIPOS_OFRENDA.filter((def) => (totalesOfrenda[def.valor] || 0) > 0).map((def) => (
+            <Card key={def.valor} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/diezmos")}>
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <p className={`text-lg font-bold ${def.monto}`}>${(totalesOfrenda[def.valor] || 0).toLocaleString()}</p>
+                  <p className="text-xs text-gray-600">{def.corto}</p>
+                  <p className="text-[10px] text-gray-400">Transferencia</p>
+                  <p className="text-[9px] text-green-600 mt-0.5">✓ Ya en ingresos</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
@@ -989,7 +974,7 @@ function formatDateForTable(dateString: string) {
               <div className="text-center">
                 <p className="text-lg font-bold text-blue-600">${(totalIngresos + totalCelulas + totalAlfoli).toLocaleString()}</p>
                 <p className="text-xs text-gray-600">Total Ingresos</p>
-                <p className="text-[9px] text-gray-400 mt-0.5">Incluye diezmos, primicias y ofrendas esp.</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">Incluye diezmos, ofrendas y actividades</p>
               </div>
             </CardContent>
           </Card>
@@ -1054,9 +1039,11 @@ function formatDateForTable(dateString: string) {
                     const ingresosData = [
                       { label: "Ofrendas Células", monto: totalCelulas, color: "bg-purple-500" },
                       { label: "Alfolí", monto: totalAlfoli, color: "bg-indigo-500" },
-                      { label: "Diezmos (Transf.)", monto: totalDiezmosTransferencia, color: "bg-teal-500" },
-                      { label: "Primicias (Transf.)", monto: totalPrimicias, color: "bg-fuchsia-500" },
-                      { label: "Ofrenda Especial (Transf.)", monto: totalDiezmoEspecial, color: "bg-rose-500" },
+                      ...TIPOS_OFRENDA.map((def) => ({
+                        label: `${def.label} (Transf.)`,
+                        monto: totalesOfrenda[def.valor] || 0,
+                        color: def.barra,
+                      })),
                       { label: "Ingresos Módulo", monto: totalIngresos, color: "bg-green-500" },
                     ].filter(d => d.monto > 0)
 

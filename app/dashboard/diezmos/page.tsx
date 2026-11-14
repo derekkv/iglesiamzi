@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { PermissionsGuard } from "@/lib/permissions-guard"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -27,12 +27,18 @@ import { useSecurityCheck } from "@/contexts/security-context"
 import { useSortOrder } from "@/hooks/use-sort-order"
 import { SortToggleButton } from "@/components/SortToggleButton"
 import { diezmosService, type DiezmoRecord, type DiezmoWithMonth } from "@/lib/mod/diezmos-service"
+import {
+  GRUPOS_OFRENDA,
+  TIPOS_OFRENDA,
+  tipoOfrenda,
+  tiposDelGrupo,
+  type GrupoOfrenda,
+  type TipoOfrenda,
+} from "@/lib/mod/diezmos-tipos"
 import { todayEcuador } from "@/lib/timezone"
 import { toast } from "sonner"
 
-type TipoOfrenda = "diezmo" | "primicia" | "diezmo_especial"
-const TIPO_LABELS: Record<TipoOfrenda, string> = { diezmo: "Diezmo", primicia: "Primicia", diezmo_especial: "Ofrenda Especial" }
-const TIPO_COLORS: Record<TipoOfrenda, string> = { diezmo: "bg-blue-100 text-blue-800 border-blue-200", primicia: "bg-purple-100 text-purple-800 border-purple-200", diezmo_especial: "bg-rose-100 text-rose-800 border-rose-200" }
+const GRUPOS: GrupoOfrenda[] = ["ofrendas", "actividades"]
 
 
 function DiezmosContent({ canEdit }: { canEdit: boolean }) {
@@ -143,7 +149,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
 
   // Filtrar registros
   const filtered = records.filter(r => {
-    if (filterTipo !== "todos" && r.tipo_ofrenda !== filterTipo) return false
+    if (filterTipo !== "todos" && tipoOfrenda(r.tipo_ofrenda).valor !== filterTipo) return false
     if (filterTransaccion !== "todos" && r.transaccion !== filterTransaccion) return false
     return true
   }).sort((a, b) => {
@@ -151,13 +157,30 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
     return sortAsc ? diff : -diff
   })
 
-  // Totales
-  const totalDiezmoTransf = records.filter(r => (r.tipo_ofrenda === "diezmo" || !r.tipo_ofrenda) && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
-  const totalDiezmoEfectivo = records.filter(r => (r.tipo_ofrenda === "diezmo" || !r.tipo_ofrenda) && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
-  const totalPrimiciaTransf = records.filter(r => r.tipo_ofrenda === "primicia" && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
-  const totalPrimiciaEfectivo = records.filter(r => r.tipo_ofrenda === "primicia" && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
-  const totalEspecialTransf = records.filter(r => r.tipo_ofrenda === "diezmo_especial" && r.transaccion === "transferencia").reduce((s, r) => s + Number(r.valor), 0)
-  const totalEspecialEfectivo = records.filter(r => r.tipo_ofrenda === "diezmo_especial" && r.transaccion === "efectivo").reduce((s, r) => s + Number(r.valor), 0)
+  /**
+   * Totales por tipo y forma de transacción, calculados sobre el catálogo en
+   * vez de con una constante por combinación: con siete tipos serían catorce
+   * constantes y bastaba olvidar una para que un tipo no apareciera en los
+   * resúmenes.
+   */
+  const totalDe = (tipo: TipoOfrenda, transaccion?: "efectivo" | "transferencia") =>
+    records
+      .filter((r) => tipoOfrenda(r.tipo_ofrenda).valor === tipo)
+      .filter((r) => !transaccion || r.transaccion === transaccion)
+      .reduce((s, r) => s + Number(r.valor), 0)
+
+  const resumenPorTipo = TIPOS_OFRENDA.map((def) => ({
+    def,
+    transferencia: totalDe(def.valor, "transferencia"),
+    efectivo: totalDe(def.valor, "efectivo"),
+    total: totalDe(def.valor),
+  }))
+
+  const totalDeGrupo = (grupo: GrupoOfrenda, campo: "transferencia" | "efectivo" | "total") =>
+    resumenPorTipo
+      .filter((r) => r.def.grupo === grupo)
+      .reduce((s, r) => s + r[campo], 0)
+
   const totalGeneral = records.reduce((s, r) => s + Number(r.valor), 0)
   const totalSearchResults = searchResults.reduce((s, r) => s + Number(r.valor), 0)
 
@@ -185,7 +208,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                 <ArrowLeft className="w-4 h-4" /><span>Volver</span>
               </Button>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Diezmos y Primicias</h1>
+                <h1 className="text-xl font-semibold text-gray-900">Diezmos, ofrendas y actividades</h1>
                 <p className="text-sm text-gray-600">Mes: {currentMonth?.name}</p>
               </div>
             </div>
@@ -206,24 +229,67 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
           </TabsList>
 
           <TabsContent value="mes" className="space-y-6">
-            {/* Stats */}
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-green-600">${totalDiezmoTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Diezmo Transf.</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-amber-600">${totalDiezmoEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Diezmo Efectivo</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-purple-600">${totalPrimiciaTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Primicia Transf.</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-purple-400">${totalPrimiciaEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Primicia Efectivo</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-rose-600">${totalEspecialTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Ofrenda Esp. Transf.</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-rose-400">${totalEspecialEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Ofrenda Esp. Efectivo</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-lg font-bold text-blue-600">${totalGeneral.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</p><p className="text-xs text-gray-500">Total General</p></CardContent></Card>
-            </div>
+            {/* Totales por grupo: diezmos y ofrendas arriba, actividades abajo */}
+            {GRUPOS.map((grupo) => {
+              const delGrupo = resumenPorTipo.filter((r) => r.def.grupo === grupo)
+              return (
+                <div key={grupo} className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                      {GRUPOS_OFRENDA[grupo]}
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Transferencia ${totalDeGrupo(grupo, "transferencia").toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                      {" · "}
+                      Efectivo ${totalDeGrupo(grupo, "efectivo").toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                      {" · "}
+                      <span className="font-semibold text-gray-700">
+                        Total ${totalDeGrupo(grupo, "total").toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                    {delGrupo.map(({ def, transferencia, efectivo, total }) => (
+                      <Card key={def.valor}>
+                        <CardContent className="p-4">
+                          <p className="text-xs font-medium text-gray-700">{def.corto}</p>
+                          <p className={`text-lg font-bold ${def.monto}`}>
+                            ${total.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Transf. ${transferencia.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Efectivo ${efectivo.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-4 flex items-baseline justify-between">
+                <p className="text-sm font-medium text-blue-900">Total general del mes</p>
+                <p className="text-xl font-bold text-blue-700">
+                  ${totalGeneral.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+                </p>
+              </CardContent>
+            </Card>
 
             {/* Filtros */}
             <div className="flex flex-wrap gap-3">
               <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white">
                 <option value="todos">Todos los tipos</option>
-                <option value="diezmo">Diezmo</option>
-                <option value="primicia">Primicia</option>
-                <option value="diezmo_especial">Ofrenda Especial</option>
+                {GRUPOS.map((grupo) => (
+                  <optgroup key={grupo} label={GRUPOS_OFRENDA[grupo]}>
+                    {tiposDelGrupo(grupo).map((def) => (
+                      <option key={def.valor} value={def.valor}>{def.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
               <select value={filterTransaccion} onChange={(e) => setFilterTransaccion(e.target.value)} className="h-9 px-3 rounded-md border border-gray-200 text-sm bg-white">
                 <option value="todos">Todas las transacciones</option>
@@ -265,7 +331,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                             <td className="border border-gray-300 px-3 py-1.5">{formatDate(record.fecha)}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{record.donador}</td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center">
-                              <Badge className={`text-xs ${TIPO_COLORS[record.tipo_ofrenda || "diezmo"]}`}>{TIPO_LABELS[record.tipo_ofrenda || "diezmo"]}</Badge>
+                              <Badge className={`text-xs ${tipoOfrenda(record.tipo_ofrenda).badge}`}>{tipoOfrenda(record.tipo_ofrenda).label}</Badge>
                             </td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center">
                               <Badge className={`text-xs ${record.transaccion === "transferencia" ? "bg-green-100 text-green-800 border-green-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>{record.transaccion === "transferencia" ? "Transferencia" : "Efectivo"}</Badge>
@@ -283,45 +349,49 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-green-50 font-semibold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Diezmo Transferencia:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Transf.</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalDiezmoTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                          {canEdit && <td className="border border-gray-300"></td>}
-                        </tr>
-                        <tr className="bg-amber-50 font-semibold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Diezmo Efectivo:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Efectivo</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalDiezmoEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                          {canEdit && <td className="border border-gray-300"></td>}
-                        </tr>
-                        <tr className="bg-purple-50 font-semibold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Primicia Transferencia:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">Transf.</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalPrimiciaTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                          {canEdit && <td className="border border-gray-300"></td>}
-                        </tr>
-                        <tr className="bg-purple-50/50 font-semibold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Primicia Efectivo:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Efectivo</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalPrimiciaEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                          {canEdit && <td className="border border-gray-300"></td>}
-                        </tr>
-                        <tr className="bg-rose-50 font-semibold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Ofrenda Especial Transferencia:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Transf.</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalEspecialTransf.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                          {canEdit && <td className="border border-gray-300"></td>}
-                        </tr>
-                        <tr className="bg-rose-50/50 font-semibold text-sm">
-                          <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">Ofrenda Especial Efectivo:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Efectivo</Badge></td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalEspecialEfectivo.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
-                          {canEdit && <td className="border border-gray-300"></td>}
-                        </tr>
+                        {/* Un renglón por tipo y transacción, generado del catálogo */}
+                        {GRUPOS.map((grupo) => {
+                          const delGrupo = resumenPorTipo.filter(
+                            (r) => r.def.grupo === grupo && (r.transferencia > 0 || r.efectivo > 0),
+                          )
+                          if (delGrupo.length === 0) return null
+
+                          return [
+                            <tr key={`${grupo}-cabecera`} className="bg-gray-100 text-xs uppercase tracking-wide text-gray-600">
+                              <td colSpan={canEdit ? 7 : 6} className="border border-gray-300 px-3 py-1">
+                                {GRUPOS_OFRENDA[grupo]}
+                              </td>
+                            </tr>,
+                            ...delGrupo.flatMap(({ def, transferencia, efectivo }) =>
+                              [
+                                transferencia > 0 ? (
+                                  <tr key={`${def.valor}-transf`} className="bg-green-50 font-semibold text-sm">
+                                    <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">{def.label} transferencia:</td>
+                                    <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Transf.</Badge></td>
+                                    <td className="border border-gray-300 px-3 py-1.5 text-right">${transferencia.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</td>
+                                    {canEdit && <td className="border border-gray-300"></td>}
+                                  </tr>
+                                ) : null,
+                                efectivo > 0 ? (
+                                  <tr key={`${def.valor}-efectivo`} className="bg-amber-50 font-semibold text-sm">
+                                    <td colSpan={4} className="border border-gray-300 px-3 py-1.5 text-right">{def.label} efectivo:</td>
+                                    <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Efectivo</Badge></td>
+                                    <td className="border border-gray-300 px-3 py-1.5 text-right">${efectivo.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</td>
+                                    {canEdit && <td className="border border-gray-300"></td>}
+                                  </tr>
+                                ) : null,
+                              ].filter(Boolean),
+                            ),
+                            <tr key={`${grupo}-subtotal`} className="bg-gray-50 font-semibold text-sm">
+                              <td colSpan={5} className="border border-gray-300 px-3 py-1.5 text-right">Subtotal {GRUPOS_OFRENDA[grupo].toLowerCase()}:</td>
+                              <td className="border border-gray-300 px-3 py-1.5 text-right">${totalDeGrupo(grupo, "total").toLocaleString("es-EC", { minimumFractionDigits: 2 })}</td>
+                              {canEdit && <td className="border border-gray-300"></td>}
+                            </tr>,
+                          ]
+                        })}
                         <tr className="bg-blue-50 font-bold text-sm">
                           <td colSpan={5} className="border border-gray-300 px-3 py-1.5 text-right">TOTAL GENERAL:</td>
-                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalGeneral.toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
+                          <td className="border border-gray-300 px-3 py-1.5 text-right">${totalGeneral.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</td>
                           {canEdit && <td className="border border-gray-300"></td>}
                         </tr>
                       </tfoot>
@@ -372,7 +442,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                             <td className="border border-gray-300 px-3 py-1.5">{record.mes_name}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{formatDate(record.fecha)}</td>
                             <td className="border border-gray-300 px-3 py-1.5">{record.donador}</td>
-                            <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className={`text-xs ${TIPO_COLORS[record.tipo_ofrenda || "diezmo"]}`}>{TIPO_LABELS[record.tipo_ofrenda || "diezmo"]}</Badge></td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className={`text-xs ${tipoOfrenda(record.tipo_ofrenda).badge}`}>{tipoOfrenda(record.tipo_ofrenda).label}</Badge></td>
                             <td className="border border-gray-300 px-3 py-1.5 text-center"><Badge className={`text-xs ${record.transaccion === "transferencia" ? "bg-green-100 text-green-800 border-green-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>{record.transaccion === "transferencia" ? "Transferencia" : "Efectivo"}</Badge></td>
                             <td className="border border-gray-300 px-3 py-1.5 text-right font-medium">${Number(record.valor).toLocaleString("es-CO", { minimumFractionDigits: 2 })}</td>
                           </tr>
@@ -393,7 +463,7 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
         {/* Dialog: Agregar */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Registrar Diezmo / Primicia</DialogTitle><DialogDescription>Ingrese los datos</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Registrar ofrenda o actividad</DialogTitle><DialogDescription>Ingrese los datos</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <div><Label>Fecha</Label><SmartDateInput value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /></div>
               <div><Label>Donante</Label><Input placeholder="Nombre del donante" value={form.donador} onChange={(e) => setForm({ ...form, donador: e.target.value })} /></div>
@@ -403,9 +473,14 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                 <Select value={form.tipo_ofrenda} onValueChange={(v) => setForm({ ...form, tipo_ofrenda: v as TipoOfrenda })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="diezmo">Diezmo</SelectItem>
-                    <SelectItem value="primicia">Primicia</SelectItem>
-                    <SelectItem value="diezmo_especial">Ofrenda Especial</SelectItem>
+                    {GRUPOS.map((grupo) => (
+                      <SelectGroup key={grupo}>
+                        <SelectLabel>{GRUPOS_OFRENDA[grupo]}</SelectLabel>
+                        {tiposDelGrupo(grupo).map((def) => (
+                          <SelectItem key={def.valor} value={def.valor}>{def.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -440,9 +515,14 @@ function DiezmosContent({ canEdit }: { canEdit: boolean }) {
                 <Select value={form.tipo_ofrenda} onValueChange={(v) => setForm({ ...form, tipo_ofrenda: v as TipoOfrenda })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="diezmo">Diezmo</SelectItem>
-                    <SelectItem value="primicia">Primicia</SelectItem>
-                    <SelectItem value="diezmo_especial">Ofrenda Especial</SelectItem>
+                    {GRUPOS.map((grupo) => (
+                      <SelectGroup key={grupo}>
+                        <SelectLabel>{GRUPOS_OFRENDA[grupo]}</SelectLabel>
+                        {tiposDelGrupo(grupo).map((def) => (
+                          <SelectItem key={def.valor} value={def.valor}>{def.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
