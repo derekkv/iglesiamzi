@@ -7,11 +7,20 @@
  * - Si una tabla requiere "any" → cualquier usuario autenticado puede acceder
  * - Si una tabla no está listada → acceso bloqueado
  * - Para escritura (INSERT/UPDATE/DELETE) se requiere can_edit en el módulo
+ * - `readOnlyModules` concede SOLO lectura: nunca habilita escritura
  */
 
 export interface TableAccess {
   /** Módulo(s) que dan acceso. "any" = cualquier usuario autenticado */
   modules: string[] | "any"
+  /**
+   * Módulos que solo pueden LEER la tabla (SELECT). Nunca habilitan
+   * INSERT/UPDATE/DELETE, ni siquiera con `can_edit` o `can_admin`.
+   *
+   * Existe para el módulo `listados`, que necesita leer tablas de otros
+   * dominios para generar informes sin poder modificarlas.
+   */
+  readOnlyModules?: string[]
   /** Si true, requiere can_edit para escritura. Default: true */
   requireEditForWrite?: boolean
   /** Si true, requiere can_admin para DELETE. Default: false */
@@ -103,9 +112,11 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   // === GESTIÓN DE CÉLULAS ===
   gestion_celulas: {
     modules: ["celulas", "ofrenda-celulas", "control_mensual", "resumen-pastoral"],
+    readOnlyModules: ["listados"],
   },
   miembros_celulas: {
     modules: ["celulas"],
+    readOnlyModules: ["listados"],
   },
 
   // === CRONOGRAMA Y ASISTENCIA ===
@@ -167,6 +178,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   censo_ninos: {
     modules: ["censo-ninos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
   censo_ninos_archivos: {
     modules: ["censo-ninos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions"],
@@ -175,6 +187,7 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   censo_jovenes: {
     modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo", "control_mensual", "resumen-pastoral", "asistencia_culto"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
   censo_jovenes_archivos: {
     modules: ["censo-jovenes", "censo-mdg", "censo-jovenes-mdg", "censo-jovenes-protocolo"],
@@ -202,12 +215,14 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   },
   bautizos_manual: {
     modules: ["bautizo"],
+    readOnlyModules: ["listados"],
   },
   matrimonios: {
     modules: ["matrimonio", "control_mensual", "resumen-pastoral"],
   },
   matrimonios_manual: {
     modules: ["matrimonio"],
+    readOnlyModules: ["listados"],
   },
   presentacion_ninos: {
     modules: ["presentacion-ninos", "listados", "control_mensual", "resumen-pastoral"],
@@ -259,30 +274,36 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   herederos_ciclos: {
     modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
   herederos_ciclo_participantes: {
     modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
   herederos_ciclo_fechas: {
     modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
   herederos_ciclo_asistencia: {
     modules: ["herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions", "historial_herederos", "consolidacion_herederos"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
 
   // === CONSOLIDACIÓN HEREDEROS ===
   consolidacion_herederos: {
     modules: ["consolidacion_herederos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions"],
     requireEditForWrite: false,
+    readOnlyModules: ["listados"],
   },
 
   // === REPORTE DE INCIDENCIAS HEREDEROS ===
   reporte_incidencias_herederos: {
     modules: ["reporte_incidencias_herederos", "herederos_baby", "herederos_kids", "herederos_explores", "herederos_champions"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
 
   // === MENSAJES Y CITACIONES ===
@@ -509,15 +530,18 @@ export const TABLE_ACCESS_MAP: Record<string, TableAccess> = {
   encuentro_participantes: {
     modules: ["eventos_encuentro"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
   eventos_tabs: {
     modules: ["eventos_encuentro", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
     requireAdminForDelete: true,
+    readOnlyModules: ["listados"],
   },
   evento_participantes: {
     modules: ["eventos_encuentro", "control_mensual", "resumen-pastoral"],
     requireEditForWrite: true,
+    readOnlyModules: ["listados"],
   },
 
   // === NOTIFICACIONES ===
@@ -593,7 +617,17 @@ export function checkTableAccess(
 
   // Verificar que el usuario tenga acceso a al menos uno de los módulos requeridos
   const hasModuleAccess = access.modules.some((m) => userModules.includes(m))
+
   if (!hasModuleAccess) {
+    // Los módulos de solo lectura habilitan SELECT y nada más.
+    const hasReadOnlyAccess = (access.readOnlyModules ?? []).some((m) => userModules.includes(m))
+    if (hasReadOnlyAccess) {
+      if (operation === "select") return { allowed: true }
+      return {
+        allowed: false,
+        reason: `Su acceso a "${table}" es de solo lectura`,
+      }
+    }
     return { allowed: false, reason: `No tiene acceso a ningún módulo que permita acceder a "${table}"` }
   }
 

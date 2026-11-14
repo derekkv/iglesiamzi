@@ -26,12 +26,8 @@ import {
   upsertMovimientoVinculado,
   logAuditServer,
 } from "@/lib/server/finanzas-sync"
-
-const TIPO_LABEL: Record<string, string> = {
-  diezmo: "Diezmo",
-  primicia: "Primicia",
-  diezmo_especial: "Ofrenda Especial",
-}
+import { detalleIngresoDiezmo, ingresoInputDesdeDiezmo } from "@/lib/server/diezmos-ingreso"
+import { etiquetaTipoOfrenda } from "@/lib/mod/diezmos-tipos"
 
 interface Discrepancia {
   tipo: string
@@ -62,24 +58,20 @@ async function detectar(mesId?: string | null): Promise<Discrepancia[]> {
     const existentes = new Set((ingresos || []).map((i: any) => `${i.mes_id}|${i.detalle}`))
 
     for (const d of diezmos || []) {
-      const tipoLabel = TIPO_LABEL[d.tipo_ofrenda] || "Diezmo"
-      const detalle = `${tipoLabel} - ${d.donador}`
+      // El detalle y el payload los calcula el mismo módulo que usa el alta,
+      // para que no haya forma de que detecte como faltante algo que ya existe.
+      const detalle = detalleIngresoDiezmo(d)
       if (!existentes.has(`${d.mes_id}|${detalle}`)) {
         out.push({
           tipo: "diezmo-sin-ingreso",
           tabla_base: "diezmos",
           id_base: d.id,
           mes_id: d.mes_id,
-          descripcion: `Diezmo #${d.numero} (${d.donador}) transferencia sin ingreso vinculado`,
+          descripcion: `${etiquetaTipoOfrenda(d.tipo_ofrenda)} #${d.numero} (${d.donador}) por transferencia sin ingreso vinculado`,
           monto: Number(d.valor),
           _fix: {
             tabla: "ingresos",
-            input: {
-              mes_id: d.mes_id, concepto: "auto-diezmo", monto: d.valor, fecha: d.fecha,
-              ministerio: "Administración", categoria_principal: "Ingresos x Ofrendas, Diezmo y Primicias",
-              detalle, observacion: `Registrado automáticamente desde módulo Diezmos (#${d.numero})`,
-              estado: "Procesado", metodo_pago: "Transferencia",
-            },
+            input: ingresoInputDesdeDiezmo(d),
           },
         })
       }

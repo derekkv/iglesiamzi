@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/secure-db"
 import { authFetch } from "@/lib/auth-fetch"
 import { type AuditInfo } from "./audit-service"
+import type { TipoOfrenda } from "./diezmos-tipos"
 
 export interface DiezmoRecord {
   id: number
@@ -9,7 +10,8 @@ export interface DiezmoRecord {
   fecha: string
   donador: string
   valor: number
-  tipo_ofrenda: "diezmo" | "primicia" | "diezmo_especial"
+  /** Catálogo en `./diezmos-tipos.ts`. Los registros antiguos pueden ser nulos. */
+  tipo_ofrenda: TipoOfrenda
   transaccion: "efectivo" | "transferencia"
   created_at?: string
   updated_at?: string
